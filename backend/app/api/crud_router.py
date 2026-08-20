@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app import crud
-from app.api.deps import get_current_user, require_csrf
+from app.api.deps import get_current_user, require_cookie_csrf
 from app.database import get_db
 
 
@@ -32,14 +32,14 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
             raise HTTPException(status_code=404, detail="Registro não encontrado")
         return item
 
-    @router.post("", response_model=read_schema, status_code=201, dependencies=[Depends(require_csrf)])
+    @router.post("", response_model=read_schema, status_code=201, dependencies=[Depends(require_cookie_csrf)])
     def create(payload: create_schema, db: Session = Depends(get_db)):
         try:
             return crud.create_item(db, model(**payload.model_dump()))
         except ValueError as exc:
             raise _database_conflict(exc) from exc
 
-    @router.put("/{item_id}", response_model=read_schema, dependencies=[Depends(require_csrf)])
+    @router.put("/{item_id}", response_model=read_schema, dependencies=[Depends(require_cookie_csrf)])
     def update(item_id: int, payload: update_schema, db: Session = Depends(get_db)):
         item = crud.get_item(db, model, item_id)
         if not item:
@@ -49,7 +49,7 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
         except ValueError as exc:
             raise _database_conflict(exc) from exc
 
-    @router.delete("/{item_id}", status_code=204, dependencies=[Depends(require_csrf)])
+    @router.delete("/{item_id}", status_code=204, dependencies=[Depends(require_cookie_csrf)])
     def delete(item_id: int, db: Session = Depends(get_db)):
         item = crud.get_item(db, model, item_id)
         if not item:
