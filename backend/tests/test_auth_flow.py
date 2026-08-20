@@ -1,7 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.database import SessionLocal
 from app.main import app
+from app.models import User
 
 
 @pytest.fixture
@@ -12,6 +14,16 @@ def client():
 def csrf_headers(client):
     token = client.cookies.get("csrf_token")
     return {"X-CSRF-Token": token} if token else {}
+
+
+def promote_to_admin(email: str):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).one()
+        user.is_admin = True
+        db.commit()
+    finally:
+        db.close()
 
 
 def test_auth_flow(client):
@@ -48,7 +60,6 @@ def test_auth_flow(client):
     client.cookies.set("refresh_token", new_refresh, domain="testserver.local", path="/api/v1/auth")
     logout = client.post("/api/v1/auth/logout", headers=csrf_headers(client))
     assert logout.status_code == 204
-
     assert "refresh_token" not in client.cookies
     assert "csrf_token" not in client.cookies
     logged_out_refresh = client.post("/api/v1/auth/refresh")
@@ -65,6 +76,7 @@ def test_non_admin_cannot_access_admin_endpoint(client):
     assert client.post("/api/v1/auth/register", json={"name": "Usuário", "email": email, "password": password}).status_code == 201
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
     assert client.get("/api/v1/admin/check").status_code == 403
+    assert client.get("/api/v1/admin/dashboard").status_code == 403
 
 
 def test_csrf_rejects_wrong_token(client):
@@ -75,30 +87,27 @@ def test_csrf_rejects_wrong_token(client):
     assert client.post("/api/v1/auth/refresh", headers={"X-CSRF-Token": "token-incorreto"}).status_code == 403
 
 
-def test_crud_mutations_require_csrf(client):
+def test_non_admin_cannot_mutate_crud(client):
     email = "teste.crud.csrf@example.com"
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Teste CRUD", "email": email, "password": password}).status_code == 201
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
 
     payload = {"name": "Dormitórios", "description": "Móveis para dormitórios"}
-    assert client.post("/api/v1/categories", json=payload).status_code == 403
+    assert client.post("/api/v1/categories", json=payload, headers=csrf_headers(client)).status_code == 403
 
-    created = client.post("/api/v1/categories", json=payload, headers=csrf_headers(client))
-    assert created.status_code == 201
-    category_id = created.json()["id"]
 
-    listed = client.get("/api/v1/categories?limit=10")
-    assert listed.status_code == 200
-    assert any(item["id"] == category_id for item in listed.json())
+def test_admin_dashboard_and_user_management(client):
+    email = "teste.admin@example.com"
+    password = "Senha-Forte-123!"
+    assert client.post("/api/v1/auth/register", json={"name": "Administrador", "email": email, "password": password}).status_code == 201
+    promote_to_admin(email)
+    assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
 
-    updated = client.put(
-        f"/api/v1/categories/{category_id}",
-        json={"name": "Dormitórios Planejados", "description": "Atualizado"},
-        headers=csrf_headers(client),
-    )
-    assert updated.status_code == 200
-    assert updated.json()["name"] == "Dormitórios Planejados"
+    dashboard = client.get("/api/v1/admin/dashboard")
+    assert dashboard.status_code == 200
+    assert "counts" in dashboard.json()
 
-    deleted = client.delete(f"/api/v1/categories/{category_id}", headers=csrf_headers(client))
-    assert deleted.status_code == 204
+    users = client.get("/api/v1/admin/users")
+    assert users.status_code == 200
+    assert any(user["email"] == email for user in users.json())
