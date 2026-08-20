@@ -4,6 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.api.auth import router as auth_router
 from app.api.routes import api_router
 from app.core.config import settings
 
@@ -29,6 +30,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
+
+# Auth fica registrado uma única vez, com o prefixo completo e explícito.
+# O router já possui prefixo "/auth", portanto o resultado é /api/v1/auth/*.
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(api_router)
 
 
