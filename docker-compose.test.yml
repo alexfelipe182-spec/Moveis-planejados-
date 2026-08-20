@@ -18,8 +18,9 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/marcenaria_db_test
+      SECRET_KEY: ${SECRET_KEY:-docker-test-secret-key-only}
       ENVIRONMENT: test
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "alembic upgrade head && pytest -q"
+    command: sh -c "alembic upgrade head && alembic current && pytest -q"
