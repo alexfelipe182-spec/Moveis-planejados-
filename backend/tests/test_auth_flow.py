@@ -1,5 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
+from starlette.testclient import TestClient
 
 from app.database import SessionLocal
 from app.main import app
@@ -8,7 +8,8 @@ from app.models import User
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def csrf_headers(client):
