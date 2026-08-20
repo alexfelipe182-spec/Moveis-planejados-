@@ -1,4 +1,4 @@
-name: PostgreSQL + Alembic + API
+name: PostgreSQL + Alembic + API + Auth
 
 on:
   push:
@@ -27,6 +27,8 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_db
       PYTHONPATH: backend
+      SECRET_KEY: test-secret-key-for-ci-only
+      ENVIRONMENT: test
 
     steps:
       - name: Checkout
@@ -42,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt pytest httpx
+          pip install -r backend/requirements.txt
 
       - name: Run Alembic migrations
         working-directory: backend
@@ -52,5 +54,6 @@ jobs:
         working-directory: backend
         run: alembic current
 
-      - name: Test API against PostgreSQL
-        run: pytest -q
+      - name: Test API, JWT, refresh rotation and permissions
+        working-directory: backend
+        run: pytest -q tests
