@@ -50,6 +50,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Validate Python source
+        run: python -m compileall -q backend
+
       - name: Run Alembic migrations
         working-directory: backend
         run: alembic upgrade head
@@ -61,3 +64,15 @@ jobs:
       - name: Test API, JWT, refresh rotation, CSRF and permissions
         working-directory: backend
         run: pytest -q tests
+
+      - name: Validate frontend JavaScript
+        run: |
+          node --version
+          node --check frontend/app.js
+
+      - name: Validate frontend files
+        run: |
+          test -s frontend/index.html
+          test -s frontend/styles.css
+          grep -q '<script src="./app.js"></script>' frontend/index.html
+          grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
