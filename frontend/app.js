@@ -1,10 +1,10 @@
 const API = window.API_BASE_URL || 'http://localhost:8000/api/v1';
 const $ = (s) => document.querySelector(s);
-const csrf = () => document.cookie.split('; ').find(x => x.startsWith('csrf_token='))?.split('=')[1] || '';
+const csrf = () => document.cookie.split('; ').find(x => x.trim().startsWith('csrf_token='))?.split('=')[1] || '';
 
 async function api(path, options = {}) {
   const opts = { credentials: 'include', ...options, headers: { ...(options.headers || {}) } };
-  if (opts.body && typeof opts.body !== 'string') {
+  if (opts.body && !(opts.body instanceof URLSearchParams) && typeof opts.body !== 'string') {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
@@ -27,8 +27,8 @@ $('#login-form').addEventListener('submit', async (e) => {
 });
 
 $('#logout').addEventListener('click', async () => { try { await api('/auth/logout',{method:'POST'}); } finally { location.reload(); } });
-
 document.querySelectorAll('.nav').forEach(btn => btn.addEventListener('click', () => showSection(btn.dataset.section)));
+
 function showSection(name) {
   document.querySelectorAll('.section').forEach(x => x.classList.add('hidden'));
   $('#' + name).classList.remove('hidden');
@@ -58,7 +58,8 @@ async function loadResource(resource, columns) {
   } catch (err) { section.innerHTML = `<div class="panel"><h2>${resource}</h2><p>${err.message}</p></div>`; }
 }
 
-async function deleteItem(resource,id){ if(!confirm('Excluir este registro?')) return; try{await api(`/${resource}/${id}`,{method:'DELETE'});loadResource(resource,resource==='products'?['id','name','category_id','price','is_active']:resource==='categories'?['id','name','description']:resource==='customers'?['id','name','email','phone']:['id','customer_id','status','total']);}catch(e){alert(e.message)} }
+const columnsFor = r => r==='products'?['id','name','category_id','price','is_active']:r==='categories'?['id','name','description']:r==='customers'?['id','name','email','phone']:['id','customer_id','status','total'];
+async function deleteItem(resource,id){ if(!confirm('Excluir este registro?')) return; try{await api(`/${resource}/${id}`,{method:'DELETE'});loadResource(resource,columnsFor(resource));}catch(e){alert(e.message)} }
 
 async function createItem(resource){
   const name = prompt('Nome:'); if(!name) return;
@@ -66,7 +67,7 @@ async function createItem(resource){
   if(resource==='categories') payload={name,description:prompt('Descrição:')||null};
   else if(resource==='products') payload={category_id:Number(prompt('ID da categoria:')),name,description:prompt('Descrição:')||null,price:Number(prompt('Preço:')||0),image_url:null,is_active:true};
   else { alert('Cadastro rápido disponível nesta etapa apenas para categorias e produtos.'); return; }
-  try{await api('/'+resource,{method:'POST',body:payload});loadResource(resource,resource==='products'?['id','name','category_id','price','is_active']:['id','name','description']);}catch(e){alert(e.message)}
+  try{await api('/'+resource,{method:'POST',body:payload});loadResource(resource,columnsFor(resource));}catch(e){alert(e.message)}
 }
 
 async function editItem(resource,id){
