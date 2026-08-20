@@ -10,9 +10,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: Backend + Frontend validation
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16
@@ -45,34 +51,43 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          python -m pip install -r backend/requirements.txt
 
-      - name: Validate Python source
+      - name: Validate Python bytecode
         run: python -m compileall -q backend
+
+      - name: Validate installed dependencies
+        run: python -m pip check
 
       - name: Run Alembic migrations
         working-directory: backend
         run: alembic upgrade head
 
-      - name: Validate migration state
+      - name: Validate Alembic state
         working-directory: backend
-        run: alembic current
+        run: |
+          alembic current
+          test "$(alembic heads | grep -c '(head)')" -eq 1
 
-      - name: Test API, JWT, refresh rotation, CSRF and permissions
+      - name: Run backend tests
         working-directory: backend
         run: pytest -q tests
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
       - name: Validate frontend JavaScript
-        run: |
-          node --version
-          node --check frontend/app.js
+        run: node --check frontend/app.js
 
       - name: Validate frontend files
         run: |
           test -s frontend/index.html
           test -s frontend/styles.css
+          test -s frontend/app.js
           grep -q '<script src="./app.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
