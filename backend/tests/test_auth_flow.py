@@ -10,7 +10,8 @@ def client():
 
 
 def csrf_headers(client):
-    return {"X-CSRF-Token": client.cookies.get("csrf_token")}
+    token = client.cookies.get("csrf_token")
+    return {"X-CSRF-Token": token} if token else {}
 
 
 def test_auth_flow(client):
@@ -48,8 +49,11 @@ def test_auth_flow(client):
     logout = client.post("/api/v1/auth/logout", headers=csrf_headers(client))
     assert logout.status_code == 204
 
-    logged_out_refresh = client.post("/api/v1/auth/refresh", headers=csrf_headers(client))
-    assert logged_out_refresh.status_code in (401, 403)
+    # Logout removes the refresh/CSRF cookies, so a subsequent refresh is rejected by CSRF first.
+    assert "refresh_token" not in client.cookies
+    assert "csrf_token" not in client.cookies
+    logged_out_refresh = client.post("/api/v1/auth/refresh")
+    assert logged_out_refresh.status_code == 403
 
 
 def test_protected_endpoint_requires_auth(client):
