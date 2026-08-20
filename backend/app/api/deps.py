@@ -38,12 +38,27 @@ def get_current_user(
     return user
 
 
+def _validate_csrf(csrf_cookie: str | None, csrf_header: str | None) -> None:
+    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token inválido")
+
+
 def require_csrf(
     csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
     csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
 ) -> None:
-    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token inválido")
+    _validate_csrf(csrf_cookie, csrf_header)
+
+
+def require_cookie_csrf(
+    access_token: str | None = Cookie(default=None),
+    csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
+    csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
+) -> None:
+    # CSRF é necessário quando a autenticação está sendo feita por cookie.
+    # Clientes que usam Authorization: Bearer não precisam enviar o token CSRF.
+    if access_token:
+        _validate_csrf(csrf_cookie, csrf_header)
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
