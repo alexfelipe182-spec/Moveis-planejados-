@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.deps import CSRF_COOKIE, require_csrf
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 from app.database import get_db
@@ -14,27 +15,30 @@ from app.schemas.user import UserCreate, UserRead
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-CSRF_COOKIE = "csrf_token"
-
 
 def _cookies(response: Response, access: str, refresh: str) -> None:
     secure = settings.environment == "production"
     csrf = secrets.token_urlsafe(32)
-    response.set_cookie("access_token", access, httponly=True, secure=secure, samesite="lax", max_age=settings.access_token_expire_minutes * 60, path="/")
-    response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite="lax", max_age=settings.refresh_token_expire_days * 86400, path="/api/v1/auth")
-    response.set_cookie(CSRF_COOKIE, csrf, httponly=False, secure=secure, samesite="lax", max_age=settings.refresh_token_expire_days * 86400, path="/")
-
-
-def _check_csrf(csrf_cookie: str | None, csrf_header: str | None) -> None:
-    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
-        raise HTTPException(status_code=403, detail="CSRF token inválido")
+    response.set_cookie(
+        "access_token", access, httponly=True, secure=secure, samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60, path="/"
+    )
+    response.set_cookie(
+        "refresh_token", refresh, httponly=True, secure=secure, samesite="lax",
+        max_age=settings.refresh_token_expire_days * 86400, path="/api/v1/auth"
+    )
+    response.set_cookie(
+        CSRF_COOKIE, csrf, httponly=False, secure=secure, samesite="lax",
+        max_age=settings.refresh_token_expire_days * 86400, path="/"
+    )
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
-    if db.scalar(select(User).where(User.email == payload.email)):
-        raise HTTPException(409, "E-mail já cadastrado")
-    user = User(name=payload.name, email=payload.email, password_hash=hash_password(payload.password), is_admin=False)
+    email = str(payload.email).lower()
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+    user = User(name=payload.name.strip(), email=email, password_hash=hash_password(payload.password), is_admin=False)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -43,7 +47,8 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == form_data.username))
+    email = form_data.username.strip().lower()
+    user = db.scalar(select(User).where(User.email == email))
     if not user or not user.is_active or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos")
     access = create_access_token(str(user.id))
@@ -55,22 +60,30 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
 
 
 @router.post("/refresh")
-def refresh(response: Response, refresh_token: str | None = Cookie(default=None), csrf_token: str | None = Cookie(default=None), x_csrf_token: str | None = Header(default=None), db: Session = Depends(get_db)):
-    _check_csrf(csrf_token, x_csrf_token)
+def refresh(
+    response: Response,
+    _: None = Depends(require_csrf),
+    refresh_token: str | None = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
     if not refresh_token:
-        raise HTTPException(401, "Refresh token ausente")
+        raise HTTPException(status_code=401, detail="Refresh token ausente")
     try:
         payload = decode_token(refresh_token)
     except ValueError:
-        raise HTTPException(401, "Refresh token inválido ou expirado")
+        raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado")
     if payload.get("type") != "refresh" or not payload.get("sub") or not payload.get("jti"):
-        raise HTTPException(401, "Refresh token inválido")
+        raise HTTPException(status_code=401, detail="Refresh token inválido")
     stored = db.scalar(select(RefreshToken).where(RefreshToken.token_jti == payload["jti"]))
     if not stored or stored.revoked or stored.expires_at <= datetime.now(timezone.utc).replace(tzinfo=None):
-        raise HTTPException(401, "Refresh token revogado ou expirado")
-    user = db.get(User, int(payload["sub"]))
+        raise HTTPException(status_code=401, detail="Refresh token revogado ou expirado")
+    try:
+        user_id = int(payload["sub"])
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Usuário inválido")
+    user = db.get(User, user_id)
     if not user or not user.is_active:
-        raise HTTPException(401, "Usuário inválido")
+        raise HTTPException(status_code=401, detail="Usuário inválido")
     stored.revoked = True
     access = create_access_token(str(user.id))
     new_refresh, jti, expires = create_refresh_token(str(user.id))
@@ -81,8 +94,12 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
 
 
 @router.post("/logout", status_code=204)
-def logout(response: Response, db: Session = Depends(get_db), refresh_token: str | None = Cookie(default=None), csrf_token: str | None = Cookie(default=None), x_csrf_token: str | None = Header(default=None)):
-    _check_csrf(csrf_token, x_csrf_token)
+def logout(
+    response: Response,
+    _: None = Depends(require_csrf),
+    db: Session = Depends(get_db),
+    refresh_token: str | None = Cookie(default=None),
+):
     if refresh_token:
         try:
             payload = decode_token(refresh_token)
