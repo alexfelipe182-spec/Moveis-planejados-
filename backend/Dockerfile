@@ -7,10 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
+RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt \
     && useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
 
 COPY --chown=appuser:appuser . .
+RUN chown appuser:appuser /app
 
 USER appuser
 
