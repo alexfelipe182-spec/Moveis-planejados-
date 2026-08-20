@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
+import secrets
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,11 +14,20 @@ from app.schemas.user import UserCreate, UserRead
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+CSRF_COOKIE = "csrf_token"
+
 
 def _cookies(response: Response, access: str, refresh: str) -> None:
     secure = settings.environment == "production"
+    csrf = secrets.token_urlsafe(32)
     response.set_cookie("access_token", access, httponly=True, secure=secure, samesite="lax", max_age=settings.access_token_expire_minutes * 60, path="/")
     response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite="lax", max_age=settings.refresh_token_expire_days * 86400, path="/api/v1/auth")
+    response.set_cookie(CSRF_COOKIE, csrf, httponly=False, secure=secure, samesite="lax", max_age=settings.refresh_token_expire_days * 86400, path="/")
+
+
+def _check_csrf(csrf_cookie: str | None, csrf_header: str | None) -> None:
+    if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
+        raise HTTPException(status_code=403, detail="CSRF token inválido")
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -45,7 +55,8 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
 
 
 @router.post("/refresh")
-def refresh(response: Response, refresh_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
+def refresh(response: Response, refresh_token: str | None = Cookie(default=None), csrf_token: str | None = Cookie(default=None), x_csrf_token: str | None = Header(default=None), db: Session = Depends(get_db)):
+    _check_csrf(csrf_token, x_csrf_token)
     if not refresh_token:
         raise HTTPException(401, "Refresh token ausente")
     try:
@@ -70,7 +81,8 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None)
 
 
 @router.post("/logout", status_code=204)
-def logout(response: Response, db: Session = Depends(get_db), refresh_token: str | None = Cookie(default=None)):
+def logout(response: Response, db: Session = Depends(get_db), refresh_token: str | None = Cookie(default=None), csrf_token: str | None = Cookie(default=None), x_csrf_token: str | None = Header(default=None)):
+    _check_csrf(csrf_token, x_csrf_token)
     if refresh_token:
         try:
             payload = decode_token(refresh_token)
@@ -82,3 +94,4 @@ def logout(response: Response, db: Session = Depends(get_db), refresh_token: str
             pass
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/api/v1/auth")
+    response.delete_cookie(CSRF_COOKIE, path="/")
