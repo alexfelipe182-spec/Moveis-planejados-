@@ -17,17 +17,21 @@ def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
 
+def _create_token(subject: str, token_type: str, expires_delta: timedelta) -> tuple[str, str, datetime]:
+    now = datetime.now(timezone.utc)
+    expires = now + expires_delta
+    jti = str(uuid4())
+    payload = {"sub": subject, "type": token_type, "jti": jti, "iat": now, "exp": expires}
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm), jti, expires
+
+
 def create_access_token(subject: str) -> str:
-    expires = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": subject, "type": "access", "exp": expires, "jti": str(uuid4())}
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+    token, _, _ = _create_token(subject, "access", timedelta(minutes=settings.access_token_expire_minutes))
+    return token
 
 
 def create_refresh_token(subject: str) -> tuple[str, str, datetime]:
-    jti = str(uuid4())
-    expires = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
-    payload = {"sub": subject, "type": "refresh", "exp": expires, "jti": jti}
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm), jti, expires
+    return _create_token(subject, "refresh", timedelta(days=settings.refresh_token_expire_days))
 
 
 def decode_token(token: str) -> dict:
