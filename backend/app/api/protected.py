@@ -4,7 +4,7 @@ from app.api.deps import get_current_user, require_admin
 from app.models import User
 from app.schemas.user import UserRead
 
-router = APIRouter(prefix="/api/v1", tags=["Security"])
+router = APIRouter(tags=["Security"])
 
 
 @router.get("/me", response_model=UserRead)
