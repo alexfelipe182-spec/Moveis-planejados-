@@ -3,39 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Marcenaria • Painel</title>
+  <meta name="description" content="Painel administrativo da marcenaria">
+  <title>Marcenaria • Administração</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div id="login" class="screen">
     <form id="login-form" class="card login-card">
+      <div class="brand-mark">M</div>
       <h1>Marcenaria</h1>
       <p>Painel administrativo</p>
-      <input id="email" type="email" placeholder="E-mail" autocomplete="username" required>
-      <input id="password" type="password" placeholder="Senha" autocomplete="current-password" required>
-      <button>Entrar</button>
-      <small id="login-error" class="error"></small>
+      <label>E-mail<input id="email" type="email" placeholder="seu@email.com" autocomplete="username" required></label>
+      <label>Senha<input id="password" type="password" placeholder="••••••••" autocomplete="current-password" required></label>
+      <button class="primary wide" type="submit">Entrar</button>
+      <small id="login-error" class="error" role="alert"></small>
     </form>
   </div>
 
   <div id="app" class="hidden">
-    <aside>
-      <h2>Marcenaria</h2>
-      <button class="nav active" data-section="dashboard">Dashboard</button>
-      <button class="nav" data-section="products">Produtos</button>
-      <button class="nav" data-section="categories">Categorias</button>
-      <button class="nav" data-section="customers">Clientes</button>
-      <button class="nav" data-section="quotes">Orçamentos</button>
-      <button id="logout" class="logout">Sair</button>
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark small">M</div><div><strong>Marcenaria</strong><small>Administração</small></div></div>
+      <nav>
+        <button class="nav active" data-section="dashboard"><span>⌂</span>Dashboard</button>
+        <button class="nav" data-section="products"><span>▦</span>Produtos</button>
+        <button class="nav" data-section="categories"><span>◈</span>Categorias</button>
+        <button class="nav" data-section="customers"><span>♙</span>Clientes</button>
+        <button class="nav" data-section="quotes"><span>▤</span>Orçamentos</button>
+      </nav>
+      <button id="logout" class="logout"><span>↪</span>Sair</button>
     </aside>
+
     <main>
-      <header><div><span>Painel</span><h1 id="title">Dashboard</h1></div><span id="user-badge"></span></header>
+      <header class="topbar">
+        <div><span class="eyebrow">Administração</span><h1 id="title">Dashboard</h1></div>
+        <div class="user-pill"><span class="status-dot"></span><span id="user-badge">Administrador</span></div>
+      </header>
+      <div id="toast" class="toast" role="status"></div>
       <section id="dashboard" class="section"></section>
       <section id="products" class="section hidden"></section>
       <section id="categories" class="section hidden"></section>
       <section id="customers" class="section hidden"></section>
       <section id="quotes" class="section hidden"></section>
     </main>
+  </div>
+
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">Cadastro</span><h2 id="modal-title">Novo registro</h2></div><button id="modal-close" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
+      <form id="item-form"></form>
+    </div>
   </div>
   <script src="./app.js"></script>
 </body>
