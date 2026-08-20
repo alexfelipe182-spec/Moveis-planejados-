@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -7,6 +8,7 @@ from starlette.responses import Response
 from app.api.auth import router as auth_router
 from app.api.routes import api_router
 from app.core.config import settings
+from app.database import engine
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -31,8 +33,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 
-# Auth fica registrado uma única vez, com o prefixo completo e explícito.
-# O router já possui prefixo "/auth", portanto o resultado é /api/v1/auth/*.
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(api_router)
 
@@ -40,6 +40,14 @@ app.include_router(api_router)
 @app.get("/health", tags=["system"])
 def health_check():
     return {"status": "ok", "service": settings.app_name}
+
+
+@app.get("/ready", tags=["system"])
+def readiness_check():
+    """Confirma que a aplicação e o banco estão prontos para receber tráfego."""
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return {"status": "ready", "service": settings.app_name}
 
 
 @app.get("/", tags=["system"])
