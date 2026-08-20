@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Marcenaria • Painel</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="login" class="screen">
+    <form id="login-form" class="card login-card">
+      <h1>Marcenaria</h1>
+      <p>Painel administrativo</p>
+      <input id="email" type="email" placeholder="E-mail" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Senha" autocomplete="current-password" required>
+      <button>Entrar</button>
+      <small id="login-error" class="error"></small>
+    </form>
+  </div>
+
+  <div id="app" class="hidden">
+    <aside>
+      <h2>Marcenaria</h2>
+      <button class="nav active" data-section="dashboard">Dashboard</button>
+      <button class="nav" data-section="products">Produtos</button>
+      <button class="nav" data-section="categories">Categorias</button>
+      <button class="nav" data-section="customers">Clientes</button>
+      <button class="nav" data-section="quotes">Orçamentos</button>
+      <button id="logout" class="logout">Sair</button>
+    </aside>
+    <main>
+      <header><div><span>Painel</span><h1 id="title">Dashboard</h1></div><span id="user-badge"></span></header>
+      <section id="dashboard" class="section"></section>
+      <section id="products" class="section hidden"></section>
+      <section id="categories" class="section hidden"></section>
+      <section id="customers" class="section hidden"></section>
+      <section id="quotes" class="section hidden"></section>
+    </main>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
