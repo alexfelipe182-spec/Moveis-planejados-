@@ -1,17 +1,24 @@
 name: Docker PostgreSQL + Alembic + API
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   docker-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Validate Docker Compose file
+        run: docker compose -f docker-compose.test.yml config -q
 
       - name: Build and test stack
         run: docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from app
