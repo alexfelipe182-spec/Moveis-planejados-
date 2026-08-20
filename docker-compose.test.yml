@@ -24,4 +24,4 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "alembic upgrade head && alembic current && pytest -q"
+    command: sh -c "alembic upgrade head && alembic current && pytest -q -p no:cacheprovider"
