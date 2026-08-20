@@ -1,6 +1,7 @@
 name: PostgreSQL + Alembic + API + Auth
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
