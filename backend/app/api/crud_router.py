@@ -6,6 +6,10 @@ from app.api.deps import get_current_user, require_csrf
 from app.database import get_db
 
 
+def _database_conflict(exc: ValueError) -> HTTPException:
+    return HTTPException(status_code=409, detail=str(exc))
+
+
 def make_router(model, create_schema, read_schema, update_schema, prefix: str):
     router = APIRouter(
         prefix=prefix,
@@ -30,20 +34,29 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
 
     @router.post("", response_model=read_schema, status_code=201, dependencies=[Depends(require_csrf)])
     def create(payload: create_schema, db: Session = Depends(get_db)):
-        return crud.create_item(db, model(**payload.model_dump()))
+        try:
+            return crud.create_item(db, model(**payload.model_dump()))
+        except ValueError as exc:
+            raise _database_conflict(exc) from exc
 
     @router.put("/{item_id}", response_model=read_schema, dependencies=[Depends(require_csrf)])
     def update(item_id: int, payload: update_schema, db: Session = Depends(get_db)):
         item = crud.get_item(db, model, item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Registro não encontrado")
-        return crud.update_item(db, item, payload.model_dump(exclude_unset=True))
+        try:
+            return crud.update_item(db, item, payload.model_dump(exclude_unset=True))
+        except ValueError as exc:
+            raise _database_conflict(exc) from exc
 
     @router.delete("/{item_id}", status_code=204, dependencies=[Depends(require_csrf)])
     def delete(item_id: int, db: Session = Depends(get_db)):
         item = crud.get_item(db, model, item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Registro não encontrado")
-        crud.delete_item(db, item)
+        try:
+            crud.delete_item(db, item)
+        except ValueError as exc:
+            raise _database_conflict(exc) from exc
 
     return router
