@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def _cookies(response: Response, access: str, refresh: str) -> None:
     secure = settings.environment == "production"
     response.set_cookie("access_token", access, httponly=True, secure=secure, samesite="lax", max_age=settings.access_token_expire_minutes * 60, path="/")
-    response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite="lax", max_age=settings.refresh_token_expire_days * 86400, path="/auth")
+    response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite="lax", max_age=settings.refresh_token_expire_days * 86400, path="/api/v1/auth")
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -45,7 +45,7 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
 
 
 @router.post("/refresh")
-def refresh(response: Response, refresh_token: str | None = None, db: Session = Depends(get_db)):
+def refresh(response: Response, refresh_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
     if not refresh_token:
         raise HTTPException(401, "Refresh token ausente")
     try:
@@ -70,7 +70,7 @@ def refresh(response: Response, refresh_token: str | None = None, db: Session = 
 
 
 @router.post("/logout", status_code=204)
-def logout(response: Response, db: Session = Depends(get_db), refresh_token: str | None = None):
+def logout(response: Response, db: Session = Depends(get_db), refresh_token: str | None = Cookie(default=None)):
     if refresh_token:
         try:
             payload = decode_token(refresh_token)
@@ -81,4 +81,4 @@ def logout(response: Response, db: Session = Depends(get_db), refresh_token: str
         except ValueError:
             pass
     response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/auth")
+    response.delete_cookie("refresh_token", path="/api/v1/auth")
