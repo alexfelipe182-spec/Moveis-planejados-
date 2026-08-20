@@ -49,7 +49,6 @@ def test_auth_flow(client):
     logout = client.post("/api/v1/auth/logout", headers=csrf_headers(client))
     assert logout.status_code == 204
 
-    # Logout removes the refresh/CSRF cookies, so a subsequent refresh is rejected by CSRF first.
     assert "refresh_token" not in client.cookies
     assert "csrf_token" not in client.cookies
     logged_out_refresh = client.post("/api/v1/auth/refresh")
@@ -74,3 +73,32 @@ def test_csrf_rejects_wrong_token(client):
     assert client.post("/api/v1/auth/register", json={"name": "Teste CSRF", "email": email, "password": password}).status_code == 201
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
     assert client.post("/api/v1/auth/refresh", headers={"X-CSRF-Token": "token-incorreto"}).status_code == 403
+
+
+def test_crud_mutations_require_csrf(client):
+    email = "teste.crud.csrf@example.com"
+    password = "Senha-Forte-123!"
+    assert client.post("/api/v1/auth/register", json={"name": "Teste CRUD", "email": email, "password": password}).status_code == 201
+    assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
+
+    payload = {"name": "Dormitórios", "description": "Móveis para dormitórios"}
+    assert client.post("/api/v1/categories", json=payload).status_code == 403
+
+    created = client.post("/api/v1/categories", json=payload, headers=csrf_headers(client))
+    assert created.status_code == 201
+    category_id = created.json()["id"]
+
+    listed = client.get("/api/v1/categories?limit=10")
+    assert listed.status_code == 200
+    assert any(item["id"] == category_id for item in listed.json())
+
+    updated = client.put(
+        f"/api/v1/categories/{category_id}",
+        json={"name": "Dormitórios Planejados", "description": "Atualizado"},
+        headers=csrf_headers(client),
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Dormitórios Planejados"
+
+    deleted = client.delete(f"/api/v1/categories/{category_id}", headers=csrf_headers(client))
+    assert deleted.status_code == 204
