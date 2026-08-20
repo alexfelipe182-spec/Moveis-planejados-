@@ -17,8 +17,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Validate Docker Compose file
+      - name: Validate test Compose file
         run: docker compose -f docker-compose.test.yml config -q
+
+      - name: Validate production Compose file
+        run: docker compose --env-file .env.production.example -f docker-compose.prod.yml config -q
 
       - name: Build and test stack
         env:
@@ -26,6 +29,11 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from app
           docker compose -f docker-compose.test.yml ps
+
+      - name: Verify production image runs as non-root
+        run: |
+          docker build -q -t moveis-planejados-api:ci ./backend
+          test "$(docker image inspect moveis-planejados-api:ci --format '{{.Config.User}}')" = "appuser"
 
       - name: Show service logs on failure
         if: failure()
