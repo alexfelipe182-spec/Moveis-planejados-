@@ -20,19 +20,18 @@ def _log(db: Session, user: User, action: str, model, item_id: int | None, descr
     db.commit()
 
 
+def _payload_data(payload) -> dict:
+    data = payload.model_dump()
+    if "photos" in data and data["photos"] is not None:
+        data["photos"] = [str(photo) for photo in data["photos"]]
+    return data
+
+
 def make_router(model, create_schema, read_schema, update_schema, prefix: str):
-    router = APIRouter(
-        prefix=prefix,
-        tags=[prefix.strip("/").capitalize()],
-        dependencies=[Depends(get_current_user)],
-    )
+    router = APIRouter(prefix=prefix, tags=[prefix.strip("/").capitalize()], dependencies=[Depends(get_current_user)])
 
     @router.get("", response_model=list[read_schema])
-    def list_all(
-        offset: int = Query(0, ge=0),
-        limit: int = Query(100, ge=1, le=100),
-        db: Session = Depends(get_db),
-    ):
+    def list_all(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=100), db: Session = Depends(get_db)):
         return crud.list_items(db, model, offset=offset, limit=limit)
 
     @router.get("/{item_id}", response_model=read_schema)
@@ -45,7 +44,7 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
     @router.post("", response_model=read_schema, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
     def create(payload: create_schema, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
         try:
-            item = crud.create_item(db, model(**payload.model_dump()))
+            item = crud.create_item(db, model(**_payload_data(payload)))
             _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
             return item
         except ValueError as exc:
@@ -57,7 +56,7 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
         if not item:
             raise HTTPException(status_code=404, detail="Registro não encontrado")
         try:
-            item = crud.update_item(db, item, payload.model_dump(exclude_unset=True))
+            item = crud.update_item(db, item, _payload_data(payload))
             _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
             return item
         except ValueError as exc:
