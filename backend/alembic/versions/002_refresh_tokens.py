@@ -3,8 +3,9 @@
 Revision ID: 002_refresh_tokens
 Revises: 001_initial
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "002_refresh_tokens"
 down_revision = "001_initial"
