@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import Date, DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,7 +20,7 @@ class Project(Base):
     measurements: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     materials: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="planning", index=True)
-    project_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    project_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     photos: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, onupdate=utc_now_naive, nullable=False)
