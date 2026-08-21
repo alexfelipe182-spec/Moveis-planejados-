@@ -58,7 +58,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
-          python -m pip install pytest-cov pip-audit
+          python -m pip install pytest-cov pip-audit ruff
 
       - name: Check Python lint
         working-directory: backend
@@ -79,16 +79,54 @@ jobs:
         working-directory: backend
         run: python -c "from sqlalchemy import create_engine, text; import os; e=create_engine(os.environ['DATABASE_URL']); c=e.connect(); assert c.execute(text('select 1')).scalar()==1; c.close(); e.dispose()"
 
+      - name: Verify Alembic has exactly one migration head
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+
+          config = Config("alembic.ini")
+          script = ScriptDirectory.from_config(config)
+          heads = script.get_heads()
+          print(f"Alembic heads: {heads}")
+          if len(heads) != 1:
+              raise SystemExit(f"Expected exactly one Alembic head, found {len(heads)}: {heads}")
+          PY
+
       - name: Run Alembic migrations
         working-directory: backend
         run: alembic upgrade head
 
-      - name: Validate Alembic state
+      - name: Validate Alembic state and schema
         working-directory: backend
         run: |
           alembic current
-          test "$(alembic heads | grep -c '(head)')" -eq 1
+          alembic heads
           alembic check
+
+      - name: Verify database revision matches migration head
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+          from alembic.runtime.migration import MigrationContext
+          from sqlalchemy import create_engine
+          import os
+
+          config = Config("alembic.ini")
+          script = ScriptDirectory.from_config(config)
+          expected = script.get_heads()
+          engine = create_engine(os.environ["DATABASE_URL"])
+          with engine.connect() as connection:
+              current = MigrationContext.configure(connection).get_current_heads()
+          print(f"Expected migration head: {expected}")
+          print(f"Database migration heads: {current}")
+          if tuple(current) != tuple(expected):
+              raise SystemExit("Database revision does not match the Alembic head")
+          engine.dispose()
+          PY
 
       - name: Run backend tests with coverage
         working-directory: backend
