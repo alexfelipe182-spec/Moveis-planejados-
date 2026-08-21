@@ -5,10 +5,18 @@ from app.api.crud_router import make_router
 from app.api.protected import router as protected_router
 from app.models import Category, Customer, Product, Quote
 from app.schemas import (
-    CategoryCreate, CategoryRead, CategoryUpdate,
-    CustomerCreate, CustomerRead, CustomerUpdate,
-    ProductCreate, ProductRead, ProductUpdate,
-    QuoteCreate, QuoteRead, QuoteUpdate,
+    CategoryCreate,
+    CategoryRead,
+    CategoryUpdate,
+    CustomerCreate,
+    CustomerRead,
+    CustomerUpdate,
+    ProductCreate,
+    ProductRead,
+    ProductUpdate,
+    QuoteCreate,
+    QuoteRead,
+    QuoteUpdate,
 )
 
 api_router = APIRouter(prefix="/api/v1")
