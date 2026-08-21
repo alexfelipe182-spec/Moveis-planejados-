@@ -1,0 +1,44 @@
+/* Camada visual profissional — Marcenaria Ideal */
+:root{--focus:rgba(182,132,79,.28)}
+*:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+html{scroll-padding-top:90px}
+body{overflow-x:hidden}
+.site-nav a,.btn,.nav,.icon-button,.small-btn,.stat{position:relative}
+.btn:active,.small-btn:active,.nav:active,.icon-button:active{transform:translateY(0) scale(.98)}
+.btn.primary{box-shadow:0 8px 20px rgba(29,42,32,.16)}
+.btn.primary:hover{box-shadow:0 12px 26px rgba(29,42,32,.22)}
+.service-card,.project-card,.stat,.panel,.contact-card,.auth-card,.modal-card{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.service-card:hover,.project-card:hover{box-shadow:0 18px 42px rgba(39,31,20,.14)}
+.panel-title h3{margin:6px 0 0}
+.table tbody tr{transition:background .15s ease}
+.badge{white-space:nowrap}
+.toast{max-width:min(420px,calc(100vw - 32px));line-height:1.35}
+/* Tablet */
+@media (max-width:1050px){
+ .site-header{padding-inline:24px}.site-nav{gap:14px}
+ .hero{grid-template-columns:1fr;padding:58px 24px}.hero-card{min-height:360px}
+ .section{padding:72px 24px}.service-grid{grid-template-columns:repeat(2,1fr)}
+ .project-grid{grid-template-columns:1fr 1fr}.project-one{grid-row:span 2}
+ .cta-section{margin-inline:24px;padding:42px}
+ .contact-card{grid-template-columns:1fr;padding:35px}
+ .sidebar{width:220px}.admin-main{margin-left:220px}.stats{grid-template-columns:repeat(3,1fr)}
+ .toolbar{align-items:flex-start;flex-direction:column}.toolbar-actions{width:100%;flex-wrap:wrap}.toolbar-actions input{flex:1}
+}
+/* Celular */
+@media (max-width:760px){
+ .site-header{height:auto;min-height:72px;flex-wrap:wrap;padding:14px 18px;gap:12px}
+ .site-nav{order:3;width:100%;overflow-x:auto;padding-bottom:2px;gap:18px;scrollbar-width:none}.site-nav::-webkit-scrollbar{display:none}
+ .header-actions{margin-left:auto}.header-actions .mini{display:none}
+ .hero{min-height:auto;padding:52px 18px 65px}.hero-copy h1{font-size:clamp(2.5rem,14vw,4.2rem)}.hero-card{min-height:300px;border-radius:22px}.hero-card-content{padding:26px}
+ .section{padding:65px 18px}.section-heading{display:block;margin-bottom:30px}.section-heading>p{margin-top:12px}.service-grid,.project-grid{grid-template-columns:1fr}.project-one{grid-row:auto}.project-card{min-height:330px}
+ .cta-section{margin:0 18px;padding:32px 24px;display:block;border-radius:22px}.cta-section .btn{margin-top:10px}
+ .contact-card{padding:28px 22px;border-radius:22px}.contact-list{margin-top:20px}
+ footer{padding:28px 18px;display:grid;text-align:center;justify-items:center}
+ .sidebar{position:fixed;width:100%;height:auto;bottom:auto;padding:10px 12px;flex-direction:row;align-items:center;overflow:hidden}.side-brand{padding:5px 7px;flex:0 0 auto}.side-brand small{display:none}.sidebar nav{display:flex;overflow-x:auto;gap:3px;flex:1;scrollbar-width:none}.sidebar nav::-webkit-scrollbar{display:none}.nav{padding:9px 10px;white-space:nowrap}.nav span{font-size:.8rem}.side-bottom{margin:0;display:block}.side-bottom>a{display:none}.logout{padding:9px 10px;white-space:nowrap}.admin-main{margin-left:0;padding-top:64px}.topbar{height:auto;min-height:74px;padding:14px 18px}.topbar h1{font-size:1.45rem}.top-actions{gap:7px}.user-pill{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.admin-section{padding:18px}
+ .welcome{display:block;padding:24px}.welcome h2{font-size:1.8rem}.welcome .btn{margin-top:8px}.stats{grid-template-columns:1fr 1fr}.stat{padding:16px}.stat strong{font-size:1.55rem}
+ .toolbar-actions{display:grid;grid-template-columns:1fr 1fr}.toolbar-actions input{min-width:0;grid-column:1/-1}.toolbar-actions .btn{width:100%}.filter{min-width:0;width:100%}
+ .panel{padding:18px}.table{font-size:.86rem}.table th,.table td{padding:11px 8px}.modal{padding:12px}.modal-card{padding:20px}.form-grid{grid-template-columns:1fr}.form-grid label:nth-child(3),.form-grid label:nth-child(4){grid-column:auto}.modal-actions{flex-direction:column-reverse}.modal-actions .btn{width:100%}
+ .auth-card{padding:28px 22px}.auth-links{flex-direction:column;align-items:flex-start}
+}
+@media (max-width:420px){.stats{grid-template-columns:1fr}.topbar h1{font-size:1.25rem}.user-pill{max-width:105px}.side-brand strong{font-size:.85rem}.nav span{display:none}.nav{padding:9px}.admin-section{padding:14px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
