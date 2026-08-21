@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
 import secrets
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CSRF_COOKIE, require_csrf
 from app.core.config import settings
-from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 from app.database import get_db
 from app.models import RefreshToken, User
 from app.schemas.user import UserCreate, UserRead
