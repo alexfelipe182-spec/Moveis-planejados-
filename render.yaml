@@ -24,7 +24,7 @@ services:
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "7"
       - key: CORS_ORIGINS
-        value: https://moveis-planejados-api.onrender.com
+        value: '["https://moveis-planejados-api.onrender.com"]'
 
 databases:
   - name: moveis-planejados-db
