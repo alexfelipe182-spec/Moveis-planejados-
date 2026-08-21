@@ -25,16 +25,19 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def _cookies(response: Response, access: str, refresh: str) -> None:
     secure = settings.environment == "production"
     csrf = secrets.token_urlsafe(32)
+    # Frontend e API são serviços separados no Render. Em produção, os
+    # cookies precisam de SameSite=None para serem enviados em fetch cross-site.
+    samesite = "none" if secure else "lax"
     response.set_cookie(
-        "access_token", access, httponly=True, secure=secure, samesite="lax",
+        "access_token", access, httponly=True, secure=secure, samesite=samesite,
         max_age=settings.access_token_expire_minutes * 60, path="/"
     )
     response.set_cookie(
-        "refresh_token", refresh, httponly=True, secure=secure, samesite="lax",
+        "refresh_token", refresh, httponly=True, secure=secure, samesite=samesite,
         max_age=settings.refresh_token_expire_days * 86400, path="/api/v1/auth"
     )
     response.set_cookie(
-        CSRF_COOKIE, csrf, httponly=False, secure=secure, samesite="lax",
+        CSRF_COOKIE, csrf, httponly=False, secure=secure, samesite=samesite,
         max_age=settings.refresh_token_expire_days * 86400, path="/"
     )
 
