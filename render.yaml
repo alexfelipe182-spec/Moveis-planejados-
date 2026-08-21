@@ -24,7 +24,14 @@ services:
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "7"
       - key: CORS_ORIGINS
-        value: '["https://moveis-planejados-api.onrender.com"]'
+        value: '["https://ideal-marcenaria.onrender.com"]'
+
+  - type: web
+    name: ideal-marcenaria
+    runtime: static
+    staticPublishPath: ./frontend
+    plan: free
+    autoDeploy: true
 
 databases:
   - name: moveis-planejados-db
