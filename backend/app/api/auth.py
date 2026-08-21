@@ -77,7 +77,7 @@ def refresh(
     try:
         payload = decode_token(refresh_token)
     except ValueError:
-        raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado")
+        raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado") from None
     if payload.get("type") != "refresh" or not payload.get("sub") or not payload.get("jti"):
         raise HTTPException(status_code=401, detail="Refresh token inválido")
     stored = db.scalar(select(RefreshToken).where(RefreshToken.token_jti == payload["jti"]))
@@ -86,7 +86,7 @@ def refresh(
     try:
         user_id = int(payload["sub"])
     except (TypeError, ValueError):
-        raise HTTPException(status_code=401, detail="Usuário inválido")
+        raise HTTPException(status_code=401, detail="Usuário inválido") from None
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuário inválido")
