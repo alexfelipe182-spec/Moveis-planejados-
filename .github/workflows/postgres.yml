@@ -69,6 +69,10 @@ jobs:
       - name: Validate installed dependencies
         run: python -m pip check
 
+      - name: Verify PostgreSQL connection
+        working-directory: backend
+        run: python -c "from sqlalchemy import create_engine, text; e=create_engine(__import__('os').environ['DATABASE_URL']); c=e.connect(); assert c.execute(text('select 1')).scalar()==1; c.close(); e.dispose()"
+
       - name: Run Alembic migrations
         working-directory: backend
         run: alembic upgrade head
@@ -78,10 +82,11 @@ jobs:
         run: |
           alembic current
           test "$(alembic heads | grep -c '(head)')" -eq 1
+          alembic check
 
       - name: Run backend tests
         working-directory: backend
-        run: pytest -q tests --maxfail=1
+        run: python -m pytest -q tests --maxfail=1 --strict-config
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
