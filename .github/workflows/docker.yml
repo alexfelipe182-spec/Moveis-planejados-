@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: docker-ci-${{ github.workflow }}-${{ github.ref }}
@@ -53,9 +52,10 @@ jobs:
             --tag moveis-planejados-api:ci \
             ./backend
 
-      - name: Verify API image runs as non-root
+      - name: Verify API image metadata
         run: |
           test "$(docker image inspect moveis-planejados-api:ci --format '{{.Config.User}}')" = "appuser"
+          test "$(docker image inspect moveis-planejados-api:ci --format '{{json .Config.ExposedPorts}}')" = '{"8000/tcp":{}}'
 
       - name: Smoke test API container
         run: |
@@ -75,6 +75,11 @@ jobs:
 
           docker logs moveis-api-ci
           exit 1
+
+      - name: Verify container is healthy and non-root
+        run: |
+          docker inspect moveis-api-ci --format '{{.State.Running}}' | grep -qx true
+          docker exec moveis-api-ci id -u | grep -vq '^0$'
 
       - name: Show service logs on failure
         if: failure()
@@ -101,6 +106,9 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
