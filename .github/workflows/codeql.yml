@@ -14,6 +14,10 @@ permissions:
   security-events: write
   actions: read
 
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: CodeQL - ${{ matrix.language }}
@@ -27,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -34,8 +40,9 @@ jobs:
           languages: ${{ matrix.language }}
           queries: security-extended
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      # Python e JavaScript deste projeto não exigem compilação para análise.
+      # O autobuild foi removido para evitar falhas de configuração/leitura
+      # em linguagens interpretadas e em um frontend estático.
 
       - name: Analyze
         uses: github/codeql-action/analyze@v3
