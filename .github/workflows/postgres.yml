@@ -128,11 +128,14 @@ jobs:
           engine.dispose()
           PY
 
-      - name: Run backend tests with coverage
+      - name: Run backend tests with coverage and JUnit report
         working-directory: backend
         run: |
           python -m pytest -q tests --maxfail=1 --strict-config \
-            --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --junitxml=junit.xml
 
       - name: Audit Python dependencies
         working-directory: backend
@@ -181,6 +184,7 @@ jobs:
           name: ci-diagnostics-${{ github.run_id }}
           path: |
             backend/coverage.xml
+            backend/junit.xml
             backend/.pytest_cache
             backend/alembic
             /tmp/frontend.log
