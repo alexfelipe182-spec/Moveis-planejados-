@@ -56,6 +56,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
 
+      - name: Check Python formatting and lint
+        working-directory: backend
+        run: ruff check .
+
       - name: Validate Python bytecode
         run: python -m compileall -q backend
 
