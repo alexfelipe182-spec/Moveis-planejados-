@@ -24,17 +24,6 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(), nullable=False),
     )
     op.create_table(
-        "refresh_tokens",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("token_jti", sa.String(64), nullable=False, unique=True),
-        sa.Column("expires_at", sa.DateTime(), nullable=False),
-        sa.Column("revoked", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-    )
-    op.create_index("ix_refresh_tokens_user_id", "refresh_tokens", ["user_id"])
-    op.create_index("ix_refresh_tokens_token_jti", "refresh_tokens", ["token_jti"])
-    op.create_table(
         "categories",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("name", sa.String(120), nullable=False, unique=True),
@@ -75,7 +64,4 @@ def downgrade():
     op.drop_table("products")
     op.drop_table("customers")
     op.drop_table("categories")
-    op.drop_index("ix_refresh_tokens_token_jti", table_name="refresh_tokens")
-    op.drop_index("ix_refresh_tokens_user_id", table_name="refresh_tokens")
-    op.drop_table("refresh_tokens")
     op.drop_table("users")
