@@ -1,0 +1,21 @@
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, require_admin
+from app.database import get_db
+from app.models import Activity, User
+from app.schemas.activity import ActivityRead
+
+router = APIRouter(prefix="/customers", tags=["Customers"], dependencies=[Depends(get_current_user)])
+
+
+@router.get("/{customer_id}/history", response_model=list[ActivityRead])
+def customer_history(
+    customer_id: int,
+    limit: int = Query(100, ge=1, le=200),
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Activity).where(Activity.entity == "customer", Activity.entity_id == customer_id).order_by(Activity.created_at.desc()).limit(limit)
+    return db.scalars(stmt).all()
