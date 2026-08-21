@@ -25,6 +25,8 @@ services:
         value: "7"
       - key: CORS_ORIGINS
         value: '["https://ideal-marcenaria.onrender.com"]'
+      - key: FRONTEND_URL
+        value: https://ideal-marcenaria.onrender.com
 
   - type: web
     name: ideal-marcenaria
