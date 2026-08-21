@@ -4,10 +4,41 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    groups:
+      python-runtime:
+        patterns:
+          - "fastapi*"
+          - "starlette*"
+          - "uvicorn*"
+          - "pydantic*"
+          - "pydantic-settings*"
+      database:
+        patterns:
+          - "sqlalchemy*"
+          - "alembic*"
+          - "psycopg*"
+      authentication:
+        patterns:
+          - "python-jose*"
+          - "passlib*"
+          - "bcrypt*"
+      testing:
+        patterns:
+          - "pytest*"
+          - "httpx*"
+          - "coverage*"
+      security:
+        patterns:
+          - "pip-audit*"
+          - "email-validator*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
