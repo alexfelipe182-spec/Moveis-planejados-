@@ -21,6 +21,16 @@ class Settings(BaseSettings):
         environment = self.environment.lower().strip()
         self.environment = environment
 
+        # Render/PostgreSQL pode fornecer DATABASE_URL como postgres:// ou
+        # postgresql://. O projeto usa psycopg v3, portanto normalizamos
+        # automaticamente para o driver postgresql+psycopg.
+        database_url = self.database_url.strip()
+        if database_url.startswith("postgres://"):
+            database_url = "postgresql+psycopg://" + database_url[len("postgres://") :]
+        elif database_url.startswith("postgresql://"):
+            database_url = "postgresql+psycopg://" + database_url[len("postgresql://") :]
+        self.database_url = database_url
+
         if environment not in {"development", "test", "production"}:
             raise ValueError("ENVIRONMENT deve ser development, test ou production")
         if self.access_token_expire_minutes < 1:
