@@ -14,10 +14,19 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  PYTHONPATH: backend
+  DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_db
+  SECRET_KEY: test-secret-key-for-ci-only
+  ENVIRONMENT: test
+
 jobs:
   test:
     name: Backend + Frontend validation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -34,12 +43,6 @@ jobs:
           --health-timeout=5s
           --health-retries=10
 
-    env:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_db
-      PYTHONPATH: backend
-      SECRET_KEY: test-secret-key-for-ci-only
-      ENVIRONMENT: test
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -47,7 +50,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
@@ -56,7 +59,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
 
-      - name: Check Python formatting and lint
+      - name: Check Python lint
         working-directory: backend
         run: ruff check .
 
@@ -78,12 +81,12 @@ jobs:
 
       - name: Run backend tests
         working-directory: backend
-        run: pytest -q tests
+        run: pytest -q tests --maxfail=1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
 
       - name: Validate frontend JavaScript
@@ -96,3 +99,22 @@ jobs:
           test -s frontend/app.js
           grep -q '<script src="./app.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
+          test "$(find frontend -maxdepth 1 -type f | wc -l)" -ge 3
+
+      - name: Check frontend has no accidental placeholder
+        run: |
+          if grep -RniE 'PLACEHOLDER|TODO:.*IMPLEMENT|lorem ipsum' frontend --exclude='*.map'; then
+            echo 'Found accidental placeholder content in frontend.'
+            exit 1
+          fi
+
+      - name: Upload test diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-diagnostics
+          path: |
+            backend/.pytest_cache
+            backend/alembic
+          if-no-files-found: ignore
+          retention-days: 7
