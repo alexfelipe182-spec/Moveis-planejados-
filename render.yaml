@@ -5,6 +5,7 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /ready
+    preDeployCommand: alembic upgrade head
     plan: free
     autoDeploy: true
     envVars:
@@ -25,9 +26,8 @@ services:
       - key: CORS_ORIGINS
         value: https://moveis-planejados-api.onrender.com
 
-  - type: pserv
-    name: moveis-planejados-db
-    runtime: postgres
+databases:
+  - name: moveis-planejados-db
     plan: free
     databaseName: marcenaria_db
     user: marcenaria
