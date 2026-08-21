@@ -20,7 +20,7 @@ def create_item(db: Session, obj):
         return obj
     except IntegrityError:
         db.rollback()
-        raise ValueError("Não foi possível criar o registro: dados duplicados ou referência inválida")
+        raise ValueError("Não foi possível criar o registro: dados duplicados ou referência inválida") from None
 
 
 def delete_item(db: Session, obj):
@@ -29,7 +29,7 @@ def delete_item(db: Session, obj):
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise ValueError("Não foi possível excluir o registro porque ele está sendo utilizado")
+        raise ValueError("Não foi possível excluir o registro porque ele está sendo utilizado") from None
 
 
 def update_item(db: Session, obj, data: dict):
@@ -41,4 +41,4 @@ def update_item(db: Session, obj, data: dict):
         return obj
     except IntegrityError:
         db.rollback()
-        raise ValueError("Não foi possível atualizar o registro: dados duplicados ou referência inválida")
+        raise ValueError("Não foi possível atualizar o registro: dados duplicados ou referência inválida") from None
