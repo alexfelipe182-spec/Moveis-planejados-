@@ -22,7 +22,10 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/marcenaria_db_test
       SECRET_KEY: ${SECRET_KEY:-docker-test-secret-key-only}
       ENVIRONMENT: test
+      CORS_ORIGINS: http://localhost:3000
+    volumes:
+      - ./tests:/tests:ro
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "alembic upgrade head && alembic current && pytest -q -p no:cacheprovider"
+    command: sh -c "alembic upgrade head && alembic current && pytest -q -p no:cacheprovider /tests"
