@@ -11,11 +11,15 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: docker-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   docker-test:
     name: Docker + PostgreSQL + Alembic + API
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -43,13 +47,34 @@ jobs:
             --exit-code-from app \
             --remove-orphans
 
-      - name: Verify API image runs as non-root
+      - name: Build API image
         run: |
-          docker build -q \
-            -t moveis-planejados-api:ci \
+          docker build \
+            --tag moveis-planejados-api:ci \
             ./backend
 
+      - name: Verify API image runs as non-root
+        run: |
           test "$(docker image inspect moveis-planejados-api:ci --format '{{.Config.User}}')" = "appuser"
+
+      - name: Smoke test API container
+        run: |
+          docker run -d --rm \
+            --name moveis-api-ci \
+            -p 8000:8000 \
+            -e SECRET_KEY=docker-test-secret-key-only \
+            -e ENVIRONMENT=test \
+            -e DATABASE_URL='postgresql+psycopg://postgres:postgres@host.docker.internal:5432/marcenaria_db' \
+            --add-host=host.docker.internal:host-gateway \
+            moveis-planejados-api:ci
+
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health; then exit 0; fi
+            sleep 1
+          done
+
+          docker logs moveis-api-ci
+          exit 1
 
       - name: Show service logs on failure
         if: failure()
@@ -58,10 +83,12 @@ jobs:
             -f docker-compose.test.yml \
             logs \
             --no-color
+          docker logs moveis-api-ci 2>/dev/null || true
 
       - name: Cleanup
         if: always()
         run: |
+          docker rm -f moveis-api-ci 2>/dev/null || true
           docker compose \
             -f docker-compose.test.yml \
             down \
