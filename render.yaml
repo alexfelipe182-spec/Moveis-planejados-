@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: moveis-planejados-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /ready
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: moveis-planejados-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: CORS_ORIGINS
+        value: https://moveis-planejados-api.onrender.com
+
+  - type: pserv
+    name: moveis-planejados-db
+    runtime: postgres
+    plan: free
+    databaseName: marcenaria_db
+    user: marcenaria
