@@ -3,56 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Painel administrativo da marcenaria">
-  <title>Marcenaria • Administração</title>
+  <meta name="theme-color" content="#172018">
+  <meta name="description" content="Marcenaria Ideal — móveis planejados, projetos sob medida e acabamento profissional.">
+  <title>Marcenaria Ideal | Móveis planejados</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div id="login" class="screen">
-    <form id="login-form" class="card login-card">
-      <div class="brand-mark">M</div>
-      <h1>Marcenaria</h1>
-      <p>Painel administrativo</p>
-      <label>E-mail<input id="email" type="email" placeholder="seu@email.com" autocomplete="username" required></label>
-      <label>Senha<input id="password" type="password" placeholder="••••••••" autocomplete="current-password" required></label>
-      <button class="primary wide" type="submit">Entrar</button>
-      <small id="login-error" class="error" role="alert"></small>
-    </form>
-  </div>
-
-  <div id="app" class="hidden">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-mark small">M</div><div><strong>Marcenaria</strong><small>Administração</small></div></div>
-      <nav>
-        <button class="nav active" data-section="dashboard"><span>⌂</span>Dashboard</button>
-        <button class="nav" data-section="products"><span>▦</span>Produtos</button>
-        <button class="nav" data-section="categories"><span>◈</span>Categorias</button>
-        <button class="nav" data-section="customers"><span>♙</span>Clientes</button>
-        <button class="nav" data-section="quotes"><span>▤</span>Orçamentos</button>
+  <div id="public-site">
+    <header class="site-header">
+      <a class="logo" href="#inicio" aria-label="Marcenaria Ideal">
+        <span class="logo-mark">MI</span><span><strong>Marcenaria</strong><small>Ideal</small></span>
+      </a>
+      <nav class="site-nav" aria-label="Navegação principal">
+        <a href="#inicio">Início</a><a href="#servicos">Serviços</a><a href="#projetos">Projetos</a><a href="#contato">Contato</a>
       </nav>
-      <button id="logout" class="logout"><span>↪</span>Sair</button>
-    </aside>
+      <div class="header-actions"><a class="whatsapp mini" href="https://wa.me/5513999999999" target="_blank" rel="noopener">WhatsApp</a><button class="btn ghost" id="open-login">Entrar</button></div>
+    </header>
 
     <main>
-      <header class="topbar">
-        <div><span class="eyebrow">Administração</span><h1 id="title">Dashboard</h1></div>
-        <div class="user-pill"><span class="status-dot"></span><span id="user-badge">Administrador</span></div>
-      </header>
-      <div id="toast" class="toast" role="status"></div>
-      <section id="dashboard" class="section"></section>
-      <section id="products" class="section hidden"></section>
-      <section id="categories" class="section hidden"></section>
-      <section id="customers" class="section hidden"></section>
-      <section id="quotes" class="section hidden"></section>
+      <section class="hero" id="inicio">
+        <div class="hero-copy"><span class="eyebrow">Móveis planejados • Sob medida</span><h1>Ambientes pensados para <em>viver melhor.</em></h1><p>Projetos de marcenaria personalizados para cozinhas, dormitórios, salas, escritórios e espaços comerciais, com atenção a cada detalhe.</p><div class="hero-actions"><button class="btn primary large" data-quote>Solicitar orçamento</button><a class="btn secondary large" href="#projetos">Ver projetos</a></div><div class="trust"><span>✓ Projeto personalizado</span><span>✓ Acabamento profissional</span><span>✓ Atendimento próximo</span></div></div>
+        <div class="hero-card"><div class="wood-swatch"></div><div class="hero-card-content"><span class="eyebrow">Marcenaria Ideal</span><h2>Seu espaço. Seu estilo. Seu projeto.</h2><p>Do primeiro desenho à instalação.</p></div></div>
+      </section>
+
+      <section class="section public-section" id="servicos"><div class="section-heading"><div><span class="eyebrow">O que fazemos</span><h2>Soluções para cada ambiente</h2></div><p>Funcionalidade, estética e aproveitamento inteligente de espaço.</p></div><div class="service-grid">
+        <article class="service-card"><span class="service-icon">⌂</span><h3>Cozinhas planejadas</h3><p>Armários, bancadas e soluções para aproveitar cada centímetro.</p></article>
+        <article class="service-card"><span class="service-icon">▦</span><h3>Dormitórios</h3><p>Guarda-roupas, painéis e móveis personalizados para sua rotina.</p></article>
+        <article class="service-card"><span class="service-icon">◇</span><h3>Salas e painéis</h3><p>Composições elegantes para TV, livros, decoração e armazenamento.</p></article>
+        <article class="service-card"><span class="service-icon">▤</span><h3>Escritórios</h3><p>Estações de trabalho e ambientes corporativos feitos sob medida.</p></article>
+      </div></section>
+
+      <section class="section projects-section" id="projetos"><div class="section-heading"><div><span class="eyebrow">Inspiração</span><h2>Projetos em destaque</h2></div><button class="btn secondary" data-quote>Quero um projeto assim</button></div><div class="project-grid">
+        <article class="project-card project-one"><div><span>Cozinha</span><h3>Linhas limpas e muito aproveitamento</h3></div></article>
+        <article class="project-card project-two"><div><span>Dormitório</span><h3>Conforto com organização inteligente</h3></div></article>
+        <article class="project-card project-three"><div><span>Home office</span><h3>Produtividade com personalidade</h3></div></article>
+      </div></section>
+
+      <section class="cta-section"><div><span class="eyebrow">Vamos criar juntos?</span><h2>Conte o que você imagina. A gente transforma em projeto.</h2></div><button class="btn light large" data-quote>Solicitar orçamento</button></section>
+
+      <section class="section contact-section" id="contato"><div class="contact-card"><div><span class="eyebrow">Fale com a gente</span><h2>Atendimento próximo e sem complicação.</h2><p>Envie uma mensagem para conversar sobre seu ambiente, medidas, estilo e orçamento.</p></div><div class="contact-list"><a href="https://wa.me/5513999999999" target="_blank" rel="noopener"><strong>WhatsApp</strong><span>Falar com a Marcenaria Ideal →</span></a><div><strong>Localização</strong><span>Praia Grande • São Paulo</span></div><div><strong>Atendimento</strong><span>Segunda a sábado</span></div></div></div></section>
     </main>
+    <footer><div class="logo"><span class="logo-mark">MI</span><span><strong>Marcenaria</strong><small>Ideal</small></span></div><span>© 2026 Marcenaria Ideal. Todos os direitos reservados.</span></footer>
   </div>
 
-  <div id="modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-card">
-      <div class="modal-head"><div><span class="eyebrow">Cadastro</span><h2 id="modal-title">Novo registro</h2></div><button id="modal-close" class="icon-btn" type="button" aria-label="Fechar">×</button></div>
-      <form id="item-form"></form>
-    </div>
+  <div id="auth-overlay" class="overlay hidden" aria-hidden="true"><div class="auth-card"><button class="close" id="close-auth" aria-label="Fechar">×</button><div class="auth-brand"><span class="logo-mark">MI</span><div><strong>Marcenaria Ideal</strong><small>Acesso ao painel</small></div></div>
+    <div id="login-view"><span class="eyebrow">Área administrativa</span><h2>Bem-vindo de volta</h2><p class="muted">Entre para gerenciar sua marcenaria.</p><form id="login-form"><label>E-mail<input id="login-email" type="email" autocomplete="username" required></label><label>Senha<input id="login-password" type="password" autocomplete="current-password" required></label><button class="btn primary wide" type="submit">Entrar</button><div id="login-error" class="form-message error"></div></form><div class="auth-links"><button id="show-register">Criar minha conta</button><button id="show-recovery">Recuperar acesso</button></div></div>
+    <div id="register-view" class="hidden"><span class="eyebrow">Novo acesso</span><h2>Crie sua conta</h2><p class="muted">O cadastro cria um usuário comum. Permissões administrativas são controladas pelo sistema.</p><form id="register-form"><label>Nome<input id="register-name" type="text" minlength="2" required></label><label>E-mail<input id="register-email" type="email" required></label><label>Senha<input id="register-password" type="password" minlength="8" required></label><button class="btn primary wide" type="submit">Cadastrar</button><div id="register-message" class="form-message"></div></form><button class="back-link" data-auth-back>← Voltar para login</button></div>
+    <div id="recovery-view" class="hidden"><span class="eyebrow">Recuperação</span><h2>Recupere seu acesso</h2><p class="muted">Informe seu e-mail. Se você perdeu a senha, nossa equipe pode orientar a recuperação pelo WhatsApp.</p><form id="recovery-form"><label>E-mail<input id="recovery-email" type="email" required></label><button class="btn primary wide" type="submit">Solicitar ajuda</button></form><a class="btn whatsapp wide" href="https://wa.me/5513999999999" target="_blank" rel="noopener">Abrir WhatsApp</a><button class="back-link" data-auth-back>← Voltar para login</button></div>
+  </div></div>
+
+  <div id="admin-app" class="hidden">
+    <aside class="sidebar"><div class="side-brand"><span class="logo-mark">MI</span><div><strong>Marcenaria</strong><small>Ideal • Admin</small></div></div><nav id="admin-nav"><button class="nav active" data-section="dashboard">⌂ <span>Dashboard</span></button><button class="nav" data-section="customers">♙ <span>Clientes</span></button><button class="nav" data-section="quotes">▤ <span>Orçamentos</span></button><button class="nav" data-section="products">▦ <span>Produtos</span></button><button class="nav" data-section="categories">◈ <span>Serviços & categorias</span></button><button class="nav admin-only" data-section="users">♙ <span>Usuários</span></button></nav><div class="side-bottom"><a href="https://wa.me/5513999999999" target="_blank" rel="noopener">WhatsApp</a><button id="logout" class="logout">↪ <span>Sair</span></button></div></aside>
+    <main class="admin-main"><header class="topbar"><div><span class="eyebrow">Painel administrativo</span><h1 id="admin-title">Dashboard</h1></div><div class="top-actions"><button id="theme-toggle" class="icon-button" title="Alternar tema">☾</button><span class="user-pill"><span class="status-dot"></span><span id="user-badge">Usuário</span></span></div></header><div id="toast" class="toast" role="status"></div><section id="dashboard" class="admin-section"></section><section id="customers" class="admin-section hidden"></section><section id="quotes" class="admin-section hidden"></section><section id="products" class="admin-section hidden"></section><section id="categories" class="admin-section hidden"></section><section id="users" class="admin-section hidden"></section></main>
   </div>
+  <div id="modal" class="modal hidden" aria-hidden="true"><div class="modal-card"><div class="modal-head"><div><span class="eyebrow">Gerenciamento</span><h2 id="modal-title">Novo registro</h2></div><button id="modal-close" class="close" type="button">×</button></div><form id="item-form"></form></div></div>
   <script src="./app.js"></script>
 </body>
 </html>
