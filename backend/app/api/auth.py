@@ -51,15 +51,33 @@ def _send_reset_email(user: User, token: str) -> bool:
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
-    email = str(payload.email).lower()
+    email = str(payload.email).strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
-    user = User(name=payload.name.strip(), email=email, password_hash=hash_password(payload.password), is_admin=False)
+
+    user = User(
+        name=payload.name.strip(),
+        email=email,
+        password_hash=hash_password(payload.password),
+        is_admin=False,
+    )
     db.add(user)
-    db.commit()
-    db.refresh(user)
-    db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email}"))
-    db.commit()
+    try:
+        db.flush()
+        db.add(
+            Activity(
+                user_id=user.id,
+                action="created",
+                entity="user",
+                entity_id=user.id,
+                description=f"Cadastro de usuário {user.email}",
+            )
+        )
+        db.commit()
+        db.refresh(user)
+    except Exception:
+        db.rollback()
+        raise
     return user
 
 
@@ -82,7 +100,6 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
 def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
     email = str(payload.email).lower()
     user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
-    # Resposta genérica evita descoberta de contas existentes.
     if not user:
         return PasswordResetResponse(message="Se o e-mail estiver cadastrado, as instruções de recuperação serão enviadas.")
     db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)).update({"used_at": _now()})
