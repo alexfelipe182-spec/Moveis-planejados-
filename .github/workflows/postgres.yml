@@ -23,11 +23,10 @@ env:
   ENVIRONMENT: test
 
 jobs:
-  test:
-    name: Backend + Frontend validation
+  quality:
+    name: Backend quality, database and tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     services:
       postgres:
         image: postgres:16
@@ -42,7 +41,6 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
-
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -54,58 +52,54 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
           python -m pip install pytest-cov pip-audit ruff
 
-      - name: Check Python lint
+      - name: Ruff
         working-directory: backend
         run: ruff check .
 
-      - name: Validate Python bytecode
+      - name: Compile Python
         run: python -m compileall -q backend
 
-      - name: Validate installed dependencies
+      - name: pip check
         run: python -m pip check
 
-      - name: Verify application imports
+      - name: Verify imports
         working-directory: backend
-        run: |
-          python -c "import app.main; import app.database; import app.models; import app.schemas; import app.api.auth; import app.api.routes"
+        run: python -c "import app.main; import app.database; import app.models; import app.schemas; import app.api.auth; import app.api.routes"
 
       - name: Verify PostgreSQL connection
-        working-directory: backend
         run: python -c "from sqlalchemy import create_engine, text; import os; e=create_engine(os.environ['DATABASE_URL']); c=e.connect(); assert c.execute(text('select 1')).scalar()==1; c.close(); e.dispose()"
 
-      - name: Verify Alembic has exactly one migration head
+      - name: Verify exactly one Alembic head
         working-directory: backend
         run: |
           python - <<'PY'
           from alembic.config import Config
           from alembic.script import ScriptDirectory
-
           config = Config("alembic.ini")
-          script = ScriptDirectory.from_config(config)
-          heads = script.get_heads()
+          heads = ScriptDirectory.from_config(config).get_heads()
           print(f"Alembic heads: {heads}")
           if len(heads) != 1:
-              raise SystemExit(f"Expected exactly one Alembic head, found {len(heads)}: {heads}")
+              raise SystemExit(f"Expected exactly one Alembic head, found {len(heads)}")
           PY
 
-      - name: Run Alembic migrations
+      - name: Apply migrations
         working-directory: backend
         run: alembic upgrade head
 
-      - name: Validate Alembic state and schema
+      - name: Validate Alembic
         working-directory: backend
         run: |
           alembic current
           alembic heads
           alembic check
 
-      - name: Verify database revision matches migration head
+      - name: Verify database revision
         working-directory: backend
         run: |
           python - <<'PY'
@@ -114,21 +108,20 @@ jobs:
           from alembic.runtime.migration import MigrationContext
           from sqlalchemy import create_engine
           import os
-
           config = Config("alembic.ini")
           script = ScriptDirectory.from_config(config)
-          expected = script.get_heads()
+          expected = tuple(script.get_heads())
           engine = create_engine(os.environ["DATABASE_URL"])
           with engine.connect() as connection:
-              current = MigrationContext.configure(connection).get_current_heads()
-          print(f"Expected migration head: {expected}")
-          print(f"Database migration heads: {current}")
-          if tuple(current) != tuple(expected):
-              raise SystemExit("Database revision does not match the Alembic head")
+              current = tuple(MigrationContext.configure(connection).get_current_heads())
+          print(f"Expected: {expected}")
+          print(f"Current:  {current}")
+          if current != expected:
+              raise SystemExit("Database revision does not match Alembic head")
           engine.dispose()
           PY
 
-      - name: Run backend tests with coverage and JUnit report
+      - name: Run tests with coverage
         working-directory: backend
         run: |
           python -m pytest -q tests --maxfail=1 --strict-config \
@@ -137,9 +130,29 @@ jobs:
             --cov-report=xml:coverage.xml \
             --junitxml=junit.xml
 
-      - name: Audit Python dependencies
+      - name: Audit dependencies
         working-directory: backend
         run: python -m pip_audit -r requirements.txt
+
+      - name: Upload backend diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-diagnostics-${{ github.run_id }}
+          path: |
+            backend/coverage.xml
+            backend/junit.xml
+            backend/.pytest_cache
+          if-no-files-found: ignore
+          retention-days: 14
+
+  frontend:
+    name: Frontend validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -147,26 +160,28 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
 
-      - name: Validate frontend JavaScript
-        run: node --check frontend/app.js
-
-      - name: Validate frontend files
+      - name: Validate required files
         run: |
           test -s frontend/index.html
           test -s frontend/styles.css
           test -s frontend/app.js
+
+      - name: Validate JavaScript
+        run: node --check frontend/app.js
+
+      - name: Validate HTML asset references
+        run: |
           grep -q '<script src="./app.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
-          test "$(find frontend -maxdepth 1 -type f | wc -l)" -ge 3
 
-      - name: Check frontend for accidental placeholders
+      - name: Check accidental placeholders
         run: |
           if grep -RniE 'PLACEHOLDER|TODO:.*IMPLEMENT|lorem ipsum' frontend --exclude='*.map'; then
             echo 'Found accidental placeholder content in frontend.'
             exit 1
           fi
 
-      - name: Smoke test frontend locally
+      - name: Frontend smoke test
         run: |
           python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &
           SERVER_PID=$!
@@ -177,16 +192,11 @@ jobs:
           done
           grep -q 'Marcenaria Ideal' /tmp/frontend.html
 
-      - name: Upload test and diagnostic artifacts
+      - name: Upload frontend diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ci-diagnostics-${{ github.run_id }}
-          path: |
-            backend/coverage.xml
-            backend/junit.xml
-            backend/.pytest_cache
-            backend/alembic
-            /tmp/frontend.log
+          name: frontend-diagnostics-${{ github.run_id }}
+          path: /tmp/frontend.log
           if-no-files-found: ignore
           retention-days: 14
