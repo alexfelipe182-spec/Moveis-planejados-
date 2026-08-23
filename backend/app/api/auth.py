@@ -24,13 +24,14 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _cookies(response: Response, access: str, refresh: str) -> None:
+def _cookies(response: Response, access: str, refresh: str) -> str:
     secure = settings.environment == "production"
     samesite = "none" if secure else "lax"
     csrf = secrets.token_urlsafe(32)
     response.set_cookie("access_token", access, httponly=True, secure=secure, samesite=samesite, max_age=settings.access_token_expire_minutes * 60, path="/")
     response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite=samesite, max_age=settings.refresh_token_expire_days * 86400, path="/api/v1/auth")
     response.set_cookie(CSRF_COOKIE, csrf, httponly=False, secure=secure, samesite=samesite, max_age=settings.refresh_token_expire_days * 86400, path="/")
+    return csrf
 
 
 def _send_reset_email(user: User, token: str) -> bool:
@@ -51,11 +52,7 @@ def _send_reset_email(user: User, token: str) -> bool:
 
 @router.get("/csrf")
 def get_csrf_token(response: Response, csrf_token: str | None = Cookie(default=None, alias=CSRF_COOKIE)):
-    """Disponibiliza o token CSRF para clientes que usam autenticação por cookie.
-
-    O token CSRF não é secreto e pode ser lido pelo frontend. O access/refresh token
-    continuam em cookies HttpOnly. Se ainda não existir um token, cria um novo.
-    """
+    """Disponibiliza o token CSRF para clientes que usam autenticação por cookie."""
     secure = settings.environment == "production"
     samesite = "none" if secure else "lax"
     if not csrf_token:
@@ -87,15 +84,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     try:
         db.flush()
-        db.add(
-            Activity(
-                user_id=user.id,
-                action="created",
-                entity="user",
-                entity_id=user.id,
-                description=f"Cadastro de usuário {user.email}",
-            )
-        )
+        db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email}"))
         db.commit()
         db.refresh(user)
     except Exception:
@@ -115,8 +104,8 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
     db.add(RefreshToken(user_id=user.id, token_jti=jti, expires_at=expires.replace(tzinfo=None)))
     db.add(Activity(user_id=user.id, action="login", entity="user", entity_id=user.id, description=f"Login realizado por {user.email}"))
     db.commit()
-    _cookies(response, access, refresh)
-    return {"access_token": access, "token_type": "bearer", "expires_in": settings.access_token_expire_minutes * 60}
+    csrf = _cookies(response, access, refresh)
+    return {"access_token": access, "token_type": "bearer", "expires_in": settings.access_token_expire_minutes * 60, "csrf_token": csrf}
 
 
 @router.post("/password-reset/request", response_model=PasswordResetResponse)
@@ -179,8 +168,8 @@ def refresh(response: Response, _: None = Depends(require_csrf), refresh_token: 
     new_refresh, jti, expires = create_refresh_token(str(user.id))
     db.add(RefreshToken(user_id=user.id, token_jti=jti, expires_at=expires.replace(tzinfo=None)))
     db.commit()
-    _cookies(response, access, new_refresh)
-    return {"access_token": access, "token_type": "bearer", "expires_in": settings.access_token_expire_minutes * 60}
+    csrf = _cookies(response, access, new_refresh)
+    return {"access_token": access, "token_type": "bearer", "expires_in": settings.access_token_expire_minutes * 60, "csrf_token": csrf}
 
 
 @router.post("/logout", status_code=204)
