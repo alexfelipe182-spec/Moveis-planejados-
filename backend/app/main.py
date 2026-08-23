@@ -40,7 +40,7 @@ app.include_router(api_router)
 
 @app.get("/docs", include_in_schema=False)
 def swagger_docs():
-    """Swagger UI com cookies, CSRF e refresh token habilitados para testes."""
+    """Swagger UI com teste integrado do fluxo login -> refresh por cookies + CSRF."""
     html = """
     <!DOCTYPE html>
     <html>
@@ -49,13 +49,25 @@ def swagger_docs():
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
       <title>API Moveis Planejados - Swagger</title>
+      <style>
+        .ideal-auth-test { margin: 20px auto; padding: 16px; max-width: 1200px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; }
+        .ideal-auth-test input { padding: 8px; margin: 4px; min-width: 220px; }
+        .ideal-auth-test button { padding: 9px 14px; margin: 4px; cursor: pointer; }
+        #ideal-auth-result { white-space: pre-wrap; margin-top: 10px; font-family: monospace; }
+      </style>
     </head>
     <body>
+      <div class="ideal-auth-test">
+        <strong>Teste de autenticação: Login → Refresh</strong><br>
+        <input id="ideal-user" type="email" placeholder="E-mail">
+        <input id="ideal-pass" type="password" placeholder="Senha">
+        <button id="ideal-test-auth" type="button">Testar Login + Refresh</button>
+        <div id="ideal-auth-result">Aguardando teste...</div>
+      </div>
       <div id="swagger-ui"></div>
       <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
       <script>
         const CSRF_STORAGE_KEY = "ideal_marcenaria_csrf";
-        const CSRF_PATH = "/api/v1/auth/csrf";
 
         function getCookie(name) {
           const prefix = name + "=";
@@ -67,70 +79,81 @@ def swagger_docs():
           return getCookie("csrf_token") || localStorage.getItem(CSRF_STORAGE_KEY);
         }
 
-        function saveCsrfFromResponse(response) {
-          if (!response) return;
-          let data = response.data ?? response.body ?? response.text;
-          if (typeof data === "string") {
-            try { data = JSON.parse(data); } catch (_) { return; }
-          }
-          if (data && data.csrf_token) {
-            localStorage.setItem(CSRF_STORAGE_KEY, data.csrf_token);
-          }
+        async function readJson(response) {
+          const text = await response.text();
+          try { return text ? JSON.parse(text) : {}; } catch (_) { return { raw: text }; }
         }
 
-        async function ensureCsrfCookie() {
-          if (getCookie("csrf_token")) return getCookie("csrf_token");
+        async function testLoginRefresh() {
+          const result = document.getElementById("ideal-auth-result");
+          const username = document.getElementById("ideal-user").value.trim();
+          const password = document.getElementById("ideal-pass").value;
+          if (!username || !password) {
+            result.textContent = "Informe e-mail e senha para o teste.";
+            return;
+          }
+          result.textContent = "Executando login...";
           try {
-            const response = await fetch(CSRF_PATH, {
-              method: "GET",
+            const loginResponse = await fetch("/api/v1/auth/login", {
+              method: "POST",
               credentials: "include",
-              cache: "no-store",
-              headers: { "Accept": "application/json" }
+              headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
+              body: new URLSearchParams({ grant_type: "", username, password, scope: "", client_id: "", client_secret: "" })
             });
-            if (response.ok) {
-              const data = await response.json();
-              if (data && data.csrf_token) {
-                localStorage.setItem(CSRF_STORAGE_KEY, data.csrf_token);
-              }
+            const loginBody = await readJson(loginResponse);
+            if (!loginResponse.ok) {
+              result.textContent = `Login: ${loginResponse.status}\n${JSON.stringify(loginBody, null, 2)}`;
+              return;
             }
-          } catch (_) {}
-          return getCsrfToken();
-        }
+            if (loginBody.csrf_token) localStorage.setItem(CSRF_STORAGE_KEY, loginBody.csrf_token);
+            const csrf = loginBody.csrf_token || getCsrfToken();
+            if (!csrf) {
+              result.textContent = "Login: 200\nFalha: CSRF não foi recebido.";
+              return;
+            }
 
-        async function csrfRequestInterceptor(request) {
-          request.credentials = "include";
-
-          const isAuth = request.url.includes("/api/v1/auth/");
-          const isRefresh = request.url.includes("/api/v1/auth/refresh");
-
-          if (isRefresh) {
-            await ensureCsrfCookie();
+            result.textContent = "Login: 200\nExecutando refresh...";
+            const refreshResponse = await fetch("/api/v1/auth/refresh", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Accept": "application/json", "X-CSRF-Token": csrf }
+            });
+            const refreshBody = await readJson(refreshResponse);
+            if (refreshResponse.ok) {
+              if (refreshBody.csrf_token) localStorage.setItem(CSRF_STORAGE_KEY, refreshBody.csrf_token);
+              result.textContent = `Login: 200\nRefresh: ${refreshResponse.status}\nFluxo login → refresh funcionando.`;
+            } else {
+              result.textContent = `Login: 200\nRefresh: ${refreshResponse.status}\n${JSON.stringify(refreshBody, null, 2)}`;
+            }
+          } catch (error) {
+            result.textContent = "Erro de rede: " + error.message;
           }
-
-          const csrf = getCsrfToken();
-          if (csrf && isAuth) {
-            request.headers = request.headers || {};
-            request.headers["X-CSRF-Token"] = csrf;
-          }
-
-          return request;
         }
 
-        function csrfResponseInterceptor(response) {
-          saveCsrfFromResponse(response);
-          return response;
-        }
+        document.getElementById("ideal-test-auth").addEventListener("click", testLoginRefresh);
 
         window.ui = SwaggerUIBundle({
           url: "/openapi.json",
           dom_id: "#swagger-ui",
           deepLinking: true,
-          requestInterceptor: csrfRequestInterceptor,
-          responseInterceptor: csrfResponseInterceptor,
-          presets: [
-            SwaggerUIBundle.presets.apis,
-            SwaggerUIBundle.SwaggerUIStandalonePreset
-          ],
+          requestInterceptor: function(request) {
+            request.credentials = "include";
+            const csrf = getCsrfToken();
+            if (csrf && request.url.includes("/api/v1/auth/")) {
+              request.headers = request.headers || {};
+              request.headers["X-CSRF-Token"] = csrf;
+            }
+            return request;
+          },
+          responseInterceptor: function(response) {
+            try {
+              const body = response && (response.data || response.body);
+              const parsed = typeof body === "string" ? JSON.parse(body) : body;
+              if (parsed && parsed.csrf_token) localStorage.setItem(CSRF_STORAGE_KEY, parsed.csrf_token);
+            } catch (_) {}
+            return response;
+          },
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
           layout: "BaseLayout"
         });
       </script>
