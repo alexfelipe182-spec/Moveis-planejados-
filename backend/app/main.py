@@ -60,8 +60,21 @@ def swagger_docs():
           return item ? decodeURIComponent(item.substring(prefix.length)) : null;
         }
 
-        function csrfRequestInterceptor(request) {
+        async function csrfRequestInterceptor(request) {
           request.credentials = "include";
+
+          // Garante que o cookie CSRF exista antes de chamadas autenticadas.
+          // O refresh_token continua HttpOnly e nunca fica exposto ao JavaScript.
+          if (request.url.includes("/api/v1/auth/") && request.url.includes("/refresh")) {
+            if (!getCookie("csrf_token")) {
+              await fetch("/api/v1/auth/csrf", {
+                method: "GET",
+                credentials: "include",
+                cache: "no-store"
+              });
+            }
+          }
+
           const csrf = getCookie("csrf_token");
           if (csrf && request.url.includes("/api/v1/auth/")) {
             request.headers = request.headers || {};
@@ -85,7 +98,10 @@ def swagger_docs():
     </body>
     </html>
     """
-    return HTMLResponse(html)
+    response = HTMLResponse(html)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/health", tags=["system"])
