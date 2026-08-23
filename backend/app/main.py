@@ -166,13 +166,14 @@ def swagger_docs():
     return response
 
 
-@app.get("/api/v1/auth/cookie-diagnostic", include_in_schema=False)
+@app.get("/api/v1/auth/cookie-diagnostic", tags=["authentication-diagnostics"])
 def cookie_diagnostic(
     request: Request,
     refresh_token: str | None = Cookie(default=None),
     csrf_token: str | None = Cookie(default=None),
     csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
 ):
+    """Diagnóstico seguro: retorna apenas presença/comparação, nunca os valores dos tokens."""
     return {
         "has_refresh_token": bool(refresh_token),
         "has_csrf_cookie": bool(csrf_token),
