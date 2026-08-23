@@ -49,6 +49,29 @@ def _send_reset_email(user: User, token: str) -> bool:
     return True
 
 
+@router.get("/csrf")
+def get_csrf_token(response: Response, csrf_token: str | None = Cookie(default=None, alias=CSRF_COOKIE)):
+    """Disponibiliza o token CSRF para clientes que usam autenticação por cookie.
+
+    O token CSRF não é secreto e pode ser lido pelo frontend. O access/refresh token
+    continuam em cookies HttpOnly. Se ainda não existir um token, cria um novo.
+    """
+    secure = settings.environment == "production"
+    samesite = "none" if secure else "lax"
+    if not csrf_token:
+        csrf_token = secrets.token_urlsafe(32)
+        response.set_cookie(
+            CSRF_COOKIE,
+            csrf_token,
+            httponly=False,
+            secure=secure,
+            samesite=samesite,
+            max_age=settings.refresh_token_expire_days * 86400,
+            path="/",
+        )
+    return {"csrf_token": csrf_token}
+
+
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     email = str(payload.email).strip().lower()
