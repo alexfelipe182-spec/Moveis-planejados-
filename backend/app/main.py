@@ -55,6 +55,7 @@ def swagger_docs():
       <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
       <script>
         const CSRF_STORAGE_KEY = "ideal_marcenaria_csrf";
+        const CSRF_PATH = "/api/v1/auth/csrf";
 
         function getCookie(name) {
           const prefix = name + "=";
@@ -66,22 +67,48 @@ def swagger_docs():
           return getCookie("csrf_token") || localStorage.getItem(CSRF_STORAGE_KEY);
         }
 
+        function saveCsrfFromResponse(response) {
+          if (!response) return;
+          let data = response.data ?? response.body ?? response.text;
+          if (typeof data === "string") {
+            try { data = JSON.parse(data); } catch (_) { return; }
+          }
+          if (data && data.csrf_token) {
+            localStorage.setItem(CSRF_STORAGE_KEY, data.csrf_token);
+          }
+        }
+
+        async function ensureCsrfCookie() {
+          if (getCookie("csrf_token")) return getCookie("csrf_token");
+          try {
+            const response = await fetch(CSRF_PATH, {
+              method: "GET",
+              credentials: "include",
+              cache: "no-store",
+              headers: { "Accept": "application/json" }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.csrf_token) {
+                localStorage.setItem(CSRF_STORAGE_KEY, data.csrf_token);
+              }
+            }
+          } catch (_) {}
+          return getCsrfToken();
+        }
+
         async function csrfRequestInterceptor(request) {
           request.credentials = "include";
 
-          // Garante que exista um cookie CSRF antes de qualquer operação protegida.
-          if (request.url.includes("/api/v1/auth/") && request.url.includes("/refresh")) {
-            if (!getCookie("csrf_token")) {
-              await fetch("/api/v1/auth/csrf", {
-                method: "GET",
-                credentials: "include",
-                cache: "no-store"
-              });
-            }
+          const isAuth = request.url.includes("/api/v1/auth/");
+          const isRefresh = request.url.includes("/api/v1/auth/refresh");
+
+          if (isRefresh) {
+            await ensureCsrfCookie();
           }
 
           const csrf = getCsrfToken();
-          if (csrf && request.url.includes("/api/v1/auth/")) {
+          if (csrf && isAuth) {
             request.headers = request.headers || {};
             request.headers["X-CSRF-Token"] = csrf;
           }
@@ -90,20 +117,7 @@ def swagger_docs():
         }
 
         function csrfResponseInterceptor(response) {
-          // O login e o refresh devolvem o CSRF no JSON. Guardamos somente o CSRF;
-          // refresh_token continua exclusivamente em cookie HttpOnly.
-          try {
-            if (response && response.body) {
-              const body = typeof response.body === "string"
-                ? JSON.parse(response.body)
-                : response.body;
-              if (body && body.csrf_token) {
-                localStorage.setItem(CSRF_STORAGE_KEY, body.csrf_token);
-              }
-            }
-          } catch (e) {
-            // Respostas que não sejam JSON são ignoradas.
-          }
+          saveCsrfFromResponse(response);
           return response;
         }
 
