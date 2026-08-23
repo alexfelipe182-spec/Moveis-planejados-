@@ -1,13 +1,13 @@
 """add projects, richer quotes, activities and password reset
 
-Revision ID: 003_projects_history_password_reset
+Revision ID: 003_projects_history_pw_reset
 Revises: 002_refresh_tokens
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "003_projects_history_password_reset"
+revision = "003_projects_history_pw_reset"
 down_revision = "002_refresh_tokens"
 branch_labels = None
 depends_on = None
