@@ -1,0 +1,109 @@
+name: Foundation Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  repository-integrity:
+    name: Repository integrity and deployment manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install YAML parser
+        run: python -m pip install --disable-pip-version-check PyYAML
+
+      - name: Validate Render Blueprint
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          path = Path("render.yaml")
+          data = yaml.safe_load(path.read_text(encoding="utf-8"))
+          assert isinstance(data, dict), "render.yaml must contain a YAML object"
+          services = data.get("services")
+          assert isinstance(services, list) and services, "render.yaml must define services"
+          databases = data.get("databases")
+          assert isinstance(databases, list) and databases, "render.yaml must define PostgreSQL"
+
+          names = {service.get("name") for service in services}
+          required = {"moveis-planejados-api", "ideal-marcenaria"}
+          missing = required - names
+          assert not missing, f"Missing Render services: {sorted(missing)}"
+
+          api = next(service for service in services if service.get("name") == "moveis-planejados-api")
+          assert api.get("runtime") == "docker", "API must use Docker runtime"
+          assert api.get("autoDeploy") is True, "API autoDeploy must remain enabled"
+          assert api.get("healthCheckPath") == "/ready", "API must use /ready as health check"
+          assert api.get("dockerfilePath") == "./backend/Dockerfile"
+          assert api.get("dockerContext") == "./backend"
+          assert api.get("envVars"), "API environment variables must be defined"
+
+          print("Render Blueprint validation: OK")
+          PY
+
+      - name: Validate production environment template
+        run: |
+          test -s .env.production.example
+          grep -q '^DATABASE_URL=' .env.production.example
+          grep -q '^SECRET_KEY=' .env.production.example
+          grep -q '^CORS_ORIGINS=' .env.production.example
+          grep -q '^FRONTEND_URL=' .env.production.example
+
+      - name: Validate Docker build context
+        run: |
+          test -s backend/Dockerfile
+          test -s backend/requirements.txt
+          grep -q 'alembic upgrade head' backend/Dockerfile
+          grep -q 'uvicorn app.main:app' backend/Dockerfile
+
+      - name: Validate Compose manifests
+        run: |
+          docker compose -f docker-compose.test.yml config -q
+          docker compose --env-file .env.production.example -f docker-compose.prod.yml config -q
+
+      - name: Validate workflow files are present
+        run: |
+          test -s .github/workflows/postgres.yml
+          test -s .github/workflows/docker.yml
+          test -s .github/workflows/security.yml
+          test -s .github/workflows/codeql.yml
+          test -s .github/workflows/foundation.yml
+
+  workflow-syntax:
+    name: GitHub Actions syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install actionlint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: Validate workflows
+        run: actionlint .github/workflows/*.yml
