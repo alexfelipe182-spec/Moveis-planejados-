@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Cookie, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import text
@@ -62,6 +62,7 @@ def swagger_docs():
         <input id="ideal-user" type="email" placeholder="E-mail">
         <input id="ideal-pass" type="password" placeholder="Senha">
         <button id="ideal-test-auth" type="button">Testar Login + Refresh</button>
+        <button id="ideal-cookie-diagnostic" type="button">Diagnosticar cookies</button>
         <div id="ideal-auth-result">Aguardando teste...</div>
       </div>
       <div id="swagger-ui"></div>
@@ -88,34 +89,22 @@ def swagger_docs():
           const result = document.getElementById("ideal-auth-result");
           const username = document.getElementById("ideal-user").value.trim();
           const password = document.getElementById("ideal-pass").value;
-          if (!username || !password) {
-            result.textContent = "Informe e-mail e senha para o teste.";
-            return;
-          }
+          if (!username || !password) { result.textContent = "Informe e-mail e senha para o teste."; return; }
           result.textContent = "Executando login...";
           try {
             const loginResponse = await fetch("/api/v1/auth/login", {
-              method: "POST",
-              credentials: "include",
+              method: "POST", credentials: "include",
               headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
               body: new URLSearchParams({ grant_type: "", username, password, scope: "", client_id: "", client_secret: "" })
             });
             const loginBody = await readJson(loginResponse);
-            if (!loginResponse.ok) {
-              result.textContent = `Login: ${loginResponse.status}\n${JSON.stringify(loginBody, null, 2)}`;
-              return;
-            }
+            if (!loginResponse.ok) { result.textContent = `Login: ${loginResponse.status}`; return; }
             if (loginBody.csrf_token) localStorage.setItem(CSRF_STORAGE_KEY, loginBody.csrf_token);
             const csrf = loginBody.csrf_token || getCsrfToken();
-            if (!csrf) {
-              result.textContent = "Login: 200\nFalha: CSRF não foi recebido.";
-              return;
-            }
-
+            if (!csrf) { result.textContent = "Login: 200\nCSRF não recebido."; return; }
             result.textContent = "Login: 200\nExecutando refresh...";
             const refreshResponse = await fetch("/api/v1/auth/refresh", {
-              method: "POST",
-              credentials: "include",
+              method: "POST", credentials: "include",
               headers: { "Accept": "application/json", "X-CSRF-Token": csrf }
             });
             const refreshBody = await readJson(refreshResponse);
@@ -123,19 +112,30 @@ def swagger_docs():
               if (refreshBody.csrf_token) localStorage.setItem(CSRF_STORAGE_KEY, refreshBody.csrf_token);
               result.textContent = `Login: 200\nRefresh: ${refreshResponse.status}\nFluxo login → refresh funcionando.`;
             } else {
-              result.textContent = `Login: 200\nRefresh: ${refreshResponse.status}\n${JSON.stringify(refreshBody, null, 2)}`;
+              result.textContent = `Login: 200\nRefresh: ${refreshResponse.status}\nErro: ${refreshBody.detail || "falha"}`;
             }
-          } catch (error) {
-            result.textContent = "Erro de rede: " + error.message;
-          }
+          } catch (error) { result.textContent = "Erro de rede: " + error.message; }
+        }
+
+        async function diagnoseCookies() {
+          const result = document.getElementById("ideal-auth-result");
+          result.textContent = "Verificando cookies (sem revelar valores)...";
+          try {
+            const csrf = getCookie("csrf_token");
+            const response = await fetch("/api/v1/auth/cookie-diagnostic", {
+              method: "GET", credentials: "include", cache: "no-store",
+              headers: csrf ? { "X-CSRF-Token": csrf } : {}
+            });
+            const body = await readJson(response);
+            result.textContent = JSON.stringify(body, null, 2);
+          } catch (error) { result.textContent = "Erro de rede: " + error.message; }
         }
 
         document.getElementById("ideal-test-auth").addEventListener("click", testLoginRefresh);
+        document.getElementById("ideal-cookie-diagnostic").addEventListener("click", diagnoseCookies);
 
         window.ui = SwaggerUIBundle({
-          url: "/openapi.json",
-          dom_id: "#swagger-ui",
-          deepLinking: true,
+          url: "/openapi.json", dom_id: "#swagger-ui", deepLinking: true,
           requestInterceptor: function(request) {
             request.credentials = "include";
             const csrf = getCsrfToken();
@@ -164,6 +164,22 @@ def swagger_docs():
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+@app.get("/api/v1/auth/cookie-diagnostic", include_in_schema=False)
+def cookie_diagnostic(
+    request: Request,
+    refresh_token: str | None = Cookie(default=None),
+    csrf_token: str | None = Cookie(default=None),
+    csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
+):
+    return {
+        "has_refresh_token": bool(refresh_token),
+        "has_csrf_cookie": bool(csrf_token),
+        "csrf_header_received": bool(csrf_header),
+        "csrf_matches": bool(csrf_token and csrf_header and csrf_token == csrf_header),
+        "origin": request.headers.get("origin"),
+    }
 
 
 @app.get("/health", tags=["system"])
