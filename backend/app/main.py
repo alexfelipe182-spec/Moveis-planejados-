@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -35,6 +36,56 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(api_router)
+
+
+@app.get("/docs", include_in_schema=False)
+def swagger_docs():
+    """Swagger UI com cookies e CSRF habilitados para testes de autenticação."""
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+      <title>API Moveis Planejados - Swagger</title>
+    </head>
+    <body>
+      <div id="swagger-ui"></div>
+      <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+      <script>
+        function getCookie(name) {
+          const prefix = name + "=";
+          const item = document.cookie.split("; ").find(row => row.startsWith(prefix));
+          return item ? decodeURIComponent(item.substring(prefix.length)) : null;
+        }
+
+        function csrfRequestInterceptor(request) {
+          request.credentials = "include";
+          const csrf = getCookie("csrf_token");
+          if (csrf && request.url.includes("/api/v1/auth/")) {
+            request.headers = request.headers || {};
+            request.headers["X-CSRF-Token"] = csrf;
+          }
+          return request;
+        }
+
+        window.ui = SwaggerUIBundle({
+          url: "/openapi.json",
+          dom_id: "#swagger-ui",
+          deepLinking: true,
+          requestInterceptor: csrfRequestInterceptor,
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+          ],
+          layout: "BaseLayout"
+        });
+      </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(html)
 
 
 @app.get("/health", tags=["system"])
