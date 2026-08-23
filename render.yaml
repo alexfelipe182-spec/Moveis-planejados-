@@ -5,7 +5,6 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /ready
-    preDeployCommand: alembic upgrade head
     plan: free
     autoDeploy: true
     envVars:
