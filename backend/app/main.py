@@ -39,7 +39,7 @@ app.include_router(api_router)
 
 @app.get("/docs", include_in_schema=False)
 def swagger_docs():
-    """Swagger UI com teste de autenticação compatível com dispositivos móveis."""
+    """Swagger UI com fluxo de autenticação compatível com dispositivos móveis."""
     html = """
     <!doctype html>
     <html lang="pt-BR">
@@ -51,111 +51,141 @@ def swagger_docs():
       <style>
         body { margin: 0; }
         .ideal-auth-test { margin: 12px auto; padding: 16px; max-width: 1180px; border: 1px solid #d0d0d0; border-radius: 10px; background: #fafafa; box-sizing: border-box; }
-        .ideal-auth-test input { box-sizing: border-box; width: 100%; max-width: 420px; padding: 11px; margin: 4px 0; }
-        .ideal-auth-test button { padding: 11px 14px; margin: 4px 4px 4px 0; border: 1px solid #888; border-radius: 6px; background: white; }
+        .ideal-auth-test input { box-sizing: border-box; width: 100%; max-width: 420px; min-height: 44px; padding: 11px; margin: 4px 0; font-size: 16px; }
+        .ideal-auth-test button { min-height: 44px; padding: 11px 14px; margin: 4px 4px 4px 0; border: 1px solid #888; border-radius: 6px; background: white; font-size: 16px; touch-action: manipulation; }
+        .ideal-auth-test button:disabled { opacity: .55; }
         #ideal-auth-result { margin-top: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       </style>
     </head>
     <body>
       <section class="ideal-auth-test" aria-label="Teste de autenticação">
         <strong>Teste de autenticação: Login → Refresh</strong>
-        <div><input id="ideal-user" type="email" autocomplete="username" placeholder="E-mail"></div>
+        <div><input id="ideal-user" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="E-mail"></div>
         <div><input id="ideal-pass" type="password" autocomplete="current-password" placeholder="Senha"></div>
         <div>
           <button id="ideal-login-refresh" type="button">Testar Login + Refresh</button>
           <button id="ideal-diagnose" type="button">Diagnosticar cookies</button>
         </div>
-        <div id="ideal-auth-result" role="status">Aguardando teste...</div>
+        <div id="ideal-auth-result" role="status" aria-live="polite">Aguardando teste...</div>
       </section>
       <div id="swagger-ui"></div>
       <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
       <script>
         (function () {
-          const CSRF_KEY = "ideal_marcenaria_csrf";
-          const result = document.getElementById("ideal-auth-result");
-          const userInput = document.getElementById("ideal-user");
-          const passInput = document.getElementById("ideal-pass");
+          "use strict";
+          var csrfMemory = null;
+          var result = document.getElementById("ideal-auth-result");
+          var userInput = document.getElementById("ideal-user");
+          var passInput = document.getElementById("ideal-pass");
+          var loginButton = document.getElementById("ideal-login-refresh");
+          var diagnoseButton = document.getElementById("ideal-diagnose");
 
-          function setResult(text) { result.textContent = text; }
+          function setResult(text) { if (result) result.textContent = text; }
           function csrfFromCookie() {
-            const prefix = "csrf_token=";
-            const row = document.cookie.split("; ").find(function (item) { return item.indexOf(prefix) === 0; });
-            return row ? decodeURIComponent(row.substring(prefix.length)) : null;
+            var prefix = "csrf_token=";
+            var cookies = document.cookie ? document.cookie.split("; ") : [];
+            for (var i = 0; i < cookies.length; i += 1) {
+              if (cookies[i].indexOf(prefix) === 0) return decodeURIComponent(cookies[i].substring(prefix.length));
+            }
+            return null;
           }
-          function csrfToken() { return csrfFromCookie() || localStorage.getItem(CSRF_KEY); }
-          async function json(response) {
-            const text = await response.text();
+          function csrfToken() { return csrfFromCookie() || csrfMemory; }
+          async function readJson(response) {
+            var text = await response.text();
             try { return text ? JSON.parse(text) : {}; } catch (_) { return {}; }
           }
+          function csrfHeaders() {
+            var token = csrfToken();
+            var headers = { "Accept": "application/json" };
+            if (token) headers["X-CSRF-Token"] = token;
+            return headers;
+          }
 
-          document.getElementById("ideal-diagnose").addEventListener("click", async function () {
+          if (diagnoseButton) diagnoseButton.addEventListener("click", async function () {
+            diagnoseButton.disabled = true;
             setResult("Verificando cookies...");
             try {
-              const token = csrfToken();
-              const headers = { "Accept": "application/json" };
-              if (token) headers["X-CSRF-Token"] = token;
-              const response = await fetch("/api/v1/auth/cookie-diagnostic", {
-                method: "GET", credentials: "include", cache: "no-store", headers: headers
+              var response = await fetch("/api/v1/auth/cookie-diagnostic", {
+                method: "GET", credentials: "include", cache: "no-store", headers: csrfHeaders()
               });
-              setResult(JSON.stringify(await json(response), null, 2));
-            } catch (error) { setResult("Erro de rede: " + error.message); }
+              setResult(JSON.stringify(await readJson(response), null, 2));
+            } catch (error) {
+              setResult("Erro de rede: " + (error && error.message ? error.message : "desconhecido"));
+            } finally { diagnoseButton.disabled = false; }
           });
 
-          document.getElementById("ideal-login-refresh").addEventListener("click", async function () {
-            const username = userInput.value.trim();
-            const password = passInput.value;
+          if (loginButton) loginButton.addEventListener("click", async function () {
+            var username = userInput ? userInput.value.trim() : "";
+            var password = passInput ? passInput.value : "";
             if (!username || !password) { setResult("Informe e-mail e senha."); return; }
+            loginButton.disabled = true;
+            if (diagnoseButton) diagnoseButton.disabled = true;
             setResult("Executando login...");
             try {
-              const login = await fetch("/api/v1/auth/login", {
+              var login = await fetch("/api/v1/auth/login", {
                 method: "POST", credentials: "include", cache: "no-store",
-                headers: { "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({ grant_type: "", username: username, password: password, scope: "", client_id: "", client_secret: "" })
+                headers: { "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+                body: new URLSearchParams({ grant_type: "", username: username, password: password, scope: "", client_id: "", client_secret: "" }).toString()
               });
-              const loginBody = await json(login);
-              if (!login.ok) { setResult("Login: " + login.status); return; }
-              if (loginBody.csrf_token) localStorage.setItem(CSRF_KEY, loginBody.csrf_token);
-              const token = csrfToken();
-              if (!token) { setResult("Login: 200\nCSRF não encontrado."); return; }
-              setResult("Login: 200\nExecutando refresh...");
-              const refresh = await fetch("/api/v1/auth/refresh", {
-                method: "POST", credentials: "include", cache: "no-store",
-                headers: { "Accept": "application/json", "X-CSRF-Token": token }
+              var loginBody = await readJson(login);
+              if (!login.ok) { setResult("Login: " + login.status + "\nErro: " + (loginBody.detail || "falha")); return; }
+              csrfMemory = loginBody.csrf_token || csrfFromCookie();
+              if (!csrfToken()) { setResult("Login: 200\nCSRF não encontrado no cookie nem na resposta."); return; }
+
+              var diagnostic = await fetch("/api/v1/auth/cookie-diagnostic", {
+                method: "GET", credentials: "include", cache: "no-store", headers: csrfHeaders()
               });
-              const refreshBody = await json(refresh);
-              if (!refresh.ok) {
-                setResult("Login: 200\nRefresh: " + refresh.status + "\nErro: " + (refreshBody.detail || "falha"));
+              var diagnosticBody = await readJson(diagnostic);
+              if (!diagnostic.ok || !diagnosticBody.csrf_matches || !diagnosticBody.has_refresh_token) {
+                setResult("Login: 200\nDiagnóstico: falhou\n" + JSON.stringify(diagnosticBody, null, 2));
                 return;
               }
-              if (refreshBody.csrf_token) localStorage.setItem(CSRF_KEY, refreshBody.csrf_token);
-              setResult("Login: 200\nRefresh: 200\nFluxo login → refresh funcionando.");
-            } catch (error) { setResult("Erro de rede: " + error.message); }
+
+              setResult("Login: 200\nDiagnóstico: OK\nExecutando refresh...");
+              var refresh = await fetch("/api/v1/auth/refresh", {
+                method: "POST", credentials: "include", cache: "no-store", headers: csrfHeaders()
+              });
+              var refreshBody = await readJson(refresh);
+              if (!refresh.ok) {
+                setResult("Login: 200\nDiagnóstico: OK\nRefresh: " + refresh.status + "\nErro: " + (refreshBody.detail || "falha"));
+                return;
+              }
+              csrfMemory = refreshBody.csrf_token || csrfFromCookie();
+              setResult("Login: 200\nDiagnóstico: OK\nRefresh: 200\nRotação: OK\nFluxo login → refresh funcionando.");
+            } catch (error) {
+              setResult("Erro de rede: " + (error && error.message ? error.message : "desconhecido"));
+            } finally {
+              loginButton.disabled = false;
+              if (diagnoseButton) diagnoseButton.disabled = false;
+            }
           });
 
-          window.ui = SwaggerUIBundle({
-            url: "/openapi.json",
-            dom_id: "#swagger-ui",
-            deepLinking: true,
-            requestInterceptor: function (request) {
-              request.credentials = "include";
-              const token = csrfToken();
-              if (token && request.url.indexOf("/api/v1/auth/") !== -1) {
-                request.headers = request.headers || {};
-                request.headers["X-CSRF-Token"] = token;
-              }
-              return request;
-            },
-            responseInterceptor: function (response) {
-              try {
-                const body = response && (response.data || response.body);
-                const parsed = typeof body === "string" ? JSON.parse(body) : body;
-                if (parsed && parsed.csrf_token) localStorage.setItem(CSRF_KEY, parsed.csrf_token);
-              } catch (_) {}
-              return response;
-            },
-            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-            layout: "BaseLayout"
-          });
+          if (typeof SwaggerUIBundle === "function") {
+            window.ui = SwaggerUIBundle({
+              url: "/openapi.json",
+              dom_id: "#swagger-ui",
+              deepLinking: true,
+              requestInterceptor: function (request) {
+                request.credentials = "include";
+                var token = csrfToken();
+                if (token && request.url.indexOf("/api/v1/auth/") !== -1) {
+                  request.headers = request.headers || {};
+                  request.headers["X-CSRF-Token"] = token;
+                }
+                return request;
+              },
+              responseInterceptor: function (response) {
+                try {
+                  var body = response && (response.data || response.body);
+                  var parsed = typeof body === "string" ? JSON.parse(body) : body;
+                  if (parsed && parsed.csrf_token) csrfMemory = parsed.csrf_token;
+                } catch (_) {}
+                return response;
+              },
+              presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+              layout: "BaseLayout"
+            });
+          }
         })();
       </script>
     </body>
