@@ -27,6 +27,29 @@ def promote_to_admin(email: str):
         db.close()
 
 
+def test_swagger_page_and_cookie_diagnostic(client):
+    docs = client.get("/docs")
+    assert docs.status_code == 200
+    assert "Testar Login + Refresh" in docs.text
+    assert "credentials: \"include\"" in docs.text
+    assert "X-CSRF-Token" in docs.text
+
+    email = "teste.swagger.mobile@example.com"
+    password = "Senha-Forte-123!"
+    assert client.post("/api/v1/auth/register", json={"name": "Teste Swagger", "email": email, "password": password}).status_code == 201
+    login = client.post("/api/v1/auth/login", data={"username": email, "password": password})
+    assert login.status_code == 200
+
+    token = login.json()["csrf_token"]
+    diagnostic = client.get("/api/v1/auth/cookie-diagnostic", headers={"X-CSRF-Token": token})
+    assert diagnostic.status_code == 200
+    body = diagnostic.json()
+    assert body["has_refresh_token"] is True
+    assert body["has_csrf_cookie"] is True
+    assert body["csrf_header_received"] is True
+    assert body["csrf_matches"] is True
+
+
 def test_auth_flow(client):
     email = "teste.auth@example.com"
     password = "Senha-Forte-123!"
@@ -92,6 +115,7 @@ def test_non_admin_cannot_mutate_crud(client):
     email = "teste.crud.csrf@example.com"
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Teste CRUD", "email": email, "password": password}).status_code == 201
+
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
 
     payload = {"name": "Dormitórios", "description": "Móveis para dormitórios"}
