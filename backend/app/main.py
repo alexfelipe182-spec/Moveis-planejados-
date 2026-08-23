@@ -40,7 +40,7 @@ app.include_router(api_router)
 
 @app.get("/docs", include_in_schema=False)
 def swagger_docs():
-    """Swagger UI com cookies e CSRF habilitados para testes de autenticação."""
+    """Swagger UI com cookies, CSRF e refresh token habilitados para testes."""
     html = """
     <!DOCTYPE html>
     <html>
@@ -54,17 +54,22 @@ def swagger_docs():
       <div id="swagger-ui"></div>
       <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
       <script>
+        const CSRF_STORAGE_KEY = "ideal_marcenaria_csrf";
+
         function getCookie(name) {
           const prefix = name + "=";
           const item = document.cookie.split("; ").find(row => row.startsWith(prefix));
           return item ? decodeURIComponent(item.substring(prefix.length)) : null;
         }
 
+        function getCsrfToken() {
+          return getCookie("csrf_token") || localStorage.getItem(CSRF_STORAGE_KEY);
+        }
+
         async function csrfRequestInterceptor(request) {
           request.credentials = "include";
 
-          // Garante que o cookie CSRF exista antes de chamadas autenticadas.
-          // O refresh_token continua HttpOnly e nunca fica exposto ao JavaScript.
+          // Garante que exista um cookie CSRF antes de qualquer operação protegida.
           if (request.url.includes("/api/v1/auth/") && request.url.includes("/refresh")) {
             if (!getCookie("csrf_token")) {
               await fetch("/api/v1/auth/csrf", {
@@ -75,12 +80,31 @@ def swagger_docs():
             }
           }
 
-          const csrf = getCookie("csrf_token");
+          const csrf = getCsrfToken();
           if (csrf && request.url.includes("/api/v1/auth/")) {
             request.headers = request.headers || {};
             request.headers["X-CSRF-Token"] = csrf;
           }
+
           return request;
+        }
+
+        function csrfResponseInterceptor(response) {
+          // O login e o refresh devolvem o CSRF no JSON. Guardamos somente o CSRF;
+          // refresh_token continua exclusivamente em cookie HttpOnly.
+          try {
+            if (response && response.body) {
+              const body = typeof response.body === "string"
+                ? JSON.parse(response.body)
+                : response.body;
+              if (body && body.csrf_token) {
+                localStorage.setItem(CSRF_STORAGE_KEY, body.csrf_token);
+              }
+            }
+          } catch (e) {
+            // Respostas que não sejam JSON são ignoradas.
+          }
+          return response;
         }
 
         window.ui = SwaggerUIBundle({
@@ -88,6 +112,7 @@ def swagger_docs():
           dom_id: "#swagger-ui",
           deepLinking: true,
           requestInterceptor: csrfRequestInterceptor,
+          responseInterceptor: csrfResponseInterceptor,
           presets: [
             SwaggerUIBundle.presets.apis,
             SwaggerUIBundle.SwaggerUIStandalonePreset
