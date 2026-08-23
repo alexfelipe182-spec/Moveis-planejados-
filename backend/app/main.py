@@ -179,7 +179,7 @@ def cookie_diagnostic(
         "has_refresh_token": bool(refresh_token),
         "has_csrf_cookie": bool(csrf_token),
         "csrf_header_received": bool(csrf_header),
-        "csrf_matches": bool(csrf_cookie and csrf_header and csrf_cookie == csrf_header),
+        "csrf_matches": bool(csrf_token and csrf_header and csrf_token == csrf_header),
         "origin": request.headers.get("origin"),
     }
 
