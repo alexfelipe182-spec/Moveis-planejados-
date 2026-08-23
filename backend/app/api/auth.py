@@ -7,6 +7,7 @@ from email.message import EmailMessage
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import CSRF_COOKIE, require_csrf
@@ -87,6 +88,9 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email}"))
         db.commit()
         db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado") from None
     except Exception:
         db.rollback()
         raise
@@ -110,7 +114,7 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
 
 @router.post("/password-reset/request", response_model=PasswordResetResponse)
 def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
-    email = str(payload.email).lower()
+    email = str(payload.email).strip().lower()
     user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
     if not user:
         return PasswordResetResponse(message="Se o e-mail estiver cadastrado, as instruções de recuperação serão enviadas.")
@@ -138,7 +142,9 @@ def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(
         raise HTTPException(status_code=400, detail="Usuário inválido ou inativo")
     user.password_hash = hash_password(payload.new_password)
     record.used_at = _now()
-    db.add(Activity(user_id=user.id, action="password_reset", entity="user", entity_id=user.id, description="Senha redefinida com sucesso"))
+    for refresh_token in db.scalars(select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked.is_(False))).all():
+        refresh_token.revoked = True
+    db.add(Activity(user_id=user.id, action="password_reset", entity="user", entity_id=user.id, description="Senha redefinida; sessões anteriores revogadas"))
     db.commit()
     return {"message": "Senha redefinida com sucesso. Faça login novamente."}
 
@@ -153,7 +159,9 @@ def refresh(response: Response, _: None = Depends(require_csrf), refresh_token: 
         raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado") from None
     if payload.get("type") != "refresh" or not payload.get("sub") or not payload.get("jti"):
         raise HTTPException(status_code=401, detail="Refresh token inválido")
-    stored = db.scalar(select(RefreshToken).where(RefreshToken.token_jti == payload["jti"]))
+    # PostgreSQL serializa duas tentativas simultâneas de refresh para o mesmo
+    # JTI. A primeira rotação vence; a segunda encontra o token já revogado.
+    stored = db.scalar(select(RefreshToken).where(RefreshToken.token_jti == payload["jti"]).with_for_update())
     if not stored or stored.revoked or stored.expires_at <= _now():
         raise HTTPException(status_code=401, detail="Refresh token revogado ou expirado")
     try:
