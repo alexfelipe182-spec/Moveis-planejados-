@@ -64,8 +64,7 @@ jobs:
             -p 8000:8000 \
             -e SECRET_KEY=docker-test-secret-key-only \
             -e ENVIRONMENT=test \
-            -e DATABASE_URL='postgresql+psycopg://postgres:postgres@host.docker.internal:5432/marcenaria_db' \
-            --add-host=host.docker.internal:host-gateway \
+            -e DATABASE_URL='postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_db' \
             moveis-planejados-api:ci
 
           for i in {1..30}; do
