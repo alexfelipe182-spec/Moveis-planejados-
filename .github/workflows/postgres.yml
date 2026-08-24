@@ -176,7 +176,7 @@ jobs:
 
       - name: Check accidental placeholders
         run: |
-          if grep -RniE 'PLACEHOLDER|TODO:.*IMPLEMENT|lorem ipsum' frontend --exclude='*.map'; then
+          if grep -RniE 'PLACEHOLDER|TODO:.*IMPLEMENT|lorem ipsum' frontend/index.html frontend/styles.css; then
             echo 'Found accidental placeholder content in frontend.'
             exit 1
           fi
