@@ -2,7 +2,8 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 
 from app.core.config import settings
 
@@ -38,5 +39,5 @@ def create_refresh_token(subject: str) -> tuple[str, str, datetime]:
 def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise ValueError("Token inválido ou expirado") from exc
