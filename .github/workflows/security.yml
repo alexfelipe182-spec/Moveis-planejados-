@@ -28,8 +28,15 @@ jobs:
           fetch-depth: 0
 
       - name: Install Gitleaks
+        env:
+          GITLEAKS_VERSION: "8.24.2"
         run: |
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o "$RUNNER_TEMP/gitleaks.tar.gz"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/bin" gitleaks
+          chmod +x "$RUNNER_TEMP/bin/gitleaks"
+          "$RUNNER_TEMP/bin/gitleaks" version
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Scan repository for secrets
