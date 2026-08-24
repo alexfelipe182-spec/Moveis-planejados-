@@ -20,13 +20,9 @@ concurrency:
 
 jobs:
   analyze:
-    name: CodeQL - ${{ matrix.language }}
+    name: CodeQL - Python
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [python, javascript]
 
     steps:
       - name: Checkout
@@ -35,16 +31,12 @@ jobs:
           fetch-depth: 1
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
+          languages: python
           queries: security-extended
 
-      # Python e JavaScript deste projeto não exigem compilação para análise.
-      # O autobuild foi removido para evitar falhas de configuração/leitura
-      # em linguagens interpretadas e em um frontend estático.
-
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
-          category: /language:${{ matrix.language }}
+          category: /language:python
