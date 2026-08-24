@@ -32,15 +32,18 @@ jobs:
           GITLEAKS_VERSION: "8.24.2"
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/bin"
+          GITLEAKS_BIN="$RUNNER_TEMP/bin/gitleaks"
+          mkdir -p "$(dirname "$GITLEAKS_BIN")"
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o "$RUNNER_TEMP/gitleaks.tar.gz"
-          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/bin" gitleaks
-          chmod +x "$RUNNER_TEMP/bin/gitleaks"
-          "$RUNNER_TEMP/bin/gitleaks" version
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$(dirname "$GITLEAKS_BIN")" gitleaks
+          chmod +x "$GITLEAKS_BIN"
+          "$GITLEAKS_BIN" version
+          echo "$GITLEAKS_BIN" > "$RUNNER_TEMP/gitleaks-path"
 
       - name: Scan repository for secrets
-        run: gitleaks detect --source=. --no-banner --redact
+        env:
+          GITLEAKS_BIN: ${{ runner.temp }}/bin/gitleaks
+        run: "$GITLEAKS_BIN detect --source=. --no-banner --redact"
 
   python-audit:
     name: Python dependency audit
