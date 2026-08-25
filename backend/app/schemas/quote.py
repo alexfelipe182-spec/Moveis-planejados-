@@ -17,7 +17,11 @@ class QuoteBase(BaseModel):
 
 
 class QuoteCreate(QuoteBase):
-    pass
+    material_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    hardware_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    labor_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    finishing_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    profit_margin: Decimal = Field(default=30, ge=0, le=100, max_digits=5, decimal_places=2)
 
 
 class QuoteUpdate(BaseModel):
