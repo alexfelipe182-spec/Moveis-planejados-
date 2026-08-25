@@ -1,6 +1,7 @@
 from fastapi import Cookie, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -8,6 +9,7 @@ from starlette.responses import Response
 from app.api.auth import router as auth_router
 from app.api.routes import api_router
 from app.core.config import settings
+from app.core.resilience import DistributedRateLimiter
 from app.database import engine
 
 
@@ -23,6 +25,28 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class TrafficProtectionMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, limiter: DistributedRateLimiter):
+        super().__init__(app)
+        self.limiter = limiter
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        if request.url.path in {"/health", "/ready"}:
+            return await call_next(request)
+        forwarded = request.headers.get("x-forwarded-for")
+        client = forwarded.split(",", 1)[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+        decision = await self.limiter.allow(client)
+        if not decision.allowed:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Muitas requisições. Tente novamente em instantes."},
+                headers={"Retry-After": str(decision.retry_after)},
+            )
+        response = await call_next(request)
+        response.headers.setdefault("X-RateLimit-Limit", str(settings.rate_limit_per_minute))
+        return response
+
+
 app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
@@ -31,6 +55,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+)
+app.add_middleware(
+    TrafficProtectionMiddleware,
+    limiter=DistributedRateLimiter(
+        settings.redis_url,
+        limit=settings.rate_limit_per_minute,
+    ),
 )
 
 app.include_router(auth_router, prefix="/api/v1")
@@ -79,7 +110,6 @@ def swagger_docs():
           var passInput = document.getElementById("ideal-pass");
           var loginButton = document.getElementById("ideal-login-refresh");
           var diagnoseButton = document.getElementById("ideal-diagnose");
-
           function setResult(text) { if (result) result.textContent = text; }
           function csrfFromCookie() {
             var prefix = "csrf_token=";
@@ -90,101 +120,37 @@ def swagger_docs():
             return null;
           }
           function csrfToken() { return csrfFromCookie() || csrfMemory; }
-          async function readJson(response) {
-            var text = await response.text();
-            try { return text ? JSON.parse(text) : {}; } catch (_) { return {}; }
-          }
-          function csrfHeaders() {
-            var token = csrfToken();
-            var headers = { "Accept": "application/json" };
-            if (token) headers["X-CSRF-Token"] = token;
-            return headers;
-          }
-
+          async function readJson(response) { var text = await response.text(); try { return text ? JSON.parse(text) : {}; } catch (_) { return {}; } }
+          function csrfHeaders() { var token = csrfToken(); var headers = { "Accept": "application/json" }; if (token) headers["X-CSRF-Token"] = token; return headers; }
           if (diagnoseButton) diagnoseButton.addEventListener("click", async function () {
-            diagnoseButton.disabled = true;
-            setResult("Verificando cookies...");
-            try {
-              var response = await fetch("/api/v1/auth/cookie-diagnostic", {
-                method: "GET", credentials: "include", cache: "no-store", headers: csrfHeaders()
-              });
-              setResult(JSON.stringify(await readJson(response), null, 2));
-            } catch (error) {
-              setResult("Erro de rede: " + (error && error.message ? error.message : "desconhecido"));
-            } finally { diagnoseButton.disabled = false; }
+            diagnoseButton.disabled = true; setResult("Verificando cookies...");
+            try { var response = await fetch("/api/v1/auth/cookie-diagnostic", { method: "GET", credentials: "include", cache: "no-store", headers: csrfHeaders() }); setResult(JSON.stringify(await readJson(response), null, 2)); }
+            catch (error) { setResult("Erro de rede: " + (error && error.message ? error.message : "desconhecido")); }
+            finally { diagnoseButton.disabled = false; }
           });
-
           if (loginButton) loginButton.addEventListener("click", async function () {
-            var username = userInput ? userInput.value.trim() : "";
-            var password = passInput ? passInput.value : "";
+            var username = userInput ? userInput.value.trim() : ""; var password = passInput ? passInput.value : "";
             if (!username || !password) { setResult("Informe e-mail e senha."); return; }
-            loginButton.disabled = true;
-            if (diagnoseButton) diagnoseButton.disabled = true;
-            setResult("Executando login...");
+            loginButton.disabled = true; if (diagnoseButton) diagnoseButton.disabled = true; setResult("Executando login...");
             try {
-              var login = await fetch("/api/v1/auth/login", {
-                method: "POST", credentials: "include", cache: "no-store",
-                headers: { "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-                body: new URLSearchParams({ grant_type: "", username: username, password: password, scope: "", client_id: "", client_secret: "" }).toString()
-              });
+              var login = await fetch("/api/v1/auth/login", { method: "POST", credentials: "include", cache: "no-store", headers: { "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: new URLSearchParams({ grant_type: "", username: username, password: password, scope: "", client_id: "", client_secret: "" }).toString() });
               var loginBody = await readJson(login);
               if (!login.ok) { setResult("Login: " + login.status + "\nErro: " + (loginBody.detail || "falha")); return; }
               csrfMemory = loginBody.csrf_token || csrfFromCookie();
               if (!csrfToken()) { setResult("Login: 200\nCSRF não encontrado no cookie nem na resposta."); return; }
-
-              var diagnostic = await fetch("/api/v1/auth/cookie-diagnostic", {
-                method: "GET", credentials: "include", cache: "no-store", headers: csrfHeaders()
-              });
+              var diagnostic = await fetch("/api/v1/auth/cookie-diagnostic", { method: "GET", credentials: "include", cache: "no-store", headers: csrfHeaders() });
               var diagnosticBody = await readJson(diagnostic);
-              if (!diagnostic.ok || !diagnosticBody.csrf_matches || !diagnosticBody.has_refresh_token) {
-                setResult("Login: 200\nDiagnóstico: falhou\n" + JSON.stringify(diagnosticBody, null, 2));
-                return;
-              }
-
+              if (!diagnostic.ok || !diagnosticBody.csrf_matches || !diagnosticBody.has_refresh_token) { setResult("Login: 200\nDiagnóstico: falhou\n" + JSON.stringify(diagnosticBody, null, 2)); return; }
               setResult("Login: 200\nDiagnóstico: OK\nExecutando refresh...");
-              var refresh = await fetch("/api/v1/auth/refresh", {
-                method: "POST", credentials: "include", cache: "no-store", headers: csrfHeaders()
-              });
+              var refresh = await fetch("/api/v1/auth/refresh", { method: "POST", credentials: "include", cache: "no-store", headers: csrfHeaders() });
               var refreshBody = await readJson(refresh);
-              if (!refresh.ok) {
-                setResult("Login: 200\nDiagnóstico: OK\nRefresh: " + refresh.status + "\nErro: " + (refreshBody.detail || "falha"));
-                return;
-              }
-              csrfMemory = refreshBody.csrf_token || csrfFromCookie();
-              setResult("Login: 200\nDiagnóstico: OK\nRefresh: 200\nRotação: OK\nFluxo login → refresh funcionando.");
-            } catch (error) {
-              setResult("Erro de rede: " + (error && error.message ? error.message : "desconhecido"));
-            } finally {
-              loginButton.disabled = false;
-              if (diagnoseButton) diagnoseButton.disabled = false;
-            }
+              if (!refresh.ok) { setResult("Login: 200\nDiagnóstico: OK\nRefresh: " + refresh.status + "\nErro: " + (refreshBody.detail || "falha")); return; }
+              csrfMemory = refreshBody.csrf_token || csrfFromCookie(); setResult("Login: 200\nDiagnóstico: OK\nRefresh: 200\nRotação: OK\nFluxo login → refresh funcionando.");
+            } catch (error) { setResult("Erro de rede: " + (error && error.message ? error.message : "desconhecido")); }
+            finally { loginButton.disabled = false; if (diagnoseButton) diagnoseButton.disabled = false; }
           });
-
           if (typeof SwaggerUIBundle === "function") {
-            window.ui = SwaggerUIBundle({
-              url: "/openapi.json",
-              dom_id: "#swagger-ui",
-              deepLinking: true,
-              requestInterceptor: function (request) {
-                request.credentials = "include";
-                var token = csrfToken();
-                if (token && request.url.indexOf("/api/v1/auth/") !== -1) {
-                  request.headers = request.headers || {};
-                  request.headers["X-CSRF-Token"] = token;
-                }
-                return request;
-              },
-              responseInterceptor: function (response) {
-                try {
-                  var body = response && (response.data || response.body);
-                  var parsed = typeof body === "string" ? JSON.parse(body) : body;
-                  if (parsed && parsed.csrf_token) csrfMemory = parsed.csrf_token;
-                } catch (_) {}
-                return response;
-              },
-              presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-              layout: "BaseLayout"
-            });
+            window.ui = SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui", deepLinking: true, requestInterceptor: function (request) { request.credentials = "include"; var token = csrfToken(); if (token && request.url.indexOf("/api/v1/auth/") !== -1) { request.headers = request.headers || {}; request.headers["X-CSRF-Token"] = token; } return request; }, responseInterceptor: function (response) { try { var body = response && (response.data || response.body); var parsed = typeof body === "string" ? JSON.parse(body) : body; if (parsed && parsed.csrf_token) csrfMemory = parsed.csrf_token; } catch (_) {} return response; }, presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset], layout: "BaseLayout" });
           }
         })();
       </script>
@@ -198,20 +164,9 @@ def swagger_docs():
 
 
 @app.get("/api/v1/auth/cookie-diagnostic", tags=["authentication-diagnostics"])
-def cookie_diagnostic(
-    request: Request,
-    refresh_token: str | None = Cookie(default=None),
-    csrf_token: str | None = Cookie(default=None),
-    csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
-):
+def cookie_diagnostic(request: Request, refresh_token: str | None = Cookie(default=None), csrf_token: str | None = Cookie(default=None), csrf_header: str | None = Header(default=None, alias="X-CSRF-Token")):
     """Diagnóstico seguro: retorna apenas presença/comparação, nunca tokens."""
-    return {
-        "has_refresh_token": bool(refresh_token),
-        "has_csrf_cookie": bool(csrf_token),
-        "csrf_header_received": bool(csrf_header),
-        "csrf_matches": bool(csrf_token and csrf_header and csrf_token == csrf_header),
-        "origin": request.headers.get("origin"),
-    }
+    return {"has_refresh_token": bool(refresh_token), "has_csrf_cookie": bool(csrf_token), "csrf_header_received": bool(csrf_header), "csrf_matches": bool(csrf_token and csrf_header and csrf_token == csrf_header), "origin": request.headers.get("origin")}
 
 
 @app.get("/health", tags=["system"])
