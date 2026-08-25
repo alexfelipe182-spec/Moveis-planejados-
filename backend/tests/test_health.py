@@ -10,11 +10,13 @@ def test_health_is_alive():
     assert response.json()["status"] == "ok"
 
 
-def test_readiness_checks_database():
+def test_readiness_checks_database_and_redis():
     with TestClient(app) as client:
         response = client.get("/ready")
     assert response.status_code == 200
-    assert response.json()["status"] == "ready"
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["dependencies"] == {"postgres": "ok", "redis": "ok"}
 
 
 def test_security_headers_are_present():
