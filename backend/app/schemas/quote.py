@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -31,3 +32,11 @@ class QuoteUpdate(BaseModel):
 class QuoteRead(QuoteBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    material_cost: Decimal = Decimal("0")
+    hardware_cost: Decimal = Decimal("0")
+    labor_cost: Decimal = Decimal("0")
+    finishing_cost: Decimal = Decimal("0")
+    profit_margin: Decimal = Decimal("30")
+    suggested_total: Decimal = Decimal("0")
+    ai_analysis: str | None = None
+    ai_analyzed_at: datetime | None = None
