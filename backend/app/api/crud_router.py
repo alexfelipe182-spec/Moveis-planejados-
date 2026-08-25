@@ -40,7 +40,11 @@ def _payload_data(payload) -> dict:
 
 
 def make_router(model, create_schema, read_schema, update_schema, prefix: str):
-    router = APIRouter(prefix=prefix, tags=[prefix.strip("/").capitalize()], dependencies=[Depends(get_current_user)])
+    # FastAPI rejects an included router when both its prefix and operation
+    # path are empty. A root CRUD router is intentionally mounted under the
+    # parent resource (for example /quotes), so give it a slash route here.
+    router_prefix = prefix or "/"
+    router = APIRouter(prefix=router_prefix, tags=[prefix.strip("/").capitalize() or "Resource"], dependencies=[Depends(get_current_user)])
 
     @router.get("", response_model=list[read_schema])
     def list_all(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=100), db: Session = Depends(get_db)):
