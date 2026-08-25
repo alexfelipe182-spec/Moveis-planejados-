@@ -1,5 +1,6 @@
 name: CI - PostgreSQL + Redis + Alembic + API + Frontend
 
+# CI validation: backend Ruff is intentionally a required first quality gate.
 on:
   workflow_dispatch:
   push:
