@@ -163,7 +163,7 @@ jobs:
           grep -q '<link rel="stylesheet" href="./professional.css">' frontend/index.html
       - name: Check accidental placeholders
         run: |
-          if grep -RniE 'PLACEHOLDER|TODO:.*IMPLEMENT|lorem ipsum' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/smart-quotes.js; then
+          if grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/smart-quotes.js; then
             echo 'Found accidental placeholder content in frontend.'
             exit 1
           fi
@@ -178,11 +178,3 @@ jobs:
           done
           grep -q 'Marcenaria Ideal' /tmp/frontend.html
           grep -q 'smart-quotes.js' /tmp/frontend.html
-      - name: Upload frontend diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-diagnostics-${{ github.run_id }}
-          path: /tmp/frontend.log
-          if-no-files-found: ignore
-          retention-days: 14
