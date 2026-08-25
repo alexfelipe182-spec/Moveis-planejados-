@@ -73,7 +73,40 @@ jobs:
         run: python -m pip check
       - name: Verify imports
         working-directory: backend
-        run: python -c "import app.main; import app.database; import app.models; import app.schemas; import app.api.auth; import app.api.routes; import app.core.resilience"
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          python - <<'PY'
+          import importlib
+          import os
+          import sys
+          import traceback
+
+          modules = (
+              "app.main",
+              "app.database",
+              "app.models",
+              "app.schemas",
+              "app.api.auth",
+              "app.api.routes",
+              "app.api.crud_router",
+              "app.core.resilience",
+          )
+
+          print("Python:", sys.version)
+          print("Working directory:", os.getcwd())
+          print("PYTHONPATH:", os.environ.get("PYTHONPATH"))
+          print("sys.path:", sys.path)
+
+          for module in modules:
+              try:
+                  importlib.import_module(module)
+              except Exception:
+                  print(f"IMPORT FAILED: {module}")
+                  traceback.print_exc()
+                  raise
+              print(f"IMPORT OK: {module}")
+          PY
       - name: Verify PostgreSQL
         run: python -c "from sqlalchemy import create_engine,text; import os; e=create_engine(os.environ['DATABASE_URL']); c=e.connect(); assert c.execute(text('select 1')).scalar()==1; c.close(); e.dispose()"
       - name: Verify Redis
