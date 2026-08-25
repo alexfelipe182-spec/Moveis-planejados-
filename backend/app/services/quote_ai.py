@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timezone
 from decimal import Decimal
 
 
@@ -29,6 +30,7 @@ def analyze_quote(
         "warnings": warnings,
         "recommendations": recommendations,
         "ai_analysis": None,
+        "ai_analyzed_at": None,
         "requires_approval": True,
     }
 
@@ -65,7 +67,9 @@ def analyze_quote(
             ],
         )
         result["ai_analysis"] = response.output_text
+        result["ai_analyzed_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
     except Exception:
         result["ai_analysis"] = None
+        result["ai_analyzed_at"] = None
 
     return result
