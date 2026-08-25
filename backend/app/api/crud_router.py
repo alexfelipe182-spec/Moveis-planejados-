@@ -55,8 +55,10 @@ def make_router(
     prefix: str,
     *,
     include_create: bool = True,
+    include_update: bool = True,
+    include_delete: bool = True,
 ):
-    """Builds a protected CRUD router, including safe nested-router support."""
+    """Build a protected CRUD router with optional operations for specialized resources."""
     if prefix and not prefix.startswith("/"):
         raise ValueError("O prefixo do CRUD deve começar com '/'")
     if prefix.endswith("/"):
@@ -99,73 +101,56 @@ def make_router(
         ):
             try:
                 item = crud.create_item(db, model(**_payload_data(payload)))
-                _log(
-                    db,
-                    current_user,
-                    "created",
-                    model,
-                    item.id,
-                    f"Criou {_entity_name(model)} #{item.id}",
-                )
+                _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
                 _emit("created", model, item.id, current_user.id)
                 return item
             except ValueError as exc:
                 raise _database_conflict(exc) from exc
 
-    @router.put(
-        "/{item_id}",
-        response_model=read_schema,
-        dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
-    )
-    def update(
-        item_id: int,
-        payload: update_schema,
-        current_user: User = Depends(require_admin),
-        db: Session = Depends(get_db),
-    ):
-        item = crud.get_item(db, model, item_id)
-        if not item:
-            raise HTTPException(status_code=404, detail="Registro não encontrado")
-        try:
-            item = crud.update_item(db, item, _payload_data(payload))
-            _log(
-                db,
-                current_user,
-                "updated",
-                model,
-                item.id,
-                f"Atualizou {_entity_name(model)} #{item.id}",
-            )
-            _emit("updated", model, item.id, current_user.id)
-            return item
-        except ValueError as exc:
-            raise _database_conflict(exc) from exc
+    if include_update:
 
-    @router.delete(
-        "/{item_id}",
-        status_code=204,
-        dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
-    )
-    def delete(
-        item_id: int,
-        current_user: User = Depends(require_admin),
-        db: Session = Depends(get_db),
-    ):
-        item = crud.get_item(db, model, item_id)
-        if not item:
-            raise HTTPException(status_code=404, detail="Registro não encontrado")
-        try:
-            crud.delete_item(db, item)
-            _log(
-                db,
-                current_user,
-                "deleted",
-                model,
-                item_id,
-                f"Excluiu {_entity_name(model)} #{item_id}",
-            )
-            _emit("deleted", model, item_id, current_user.id)
-        except ValueError as exc:
-            raise _database_conflict(exc) from exc
+        @router.put(
+            "/{item_id}",
+            response_model=read_schema,
+            dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+        )
+        def update(
+            item_id: int,
+            payload: update_schema,
+            current_user: User = Depends(require_admin),
+            db: Session = Depends(get_db),
+        ):
+            item = crud.get_item(db, model, item_id)
+            if not item:
+                raise HTTPException(status_code=404, detail="Registro não encontrado")
+            try:
+                item = crud.update_item(db, item, _payload_data(payload))
+                _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
+                _emit("updated", model, item.id, current_user.id)
+                return item
+            except ValueError as exc:
+                raise _database_conflict(exc) from exc
+
+    if include_delete:
+
+        @router.delete(
+            "/{item_id}",
+            status_code=204,
+            dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+        )
+        def delete(
+            item_id: int,
+            current_user: User = Depends(require_admin),
+            db: Session = Depends(get_db),
+        ):
+            item = crud.get_item(db, model, item_id)
+            if not item:
+                raise HTTPException(status_code=404, detail="Registro não encontrado")
+            try:
+                crud.delete_item(db, item)
+                _log(db, current_user, "deleted", model, item_id, f"Excluiu {_entity_name(model)} #{item_id}")
+                _emit("deleted", model, item_id, current_user.id)
+            except ValueError as exc:
+                raise _database_conflict(exc) from exc
 
     return router
