@@ -8,10 +8,12 @@ class Settings(BaseSettings):
     app_name: str = "Moveis Planejados API"
     environment: str = "development"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/marcenaria_db"
+    redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    rate_limit_per_minute: int = 120
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     smtp_host: str | None = None
     smtp_port: int = 587
@@ -39,6 +41,10 @@ class Settings(BaseSettings):
             raise ValueError("Os tempos de expiração devem ser maiores que zero")
         if self.password_reset_expire_minutes < 5:
             raise ValueError("PASSWORD_RESET_EXPIRE_MINUTES deve ser pelo menos 5")
+        if self.rate_limit_per_minute < 1:
+            raise ValueError("RATE_LIMIT_PER_MINUTE deve ser maior que zero")
+        if not self.redis_url.startswith(("redis://", "rediss://")):
+            raise ValueError("REDIS_URL deve usar redis:// ou rediss://")
         if not self.cors_origins:
             raise ValueError("CORS_ORIGINS deve conter pelo menos uma origem")
         normalized_origins: list[str] = []
