@@ -44,37 +44,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/requirements.txt
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
           python -m pip install pytest-cov pip-audit ruff
-
       - name: Ruff
         working-directory: backend
         run: ruff check .
-
       - name: Compile Python
         run: python -m compileall -q backend
-
       - name: pip check
         run: python -m pip check
-
       - name: Verify imports
         working-directory: backend
         run: python -c "import app.main; import app.database; import app.models; import app.schemas; import app.api.auth; import app.api.routes"
-
       - name: Verify PostgreSQL connection
         run: python -c "from sqlalchemy import create_engine, text; import os; e=create_engine(os.environ['DATABASE_URL']); c=e.connect(); assert c.execute(text('select 1')).scalar()==1; c.close(); e.dispose()"
-
       - name: Verify exactly one Alembic head
         working-directory: backend
         run: |
@@ -87,18 +79,15 @@ jobs:
           if len(heads) != 1:
               raise SystemExit(f"Expected exactly one Alembic head, found {len(heads)}")
           PY
-
       - name: Apply migrations
         working-directory: backend
         run: alembic upgrade head
-
       - name: Validate Alembic
         working-directory: backend
         run: |
           alembic current
           alembic heads
           alembic check
-
       - name: Verify database revision
         working-directory: backend
         run: |
@@ -120,7 +109,6 @@ jobs:
               raise SystemExit("Database revision does not match Alembic head")
           engine.dispose()
           PY
-
       - name: Run tests with coverage
         working-directory: backend
         run: |
@@ -129,11 +117,9 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --junitxml=junit.xml
-
       - name: Audit dependencies
         working-directory: backend
         run: python -m pip_audit -r requirements.txt
-
       - name: Upload backend diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -153,34 +139,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
-
       - name: Validate required files
         run: |
           test -s frontend/index.html
           test -s frontend/styles.css
+          test -s frontend/professional.css
           test -s frontend/app.js
-
+          test -s frontend/smart-quotes.js
       - name: Validate JavaScript
-        run: node --check frontend/app.js
-
+        run: |
+          node --check frontend/app.js
+          node --check frontend/smart-quotes.js
       - name: Validate HTML asset references
         run: |
           grep -q '<script src="./app.js"></script>' frontend/index.html
+          grep -q '<script src="./smart-quotes.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
-
+          grep -q '<link rel="stylesheet" href="./professional.css">' frontend/index.html
       - name: Check accidental placeholders
         run: |
-          if grep -RniE 'PLACEHOLDER|TODO:.*IMPLEMENT|lorem ipsum' frontend/index.html frontend/styles.css; then
+          if grep -RniE 'PLACEHOLDER|TODO:.*IMPLEMENT|lorem ipsum' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/smart-quotes.js; then
             echo 'Found accidental placeholder content in frontend.'
             exit 1
           fi
-
       - name: Frontend smoke test
         run: |
           python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &
@@ -191,7 +177,7 @@ jobs:
             sleep 1
           done
           grep -q 'Marcenaria Ideal' /tmp/frontend.html
-
+          grep -q 'smart-quotes.js' /tmp/frontend.html
       - name: Upload frontend diagnostics
         if: always()
         uses: actions/upload-artifact@v7
