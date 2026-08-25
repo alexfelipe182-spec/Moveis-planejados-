@@ -16,6 +16,7 @@ from app.schemas import (
     ProjectCreate, ProjectRead, ProjectUpdate,
     QuoteCreate, QuoteRead, QuoteUpdate,
 )
+from app.services.quote_ai import analyze_quote
 from app.services.quote_pricing import calculate_quote_suggestion
 
 
@@ -41,10 +42,15 @@ quotes_router = APIRouter(prefix="/quotes", tags=["Quotes"])
 quotes_router.include_router(make_router(Quote, QuoteCreate, QuoteRead, QuoteUpdate, ""))
 
 
-@quotes_router.post("/estimate", response_model=dict[str, Decimal])
+@quotes_router.post("/estimate", response_model=dict[str, object])
 def estimate_quote(payload: QuoteEstimateRequest):
-    """Calcula uma sugestão de preço sem alterar o orçamento salvo."""
-    return calculate_quote_suggestion(**payload.model_dump())
+    """Calcula e analisa uma sugestão sem alterar o orçamento salvo."""
+    pricing = calculate_quote_suggestion(**payload.model_dump())
+    return analyze_quote(
+        base_cost=pricing["base_cost"],
+        suggested_total=pricing["suggested_total"],
+        profit_margin=pricing["profit_margin"],
+    ) | pricing
 
 
 api_router.include_router(quotes_router)
