@@ -18,10 +18,7 @@
 
   async function analyze(payload) {
     const response = await fetch(`${apiBase}/quotes/estimate`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || `Erro ${response.status}`);
@@ -42,108 +39,50 @@
       showSection('customers');
       return;
     }
-
     const options = customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.email ? ` — ${escapeHtml(c.email)}` : ''}</option>`).join('');
     const form = document.querySelector('#item-form');
     document.querySelector('#modal-title').textContent = 'Novo orçamento inteligente';
-    form.innerHTML = `
-      <div class="smart-quote-create">
-        <div class="smart-quote-intro">
-          <span class="eyebrow">Assistente de orçamento</span>
-          <h3>Monte o orçamento e deixe a IA analisar</h3>
-          <p>Informe os custos reais. O sistema calcula custo base, preço sugerido, margem e alertas automaticamente.</p>
-        </div>
-        <div class="form-grid">
-          <label>Cliente<select name="customer_id" required><option value="">Selecione o cliente...</option>${options}</select></label>
-          <label>Margem de lucro (%)<input name="profit_margin" type="number" value="30" min="0" max="100" step="0.01" required></label>
-          <label class="span-2">Descrição<textarea name="description" minlength="3" maxlength="3000" required placeholder="Ex.: Cozinha planejada em MDF, portas basculantes..."></textarea></label>
-          <label>Medidas<textarea name="measurements" maxlength="2000" placeholder="Ex.: 3,20m x 2,40m"></textarea></label>
-          <label>Materiais<textarea name="materials" maxlength="2000" placeholder="Ex.: MDF amadeirado 18mm, MDF branco..."></textarea></label>
-        </div>
-        <div class="cost-grid">
-          <label>Material<input name="material_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label>
-          <label>Ferragens<input name="hardware_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label>
-          <label>Mão de obra<input name="labor_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label>
-          <label>Acabamento<input name="finishing_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label>
-        </div>
-        <div id="smart-quote-result" class="smart-quote-result" aria-live="polite"></div>
-        <div class="modal-actions">
-          <button type="button" class="btn secondary" data-smart-cancel>Cancelar</button>
-          <button type="button" class="btn secondary" data-smart-analyze>✨ Calcular com IA</button>
-          <button type="submit" class="btn primary" data-smart-save disabled>Salvar orçamento</button>
-        </div>
-      </div>`;
+    form.innerHTML = `<div class="smart-quote-create"><div class="smart-quote-intro"><span class="eyebrow">Assistente de orçamento</span><h3>Monte o orçamento e deixe a IA analisar</h3><p>Informe os custos reais. O sistema calcula custo base, preço sugerido, margem e alertas automaticamente.</p></div><div class="form-grid"><label>Cliente<select name="customer_id" required><option value="">Selecione o cliente...</option>${options}</select></label><label>Margem de lucro (%)<input name="profit_margin" type="number" value="30" min="0" max="100" step="0.01" required></label><label class="span-2">Descrição<textarea name="description" minlength="3" maxlength="3000" required placeholder="Ex.: Cozinha planejada em MDF, portas basculantes..."></textarea></label><label>Medidas<textarea name="measurements" maxlength="2000" placeholder="Ex.: 3,20m x 2,40m"></textarea></label><label>Materiais<textarea name="materials" maxlength="2000" placeholder="Ex.: MDF amadeirado 18mm, MDF branco..."></textarea></label></div><div class="cost-grid"><label>Material<input name="material_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Ferragens<input name="hardware_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Mão de obra<input name="labor_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Acabamento<input name="finishing_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label></div><div id="smart-quote-result" class="smart-quote-result" aria-live="polite"></div><div class="modal-actions"><button type="button" class="btn secondary" data-smart-cancel>Cancelar</button><button type="button" class="btn secondary" data-smart-analyze>✨ Calcular com IA</button><button type="button" class="btn primary" data-smart-save disabled>Salvar orçamento</button></div></div>`;
 
     const smartForm = form.querySelector('.smart-quote-create');
     const saveButton = smartForm.querySelector('[data-smart-save]');
     let lastEstimate = null;
-
     const payloadFromForm = () => ({
-      material_cost: numberValue(smartForm, 'material_cost'),
-      hardware_cost: numberValue(smartForm, 'hardware_cost'),
-      labor_cost: numberValue(smartForm, 'labor_cost'),
-      finishing_cost: numberValue(smartForm, 'finishing_cost'),
+      material_cost: numberValue(smartForm, 'material_cost'), hardware_cost: numberValue(smartForm, 'hardware_cost'),
+      labor_cost: numberValue(smartForm, 'labor_cost'), finishing_cost: numberValue(smartForm, 'finishing_cost'),
       profit_margin: numberValue(smartForm, 'profit_margin')
     });
 
     smartForm.querySelector('[data-smart-analyze]').addEventListener('click', async () => {
-      const button = smartForm.querySelector('[data-smart-analyze]');
-      button.disabled = true;
-      button.textContent = 'Calculando...';
+      const button = smartForm.querySelector('[data-smart-analyze]'); button.disabled = true; button.textContent = 'Calculando...';
       try {
         lastEstimate = await analyze(payloadFromForm());
         const result = smartForm.querySelector('#smart-quote-result');
-        result.innerHTML = `
-          <div class="smart-result-card">
-            <div><small>Custo base</small><strong>${money(lastEstimate.base_cost)}</strong></div>
-            <div><small>Preço sugerido</small><strong>${money(lastEstimate.suggested_total)}</strong></div>
-            <div><small>Margem</small><strong>${Number(lastEstimate.profit_margin || 0).toFixed(2)}%</strong></div>
-          </div>
-          <div class="smart-result-lists">
-            <div><strong>Alertas</strong><ul>${(lastEstimate.warnings || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhum alerta.</li>'}</ul></div>
-            <div><strong>Recomendações</strong><ul>${(lastEstimate.recommendations || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhuma recomendação.</li>'}</ul></div>
-          </div>`;
-        saveButton.disabled = false;
-        toast('Análise concluída. Revise o preço antes de salvar.');
-      } catch (err) {
-        toast(err.message, 'error');
-      } finally {
-        button.disabled = false;
-        button.textContent = '✨ Calcular com IA';
-      }
+        result.innerHTML = `<div class="smart-result-card"><div><small>Custo base</small><strong>${money(lastEstimate.base_cost)}</strong></div><div><small>Preço sugerido</small><strong>${money(lastEstimate.suggested_total)}</strong></div><div><small>Margem</small><strong>${Number(lastEstimate.profit_margin || 0).toFixed(2)}%</strong></div></div><div class="smart-result-lists"><div><strong>Alertas</strong><ul>${(lastEstimate.warnings || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhum alerta.</li>'}</ul></div><div><strong>Recomendações</strong><ul>${(lastEstimate.recommendations || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhuma recomendação.</li>'}</ul></div></div>`;
+        saveButton.disabled = false; toast('Análise concluída. Revise o preço antes de salvar.');
+      } catch (err) { toast(err.message, 'error'); }
+      finally { button.disabled = false; button.textContent = '✨ Calcular com IA'; }
     });
 
     smartForm.querySelector('[data-smart-cancel]').addEventListener('click', closeModal);
-
-    form.onsubmit = async event => {
-      event.preventDefault();
-      if (!lastEstimate) {
-        toast('Calcule o orçamento com a IA antes de salvar.', 'error');
-        return;
-      }
+    saveButton.addEventListener('click', async () => {
+      if (!lastEstimate) { toast('Calcule o orçamento com a IA antes de salvar.', 'error'); return; }
+      const fd = new FormData(smartForm);
       const data = payloadFromForm();
-      data.customer_id = Number(new FormData(smartForm).get('customer_id'));
-      data.description = new FormData(smartForm).get('description');
-      data.measurements = new FormData(smartForm).get('measurements') || null;
-      data.materials = new FormData(smartForm).get('materials') || null;
+      data.customer_id = Number(fd.get('customer_id'));
+      data.description = fd.get('description');
+      data.measurements = fd.get('measurements') || null;
+      data.materials = fd.get('materials') || null;
       data.total = Number(lastEstimate.suggested_total || 0);
       data.status = 'analysis';
-      saveButton.disabled = true;
-      saveButton.textContent = 'Salvando...';
+      saveButton.disabled = true; saveButton.textContent = 'Salvando...';
       try {
         await api('/quotes', { method: 'POST', body: data });
-        closeModal();
-        toast('Orçamento criado com análise inteligente.');
-        await loadResource('quotes');
-      } catch (err) {
-        toast(err.message, 'error');
-        saveButton.disabled = false;
-        saveButton.textContent = 'Salvar orçamento';
-      }
-    };
+        closeModal(); toast('Orçamento criado com análise inteligente.'); await loadResource('quotes');
+      } catch (err) { toast(err.message, 'error'); saveButton.disabled = false; saveButton.textContent = 'Salvar orçamento'; }
+    });
 
-    $('#modal')?.classList.remove('hidden');
-    $('#modal')?.setAttribute('aria-hidden', 'false');
+    $('#modal')?.classList.remove('hidden'); $('#modal')?.setAttribute('aria-hidden', 'false');
   }
 
   const originalCreateItem = window.createItem;
