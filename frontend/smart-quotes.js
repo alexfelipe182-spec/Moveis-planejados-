@@ -2,102 +2,27 @@
   const apiBase = window.API_BASE_URL || (location.hostname === 'localhost' ? 'http://localhost:8000/api/v1' : 'https://ideal-marcenaria-api.onrender.com/api/v1');
   const money = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const escapeHtml = (value = '') => String(value).replace(/[&<>'\"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c]));
-
-  function renderPanel(result) {
-    let panel = document.querySelector('#smart-quote-result');
-    if (!panel) {
-      panel = document.createElement('section'); panel.id = 'smart-quote-result'; panel.className = 'smart-quote-panel';
-      document.querySelector('.admin-main')?.prepend(panel);
-    }
-    const warnings = (result.warnings || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhum alerta financeiro.</li>';
-    const recommendations = (result.recommendations || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhuma recomendação adicional.</li>';
-    panel.innerHTML = `<div class="panel"><div class="panel-title"><div><span class="eyebrow">Inteligência de orçamento</span><h3>Análise automática</h3></div><span class="badge">Requer aprovação</span></div><div class="smart-quote-grid"><div><small>Custo base</small><strong>${money(result.base_cost)}</strong></div><div><small>Preço sugerido</small><strong>${money(result.suggested_total)}</strong></div><div><small>Margem</small><strong>${Number(result.profit_margin || 0).toFixed(2)}%</strong></div></div><div class="smart-quote-columns"><div><h4>Alertas</h4><ul>${warnings}</ul></div><div><h4>Recomendações</h4><ul>${recommendations}</ul></div></div></div>`;
+  function renderPanel(result) { let panel=document.querySelector('#smart-quote-result'); if(!panel){panel=document.createElement('section');panel.id='smart-quote-result';panel.className='smart-quote-panel';document.querySelector('.admin-main')?.prepend(panel)} const warnings=(result.warnings||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('')||'<li>Nenhum alerta financeiro.</li>'; const recommendations=(result.recommendations||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('')||'<li>Nenhuma recomendação adicional.</li>'; panel.innerHTML=`<div class="panel"><div class="panel-title"><div><span class="eyebrow">Inteligência de orçamento</span><h3>Análise automática</h3></div><span class="badge">Requer aprovação</span></div><div class="smart-quote-grid"><div><small>Custo base</small><strong>${money(result.base_cost)}</strong></div><div><small>Preço sugerido</small><strong>${money(result.suggested_total)}</strong></div><div><small>Margem</small><strong>${Number(result.profit_margin||0).toFixed(2)}%</strong></div></div><div class="smart-quote-columns"><div><h4>Alertas</h4><ul>${warnings}</ul></div><div><h4>Recomendações</h4><ul>${recommendations}</ul></div></div></div>`; }
+  async function analyze(payload){const response=await fetch(`${apiBase}/quotes/estimate`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||`Erro ${response.status}`);renderPanel(data);return data} window.analyzeSmartQuote=analyze;
+  function numberValue(form,name){return Number(new FormData(form).get(name)||0)}
+  async function openQuoteItems(quoteId,quoteDescription=''){
+    const items=await api(`/quotes/${quoteId}/items`); const form=document.querySelector('#item-form'); document.querySelector('#modal-title').textContent=`Itens do orçamento #${quoteId}`;
+    form.innerHTML=`<div class="smart-quote-create"><div class="smart-quote-intro"><span class="eyebrow">Composição do orçamento</span><h3>${escapeHtml(quoteDescription||'Móveis planejados')}</h3><p>Adicione cada móvel. O subtotal é calculado automaticamente e o total geral é atualizado no orçamento.</p></div><div id="quote-items-list"></div><div class="cost-grid"><label>Nome do móvel<input id="qi-name" type="text" maxlength="200" placeholder="Ex.: Armário de cozinha" required></label><label>Quantidade<input id="qi-quantity" type="number" min="0.01" step="0.01" value="1" inputmode="decimal"></label><label>Medidas (L × A × P)<input id="qi-measurements" type="text" maxlength="100" placeholder="Ex.: 2,40 × 2,10 × 0,60m"></label><label>Preço unitário<input id="qi-price" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label></div><div class="smart-result-card"><div><small>Total dos itens</small><strong id="quote-items-total">R$ 0,00</strong></div><div><small>Orçamento</small><strong>#${quoteId}</strong></div></div><div class="modal-actions"><button type="button" class="btn secondary" id="quote-items-close">Fechar</button><button type="button" class="btn primary" id="quote-item-add">+ Adicionar móvel</button></div></div>`;
+    const list=form.querySelector('#quote-items-list'),totalEl=form.querySelector('#quote-items-total');
+    const renderItems=rows=>{const total=rows.reduce((sum,item)=>sum+Number(item.subtotal||0),0);totalEl.textContent=money(total);list.innerHTML=rows.length?rows.map(item=>`<div class="panel" data-item-id="${item.id}" style="margin-bottom:10px"><div class="panel-title"><div><strong>${escapeHtml(item.name)}</strong><small>${Number(item.quantity)} × ${money(item.unit_price)}${item.description?` • ${escapeHtml(item.description)}`:''}</small></div><strong>${money(item.subtotal)}</strong><button type="button" class="btn secondary quote-item-delete" data-id="${item.id}">Excluir</button></div></div>`).join(''):'<p class="muted">Nenhum móvel adicionado ainda.</p>'}; renderItems(items);
+    form.querySelector('#quote-item-add').addEventListener('click',async()=>{const name=form.querySelector('#qi-name').value.trim();const quantity=Number(form.querySelector('#qi-quantity').value||0);const unit_price=Number(form.querySelector('#qi-price').value||0);const raw=form.querySelector('#qi-measurements').value.trim();if(!name||quantity<=0||unit_price<0){toast('Informe nome, quantidade e preço unitário.','error');return}const button=form.querySelector('#quote-item-add');button.disabled=true;button.textContent='Adicionando...';try{const parts=raw.replace(/,/g,'.').split(/[x×]/).map(x=>Number(x.trim())).filter(Number.isFinite);const item=await api(`/quotes/${quoteId}/items`,{method:'POST',body:{name,quantity,unit_price,width:parts[0]||null,height:parts[1]||null,depth:parts[2]||null}});items.push(item);renderItems(items);form.querySelector('#qi-name').value='';form.querySelector('#qi-measurements').value='';form.querySelector('#qi-price').value='0';toast('Móvel adicionado. Total atualizado automaticamente.')}catch(err){toast(err.message,'error')}finally{button.disabled=false;button.textContent='+ Adicionar móvel'}});
+    list.addEventListener('click',async event=>{const button=event.target.closest('.quote-item-delete');if(!button)return;if(!confirm('Excluir este móvel do orçamento?'))return;try{await api(`/quotes/${quoteId}/items/${button.dataset.id}`,{method:'DELETE'});const index=items.findIndex(x=>String(x.id)===String(button.dataset.id));if(index>=0)items.splice(index,1);renderItems(items);toast('Móvel removido. Total atualizado.')}catch(err){toast(err.message,'error')}});
+    form.querySelector('#quote-items-close').addEventListener('click',async()=>{closeModal();try{await loadResource('quotes')}catch(_){}}); $('#modal')?.classList.remove('hidden');$('#modal')?.setAttribute('aria-hidden','false');
   }
-
-  async function analyze(payload) {
-    const response = await fetch(`${apiBase}/quotes/estimate`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.detail || `Erro ${response.status}`);
-    renderPanel(data); return data;
+  window.openQuoteItems=openQuoteItems;
+  async function openSmartQuoteCreate(){
+    const customers=await api('/customers?limit=100');if(!customers.length){toast('Cadastre pelo menos um cliente antes de criar um orçamento.','error');showSection('customers');return}const options=customers.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}${c.email?` — ${escapeHtml(c.email)}`:''}</option>`).join('');const form=document.querySelector('#item-form');document.querySelector('#modal-title').textContent='Novo orçamento inteligente';
+    form.innerHTML=`<div class="smart-quote-create"><div class="smart-quote-intro"><span class="eyebrow">Assistente de orçamento</span><h3>Monte o orçamento e deixe a IA analisar</h3><p>Informe os custos reais. O sistema calcula custo base, preço sugerido, margem e alertas automaticamente.</p></div><div class="form-grid"><label>Cliente<select name="customer_id" required><option value="">Selecione o cliente...</option>${options}</select></label><label>Margem de lucro (%)<input name="profit_margin" type="number" value="30" min="0" max="100" step="0.01" required></label><label class="span-2">Descrição<textarea name="description" minlength="3" maxlength="3000" required placeholder="Ex.: Cozinha planejada em MDF, portas basculantes..."></textarea></label><label>Medidas<textarea name="measurements" maxlength="2000" placeholder="Ex.: 3,20m x 2,40m"></textarea></label><label>Materiais<textarea name="materials" maxlength="2000" placeholder="Ex.: MDF amadeirado 18mm, MDF branco..."></textarea></label></div><div class="cost-grid"><label>Material<input name="material_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Ferragens<input name="hardware_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Mão de obra<input name="labor_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Acabamento<input name="finishing_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label></div><div id="smart-quote-result" class="smart-quote-result" aria-live="polite"></div><div class="modal-actions"><button type="button" class="btn secondary" data-smart-cancel>Cancelar</button><button type="button" class="btn secondary" data-smart-analyze>✨ Calcular com IA</button><button type="button" class="btn primary" data-smart-save disabled>Salvar orçamento</button></div></div>`;
+    const smartForm=form.querySelector('.smart-quote-create'),saveButton=smartForm.querySelector('[data-smart-save]');let lastEstimate=null;const payloadFromForm=()=>({material_cost:numberValue(smartForm,'material_cost'),hardware_cost:numberValue(smartForm,'hardware_cost'),labor_cost:numberValue(smartForm,'labor_cost'),finishing_cost:numberValue(smartForm,'finishing_cost'),profit_margin:numberValue(smartForm,'profit_margin')});
+    smartForm.querySelector('[data-smart-analyze]').addEventListener('click',async()=>{const button=smartForm.querySelector('[data-smart-analyze]');button.disabled=true;button.textContent='Calculando...';try{lastEstimate=await analyze(payloadFromForm());const result=smartForm.querySelector('#smart-quote-result');result.innerHTML=`<div class="smart-result-card"><div><small>Custo base</small><strong>${money(lastEstimate.base_cost)}</strong></div><div><small>Preço sugerido</small><strong>${money(lastEstimate.suggested_total)}</strong></div><div><small>Margem</small><strong>${Number(lastEstimate.profit_margin||0).toFixed(2)}%</strong></div></div><div class="smart-result-lists"><div><strong>Alertas</strong><ul>${(lastEstimate.warnings||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('')||'<li>Nenhum alerta.</li>'}</ul></div><div><strong>Recomendações</strong><ul>${(lastEstimate.recommendations||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('')||'<li>Nenhuma recomendação.</li>'}</ul></div></div>`;saveButton.disabled=false;toast('Análise concluída. Revise o preço antes de salvar.')}catch(err){toast(err.message,'error')}finally{button.disabled=false;button.textContent='✨ Calcular com IA'}});
+    smartForm.querySelector('[data-smart-cancel]').addEventListener('click',closeModal);
+    saveButton.addEventListener('click',async()=>{if(!lastEstimate){toast('Calcule o orçamento com a IA antes de salvar.','error');return}const fd=new FormData(smartForm),data=payloadFromForm();data.customer_id=Number(fd.get('customer_id'));data.description=fd.get('description');data.measurements=fd.get('measurements')||null;data.materials=fd.get('materials')||null;data.total=Number(lastEstimate.suggested_total||0);data.status='analysis';saveButton.disabled=true;saveButton.textContent='Salvando...';try{const quote=await api('/quotes',{method:'POST',body:data});toast('Orçamento criado. Agora adicione os móveis.');await openQuoteItems(quote.id,quote.description)}catch(err){toast(err.message,'error');saveButton.disabled=false;saveButton.textContent='Salvar orçamento'}});
+    $('#modal')?.classList.remove('hidden');$('#modal')?.setAttribute('aria-hidden','false');
   }
-  window.analyzeSmartQuote = analyze;
-
-  function numberValue(form, name) { return Number(new FormData(form).get(name) || 0); }
-
-  async function openQuoteItems(quoteId, quoteDescription = '') {
-    const items = await api(`/quotes/${quoteId}/items`);
-    const form = document.querySelector('#item-form');
-    document.querySelector('#modal-title').textContent = `Itens do orçamento #${quoteId}`;
-    form.innerHTML = `<div class="smart-quote-create"><div class="smart-quote-intro"><span class="eyebrow">Composição do orçamento</span><h3>${escapeHtml(quoteDescription || 'Móveis planejados')}</h3><p>Adicione cada móvel/produto. O subtotal é calculado automaticamente e o total geral é atualizado no orçamento.</p></div><div id="quote-items-list"></div><div class="cost-grid"><label>Nome do móvel<input id="qi-name" type="text" maxlength="300" placeholder="Ex.: Armário de cozinha" required></label><label>Quantidade<input id="qi-quantity" type="number" min="0.01" step="0.01" value="1" inputmode="decimal"></label><label>Medidas<input id="qi-measurements" type="text" maxlength="500" placeholder="Ex.: 2,40 x 0,60m"></label><label>Preço unitário<input id="qi-price" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label></div><div class="smart-result-card"><div><small>Total dos itens</small><strong id="quote-items-total">R$ 0,00</strong></div><div><small>Orçamento</small><strong>#${quoteId}</strong></div></div><div class="modal-actions"><button type="button" class="btn secondary" id="quote-items-close">Fechar</button><button type="button" class="btn primary" id="quote-item-add">+ Adicionar móvel</button></div></div>`;
-
-    const list = form.querySelector('#quote-items-list');
-    const totalEl = form.querySelector('#quote-items-total');
-    const renderItems = rows => {
-      const total = rows.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
-      totalEl.textContent = money(total);
-      list.innerHTML = rows.length ? rows.map(item => `<div class="panel" data-item-id="${item.id}" style="margin-bottom:10px"><div class="panel-title"><div><strong>${escapeHtml(item.name)}</strong><small>${Number(item.quantity)} × ${money(item.unit_price)}${item.measurements ? ` • ${escapeHtml(item.measurements)}` : ''}</small></div><strong>${money(item.subtotal)}</strong><button type="button" class="btn secondary quote-item-delete" data-id="${item.id}">Excluir</button></div></div>`).join('') : '<p class="muted">Nenhum móvel adicionado ainda.</p>';
-    };
-    renderItems(items);
-
-    form.querySelector('#quote-item-add').addEventListener('click', async () => {
-      const name = form.querySelector('#qi-name').value.trim();
-      const quantity = Number(form.querySelector('#qi-quantity').value || 0);
-      const unit_price = Number(form.querySelector('#qi-price').value || 0);
-      const measurements = form.querySelector('#qi-measurements').value.trim() || null;
-      if (!name || quantity <= 0 || unit_price < 0) { toast('Informe nome, quantidade e preço unitário.', 'error'); return; }
-      const button = form.querySelector('#quote-item-add'); button.disabled = true; button.textContent = 'Adicionando...';
-      try {
-        const item = await api(`/quotes/${quoteId}/items`, { method: 'POST', body: { name, quantity, unit_price, measurements } });
-        items.push(item); renderItems(items);
-        form.querySelector('#qi-name').value = ''; form.querySelector('#qi-measurements').value = ''; form.querySelector('#qi-price').value = '0';
-        toast('Móvel adicionado. Total atualizado automaticamente.');
-      } catch (err) { toast(err.message, 'error'); }
-      finally { button.disabled = false; button.textContent = '+ Adicionar móvel'; }
-    });
-
-    list.addEventListener('click', async event => {
-      const button = event.target.closest('.quote-item-delete'); if (!button) return;
-      if (!confirm('Excluir este móvel do orçamento?')) return;
-      try {
-        await api(`/quotes/${quoteId}/items/${button.dataset.id}`, { method: 'DELETE' });
-        const index = items.findIndex(x => String(x.id) === String(button.dataset.id)); if (index >= 0) items.splice(index, 1);
-        renderItems(items); toast('Móvel removido. Total atualizado.');
-      } catch (err) { toast(err.message, 'error'); }
-    });
-
-    form.querySelector('#quote-items-close').addEventListener('click', async () => { closeModal(); try { await loadResource('quotes'); } catch (_) {} });
-    $('#modal')?.classList.remove('hidden'); $('#modal')?.setAttribute('aria-hidden', 'false');
-  }
-  window.openQuoteItems = openQuoteItems;
-
-  async function openSmartQuoteCreate() {
-    const customers = await api('/customers?limit=100');
-    if (!customers.length) { toast('Cadastre pelo menos um cliente antes de criar um orçamento.', 'error'); showSection('customers'); return; }
-    const options = customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.email ? ` — ${escapeHtml(c.email)}` : ''}</option>`).join('');
-    const form = document.querySelector('#item-form');
-    document.querySelector('#modal-title').textContent = 'Novo orçamento inteligente';
-    form.innerHTML = `<div class="smart-quote-create"><div class="smart-quote-intro"><span class="eyebrow">Assistente de orçamento</span><h3>Monte o orçamento e deixe a IA analisar</h3><p>Informe os custos reais. O sistema calcula custo base, preço sugerido, margem e alertas automaticamente.</p></div><div class="form-grid"><label>Cliente<select name="customer_id" required><option value="">Selecione o cliente...</option>${options}</select></label><label>Margem de lucro (%)<input name="profit_margin" type="number" value="30" min="0" max="100" step="0.01" required></label><label class="span-2">Descrição<textarea name="description" minlength="3" maxlength="3000" required placeholder="Ex.: Cozinha planejada em MDF, portas basculantes..."></textarea></label><label>Medidas<textarea name="measurements" maxlength="2000" placeholder="Ex.: 3,20m x 2,40m"></textarea></label><label>Materiais<textarea name="materials" maxlength="2000" placeholder="Ex.: MDF amadeirado 18mm, MDF branco..."></textarea></label></div><div class="cost-grid"><label>Material<input name="material_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Ferragens<input name="hardware_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Mão de obra<input name="labor_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Acabamento<input name="finishing_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label></div><div id="smart-quote-result" class="smart-quote-result" aria-live="polite"></div><div class="modal-actions"><button type="button" class="btn secondary" data-smart-cancel>Cancelar</button><button type="button" class="btn secondary" data-smart-analyze>✨ Calcular com IA</button><button type="button" class="btn primary" data-smart-save disabled>Salvar orçamento</button></div></div>`;
-    const smartForm = form.querySelector('.smart-quote-create'); const saveButton = smartForm.querySelector('[data-smart-save]'); let lastEstimate = null;
-    const payloadFromForm = () => ({ material_cost: numberValue(smartForm, 'material_cost'), hardware_cost: numberValue(smartForm, 'hardware_cost'), labor_cost: numberValue(smartForm, 'labor_cost'), finishing_cost: numberValue(smartForm, 'finishing_cost'), profit_margin: numberValue(smartForm, 'profit_margin') });
-    smartForm.querySelector('[data-smart-analyze]').addEventListener('click', async () => {
-      const button = smartForm.querySelector('[data-smart-analyze]'); button.disabled = true; button.textContent = 'Calculando...';
-      try { lastEstimate = await analyze(payloadFromForm()); const result = smartForm.querySelector('#smart-quote-result'); result.innerHTML = `<div class="smart-result-card"><div><small>Custo base</small><strong>${money(lastEstimate.base_cost)}</strong></div><div><small>Preço sugerido</small><strong>${money(lastEstimate.suggested_total)}</strong></div><div><small>Margem</small><strong>${Number(lastEstimate.profit_margin || 0).toFixed(2)}%</strong></div></div><div class="smart-result-lists"><div><strong>Alertas</strong><ul>${(lastEstimate.warnings || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhum alerta.</li>'}</ul></div><div><strong>Recomendações</strong><ul>${(lastEstimate.recommendations || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhuma recomendação.</li>'}</ul></div></div>`; saveButton.disabled = false; toast('Análise concluída. Revise o preço antes de salvar.'); }
-      catch (err) { toast(err.message, 'error'); } finally { button.disabled = false; button.textContent = '✨ Calcular com IA'; }
-    });
-    smartForm.querySelector('[data-smart-cancel]').addEventListener('click', closeModal);
-    saveButton.addEventListener('click', async () => {
-      if (!lastEstimate) { toast('Calcule o orçamento com a IA antes de salvar.', 'error'); return; }
-      const fd = new FormData(smartForm); const data = payloadFromForm(); data.customer_id = Number(fd.get('customer_id')); data.description = fd.get('description'); data.measurements = fd.get('measurements') || null; data.materials = fd.get('materials') || null; data.total = Number(lastEstimate.suggested_total || 0); data.status = 'analysis';
-      saveButton.disabled = true; saveButton.textContent = 'Salvando...';
-      try {
-        const quote = await api('/quotes', { method: 'POST', body: data });
-        toast('Orçamento criado. Agora adicione os móveis.');
-        await openQuoteItems(quote.id, quote.description);
-      } catch (err) { toast(err.message, 'error'); saveButton.disabled = false; saveButton.textContent = 'Salvar orçamento'; }
-    });
-    $('#modal')?.classList.remove('hidden'); $('#modal')?.setAttribute('aria-hidden', 'false');
-  }
-
-  const originalCreateItem = window.createItem;
-  window.createItem = function(resource) { if (resource === 'quotes') return openSmartQuoteCreate().catch(err => toast(err.message, 'error')); return originalCreateItem(resource); };
+  const originalCreateItem=window.createItem;window.createItem=function(resource){if(resource==='quotes')return openSmartQuoteCreate().catch(err=>toast(err.message,'error'));return originalCreateItem(resource)};
 })();
