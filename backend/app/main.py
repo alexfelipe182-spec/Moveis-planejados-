@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Cookie, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -11,6 +13,21 @@ from app.api.routes import api_router
 from app.core.config import settings
 from app.core.resilience import DistributedRateLimiter
 from app.database import engine
+
+
+rate_limiter = DistributedRateLimiter(
+    settings.redis_url,
+    limit=settings.rate_limit_per_minute,
+)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        yield
+    finally:
+        await rate_limiter.close()
+        engine.dispose()
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -47,7 +64,7 @@ class TrafficProtectionMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None)
+app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None, lifespan=lifespan)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -58,10 +75,7 @@ app.add_middleware(
 )
 app.add_middleware(
     TrafficProtectionMiddleware,
-    limiter=DistributedRateLimiter(
-        settings.redis_url,
-        limit=settings.rate_limit_per_minute,
-    ),
+    limiter=rate_limiter,
 )
 
 app.include_router(auth_router, prefix="/api/v1")
@@ -175,10 +189,13 @@ def health_check():
 
 
 @app.get("/ready", tags=["system"])
-def readiness_check():
+async def readiness_check():
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
-    return {"status": "ready", "service": settings.app_name}
+    redis_ok = await rate_limiter.redis.ping()
+    if not redis_ok:
+        return JSONResponse(status_code=503, content={"status": "not_ready", "service": settings.app_name, "dependencies": {"postgres": "ok", "redis": "unhealthy"}})
+    return {"status": "ready", "service": settings.app_name, "dependencies": {"postgres": "ok", "redis": "ok"}}
 
 
 @app.get("/", tags=["system"])
