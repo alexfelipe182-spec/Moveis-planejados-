@@ -1,4 +1,4 @@
-name: CI - PostgreSQL + Alembic + API + Frontend
+name: CI - PostgreSQL + Redis + Alembic + API + Frontend
 
 on:
   workflow_dispatch:
@@ -19,12 +19,14 @@ env:
   NODE_VERSION: "22"
   PYTHONPATH: backend
   DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_db
+  REDIS_URL: redis://127.0.0.1:6379/0
+  RATE_LIMIT_PER_MINUTE: "120"
   SECRET_KEY: test-secret-key-for-ci-only
   ENVIRONMENT: test
 
 jobs:
   backend:
-    name: Backend quality + database + tests
+    name: Backend quality + PostgreSQL + Redis + tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -40,6 +42,15 @@ jobs:
           --health-cmd="pg_isready -U postgres -d marcenaria_db"
           --health-interval=5s
           --health-timeout=5s
+          --health-retries=20
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
           --health-retries=20
     steps:
       - uses: actions/checkout@v4
@@ -62,9 +73,11 @@ jobs:
         run: python -m pip check
       - name: Verify imports
         working-directory: backend
-        run: python -c "import app.main; import app.database; import app.models; import app.schemas; import app.api.auth; import app.api.routes"
+        run: python -c "import app.main; import app.database; import app.models; import app.schemas; import app.api.auth; import app.api.routes; import app.core.resilience"
       - name: Verify PostgreSQL
         run: python -c "from sqlalchemy import create_engine,text; import os; e=create_engine(os.environ['DATABASE_URL']); c=e.connect(); assert c.execute(text('select 1')).scalar()==1; c.close(); e.dispose()"
+      - name: Verify Redis
+        run: python -c "import os; import redis; client=redis.Redis.from_url(os.environ['REDIS_URL']); assert client.ping(); client.set('ci:health','ok',ex=30); assert client.get('ci:health') == b'ok'; client.delete('ci:health')"
       - name: Verify Alembic has one head
         working-directory: backend
         run: |
