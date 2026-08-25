@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from app.api.activity import router as activity_router
 from app.api.admin import router as admin_router
@@ -13,6 +16,16 @@ from app.schemas import (
     ProjectCreate, ProjectRead, ProjectUpdate,
     QuoteCreate, QuoteRead, QuoteUpdate,
 )
+from app.services.quote_pricing import calculate_quote_suggestion
+
+
+class QuoteEstimateRequest(BaseModel):
+    material_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    hardware_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    labor_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    finishing_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    profit_margin: Decimal = Field(default=30, ge=0, le=100, max_digits=5, decimal_places=2)
+
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(protected_router)
@@ -23,4 +36,15 @@ api_router.include_router(make_router(Category, CategoryCreate, CategoryRead, Ca
 api_router.include_router(make_router(Product, ProductCreate, ProductRead, ProductUpdate, "/products"))
 api_router.include_router(make_router(Customer, CustomerCreate, CustomerRead, CustomerUpdate, "/customers"))
 api_router.include_router(make_router(Project, ProjectCreate, ProjectRead, ProjectUpdate, "/projects"))
-api_router.include_router(make_router(Quote, QuoteCreate, QuoteRead, QuoteUpdate, "/quotes"))
+
+quotes_router = APIRouter(prefix="/quotes", tags=["Quotes"])
+quotes_router.include_router(make_router(Quote, QuoteCreate, QuoteRead, QuoteUpdate, ""))
+
+
+@quotes_router.post("/estimate", response_model=dict[str, Decimal])
+def estimate_quote(payload: QuoteEstimateRequest):
+    """Calcula uma sugestão de preço sem alterar o orçamento salvo."""
+    return calculate_quote_suggestion(**payload.model_dump())
+
+
+api_router.include_router(quotes_router)
