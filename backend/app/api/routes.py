@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,7 +9,7 @@ from app.api.activity import router as activity_router
 from app.api.admin import router as admin_router
 from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
-from app.api.deps import get_current_user, require_admin, require_cookie_csrf
+from app.api.deps import require_admin, require_cookie_csrf
 from app.api.protected import router as protected_router
 from app.database import get_db
 from app.models import Activity, Category, Customer, Product, Project, Quote, User
@@ -80,15 +79,13 @@ def create_quote(
 
     try:
         item = crud.create_item(db, Quote(**data))
-        db.add(
-            Activity(
-                user_id=current_user.id,
-                action="created",
-                entity="quote",
-                entity_id=item.id,
-                description=f"Criou quote #{item.id} com análise inteligente",
-            )
-        )
+        db.add(Activity(
+            user_id=current_user.id,
+            action="created",
+            entity="quote",
+            entity_id=item.id,
+            description=f"Criou quote #{item.id} com análise inteligente",
+        ))
         db.commit()
         db.refresh(item)
     except ValueError as exc:
