@@ -5,6 +5,7 @@ from app import crud
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, User
+from app.services.automation import engine
 
 
 def _database_conflict(exc: ValueError) -> HTTPException:
@@ -15,9 +16,20 @@ def _entity_name(model) -> str:
     return model.__tablename__.rstrip("s")
 
 
+def _event_name(action: str, model) -> str:
+    return f"{_entity_name(model)}.{action}"
+
+
 def _log(db: Session, user: User, action: str, model, item_id: int | None, description: str) -> None:
     db.add(Activity(user_id=user.id, action=action, entity=_entity_name(model), entity_id=item_id, description=description))
     db.commit()
+
+
+def _emit(action: str, model, item_id: int, user_id: int) -> None:
+    engine.emit(
+        _event_name(action, model),
+        {"entity": _entity_name(model), "item_id": item_id, "user_id": user_id},
+    )
 
 
 def _payload_data(payload) -> dict:
@@ -46,6 +58,7 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
         try:
             item = crud.create_item(db, model(**_payload_data(payload)))
             _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
+            _emit("created", model, item.id, current_user.id)
             return item
         except ValueError as exc:
             raise _database_conflict(exc) from exc
@@ -58,6 +71,7 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
         try:
             item = crud.update_item(db, item, _payload_data(payload))
             _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
+            _emit("updated", model, item.id, current_user.id)
             return item
         except ValueError as exc:
             raise _database_conflict(exc) from exc
@@ -70,6 +84,7 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
         try:
             crud.delete_item(db, item)
             _log(db, current_user, "deleted", model, item_id, f"Excluiu {_entity_name(model)} #{item_id}")
+            _emit("deleted", model, item_id, current_user.id)
         except ValueError as exc:
             raise _database_conflict(exc) from exc
 
