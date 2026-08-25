@@ -5,6 +5,7 @@ from app.schemas.password_reset import PasswordResetConfirm, PasswordResetReques
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.schemas.quote import QuoteCreate, QuoteEstimateResponse, QuoteRead, QuoteUpdate
+from app.schemas.quote_item import QuoteItemCreate, QuoteItemRead, QuoteItemUpdate
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "ProductCreate", "ProductRead", "ProductUpdate",
     "ProjectCreate", "ProjectRead", "ProjectUpdate",
     "QuoteCreate", "QuoteEstimateResponse", "QuoteRead", "QuoteUpdate",
+    "QuoteItemCreate", "QuoteItemRead", "QuoteItemUpdate",
     "UserCreate", "UserRead", "UserUpdate",
 ]
