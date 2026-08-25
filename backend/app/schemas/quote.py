@@ -33,6 +33,21 @@ class QuoteUpdate(BaseModel):
     status: QuoteStatus | None = None
 
 
+class QuoteEstimateResponse(BaseModel):
+    material_cost: Decimal
+    hardware_cost: Decimal
+    labor_cost: Decimal
+    finishing_cost: Decimal
+    base_cost: Decimal
+    profit_margin: Decimal
+    suggested_total: Decimal
+    warnings: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    ai_analysis: str | None = None
+    ai_analyzed_at: datetime | None = None
+    requires_approval: bool = True
+
+
 class QuoteRead(QuoteBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
