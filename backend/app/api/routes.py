@@ -116,5 +116,5 @@ def estimate_quote(payload: QuoteEstimateRequest):
     ) | pricing
 
 
-quotes_router.include_router(make_router(Quote, QuoteCreate, QuoteRead, QuoteUpdate, ""))
+quotes_router.include_router(make_router(Quote, QuoteCreate, QuoteRead, QuoteUpdate, "", include_create=False))
 api_router.include_router(quotes_router)
