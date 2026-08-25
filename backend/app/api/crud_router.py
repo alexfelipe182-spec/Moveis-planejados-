@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-
 from app import crud
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.database import get_db
@@ -39,12 +38,13 @@ def _payload_data(payload) -> dict:
     return data
 
 
-def make_router(model, create_schema, read_schema, update_schema, prefix: str):
-    # FastAPI rejects an included router when both its prefix and operation
-    # path are empty. A root CRUD router is intentionally mounted under the
-    # parent resource (for example /quotes), so give it a slash route here.
+def make_router(model, create_schema, read_schema, update_schema, prefix: str, *, include_create: bool = True):
     router_prefix = prefix or "/"
-    router = APIRouter(prefix=router_prefix, tags=[prefix.strip("/").capitalize() or "Resource"], dependencies=[Depends(get_current_user)])
+    router = APIRouter(
+        prefix=router_prefix,
+        tags=[prefix.strip("/").capitalize() or "Resource"],
+        dependencies=[Depends(get_current_user)],
+    )
 
     @router.get("", response_model=list[read_schema])
     def list_all(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=100), db: Session = Depends(get_db)):
@@ -57,15 +57,16 @@ def make_router(model, create_schema, read_schema, update_schema, prefix: str):
             raise HTTPException(status_code=404, detail="Registro não encontrado")
         return item
 
-    @router.post("", response_model=read_schema, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
-    def create(payload: create_schema, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
-        try:
-            item = crud.create_item(db, model(**_payload_data(payload)))
-            _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
-            _emit("created", model, item.id, current_user.id)
-            return item
-        except ValueError as exc:
-            raise _database_conflict(exc) from exc
+    if include_create:
+        @router.post("", response_model=read_schema, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
+        def create(payload: create_schema, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+            try:
+                item = crud.create_item(db, model(**_payload_data(payload)))
+                _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
+                _emit("created", model, item.id, current_user.id)
+                return item
+            except ValueError as exc:
+                raise _database_conflict(exc) from exc
 
     @router.put("/{item_id}", response_model=read_schema, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
     def update(item_id: int, payload: update_schema, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
