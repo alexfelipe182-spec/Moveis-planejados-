@@ -18,7 +18,7 @@ from app.schemas import (
     CustomerCreate, CustomerRead, CustomerUpdate,
     ProductCreate, ProductRead, ProductUpdate,
     ProjectCreate, ProjectRead, ProjectUpdate,
-    QuoteCreate, QuoteRead, QuoteUpdate,
+    QuoteCreate, QuoteEstimateResponse, QuoteRead, QuoteUpdate,
 )
 from app.services.automation import engine
 from app.services.quote_ai import analyze_quote
@@ -39,7 +39,7 @@ api_router.include_router(admin_router)
 api_router.include_router(activity_router)
 api_router.include_router(customer_history_router)
 api_router.include_router(make_router(Category, CategoryCreate, CategoryRead, CategoryUpdate, "/categories"))
-api_router.include_router(make_router(Product, ProductCreate, ProductRead, ProductUpdate, "/products"))
+api_router.include_router(make_router(Product, ProductCreate, ProductRead, ProductUpdate, "/products",))
 api_router.include_router(make_router(Customer, CustomerCreate, CustomerRead, CustomerUpdate, "/customers"))
 api_router.include_router(make_router(Project, ProjectCreate, ProjectRead, ProjectUpdate, "/projects"))
 
@@ -105,7 +105,7 @@ def create_quote(
     return item
 
 
-@quotes_router.post("/estimate", response_model=dict[str, object])
+@quotes_router.post("/estimate", response_model=QuoteEstimateResponse)
 def estimate_quote(payload: QuoteEstimateRequest):
     """Calcula e analisa uma sugestão sem alterar o orçamento salvo."""
     pricing = calculate_quote_suggestion(**payload.model_dump())
