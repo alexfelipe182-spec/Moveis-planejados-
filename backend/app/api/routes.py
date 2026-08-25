@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.api.activity import router as activity_router
 from app.api.admin import router as admin_router
+from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
 from app.api.deps import require_admin, require_cookie_csrf
 from app.api.protected import router as protected_router
@@ -64,37 +65,16 @@ def _quote_calculation(payload: QuoteCreate | QuoteUpdate, current: Quote | None
 
 
 @quotes_router.post("", response_model=QuoteRead, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
-def create_quote(
-    payload: QuoteCreate,
-    current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    """Cria orçamento, calcula preço, executa análise e persiste o resultado."""
+def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     pricing = _quote_calculation(payload)
-    analysis = analyze_quote(
-        base_cost=pricing["base_cost"],
-        suggested_total=pricing["suggested_total"],
-        profit_margin=pricing["profit_margin"],
-    )
+    analysis = analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"], profit_margin=pricing["profit_margin"])
     data = payload.model_dump()
-    data.update(
-        {
-            "suggested_total": pricing["suggested_total"],
-            "total": pricing["suggested_total"],
-            "status": "analysis",
-            "ai_analysis": analysis["ai_analysis"],
-            "ai_analyzed_at": analysis["ai_analyzed_at"],
-        }
-    )
+    data.update({"suggested_total": pricing["suggested_total"], "total": pricing["suggested_total"], "status": "analysis",
+                 "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
     try:
         item = crud.create_item(db, Quote(**data))
-        db.add(Activity(
-            user_id=current_user.id,
-            action="created",
-            entity="quote",
-            entity_id=item.id,
-            description=f"Criou quote #{item.id} com análise inteligente",
-        ))
+        db.add(Activity(user_id=current_user.id, action="created", entity="quote", entity_id=item.id,
+                        description=f"Criou quote #{item.id} com análise inteligente"))
         db.commit()
         db.refresh(item)
     except ValueError as exc:
@@ -107,40 +87,23 @@ def create_quote(
 
 @quotes_router.post("/estimate", response_model=QuoteEstimateResponse)
 def estimate_quote(payload: QuoteEstimateRequest):
-    """Calcula e analisa uma sugestão sem alterar o orçamento salvo."""
     pricing = calculate_quote_suggestion(**payload.model_dump())
-    return analyze_quote(
-        base_cost=pricing["base_cost"],
-        suggested_total=pricing["suggested_total"],
-        profit_margin=pricing["profit_margin"],
-    ) | pricing
+    return analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"],
+                         profit_margin=pricing["profit_margin"]) | pricing
 
 
 @quotes_router.put("/{item_id}", response_model=QuoteRead, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
-def update_quote(
-    item_id: int,
-    payload: QuoteUpdate,
-    current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    """Atualiza um orçamento e sempre recalcula preço e análise; total não é aceito manualmente."""
+def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Atualiza orçamento e recalcula sempre; total não pode ser informado manualmente."""
     item = crud.get_item(db, Quote, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     data = payload.model_dump(exclude_unset=True)
     pricing = _quote_calculation(payload, item)
-    analysis = analyze_quote(
-        base_cost=pricing["base_cost"],
-        suggested_total=pricing["suggested_total"],
-        profit_margin=pricing["profit_margin"],
-    )
-    data.update({
-        "suggested_total": pricing["suggested_total"],
-        "total": pricing["suggested_total"],
-        "status": "analysis" if payload.status is None else payload.status,
-        "ai_analysis": analysis["ai_analysis"],
-        "ai_analyzed_at": analysis["ai_analyzed_at"],
-    })
+    analysis = analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"], profit_margin=pricing["profit_margin"])
+    data.update({"suggested_total": pricing["suggested_total"], "total": pricing["suggested_total"],
+                 "status": "analysis" if payload.status is None else payload.status,
+                 "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
     try:
         item = crud.update_item(db, item, data)
         db.add(Activity(user_id=current_user.id, action="updated", entity="quote", entity_id=item.id,
