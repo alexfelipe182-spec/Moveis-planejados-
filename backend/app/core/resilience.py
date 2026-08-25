@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections import defaultdict
 from dataclasses import dataclass
 
 from redis.asyncio import Redis
