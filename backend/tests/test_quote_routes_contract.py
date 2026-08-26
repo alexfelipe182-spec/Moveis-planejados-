@@ -14,6 +14,7 @@ def test_quote_routes_are_exposed_in_openapi_contract():
     assert "POST" in _methods(prefix)
     assert "GET" in _methods(prefix)
     assert "POST" in _methods(f"{prefix}/estimate")
+    assert "PATCH" in _methods(f"{prefix}/{{item_id}}/decision")
     assert "PUT" in _methods(f"{prefix}/{{item_id}}")
     assert "GET" in _methods(f"{prefix}/{{item_id}}")
     assert "DELETE" in _methods(f"{prefix}/{{item_id}}")
