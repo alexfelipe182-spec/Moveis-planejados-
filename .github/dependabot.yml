@@ -20,14 +20,15 @@ updates:
           - "psycopg*"
       authentication:
         patterns:
-          - "python-jose*"
-          - "passlib*"
+          - "PyJWT*"
           - "bcrypt*"
+          - "python-multipart*"
       testing:
         patterns:
           - "pytest*"
           - "httpx*"
           - "coverage*"
+          - "ruff*"
       security:
         patterns:
           - "pip-audit*"

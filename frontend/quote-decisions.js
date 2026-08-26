@@ -1,6 +1,11 @@
 (() => {
   const decisionLabels = { approved: 'Aprovar', rejected: 'Rejeitar' };
   const commercialLabels = { accepted: 'Cliente aceitou', declined: 'Cliente recusou' };
+  const quoteStatusLabels = {
+    sent: 'Enviado • aguardando cliente',
+    accepted: 'Aceito pelo cliente',
+    declined: 'Recusado pelo cliente',
+  };
 
   async function decideQuote(quoteId, decision) {
     if (!decisionLabels[decision]) throw new Error('Decisão de orçamento inválida.');
@@ -37,14 +42,45 @@
     return element;
   }
 
+  function visibleQuotes() {
+    let rows = state.rows.filter(row => !state.search || Object.values(row).some(value => String(value ?? '').toLowerCase().includes(state.search.toLowerCase())));
+    if (state.status) rows = rows.filter(row => row.status === state.status);
+    return rows;
+  }
+
+  function enhanceCommercialStatuses() {
+    const section = document.querySelector('#quotes');
+    if (!section || section.classList.contains('hidden')) return;
+
+    const filter = section.querySelector('select.filter');
+    if (filter) {
+      Object.entries(quoteStatusLabels).forEach(([value, label]) => {
+        if (filter.querySelector(`option[value="${value}"]`)) return;
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        filter.appendChild(option);
+      });
+      filter.value = state.status || '';
+    }
+
+    const quotes = visibleQuotes();
+    [...section.querySelectorAll('tbody tr')].forEach((tr, index) => {
+      const quote = quotes[index];
+      if (!quote || !quoteStatusLabels[quote.status]) return;
+      const statusCell = tr.querySelectorAll('td')[3];
+      const badge = statusCell?.querySelector('.badge');
+      if (badge) badge.textContent = quoteStatusLabels[quote.status];
+    });
+  }
+
   function addDecisionButtons() {
     const section = document.querySelector('#quotes');
     if (!section || section.classList.contains('hidden')) return;
     const rows = [...section.querySelectorAll('tbody tr')];
-    let visibleRows = state.rows.filter(row => !state.search || Object.values(row).some(value => String(value ?? '').toLowerCase().includes(state.search.toLowerCase())));
-    if (state.status) visibleRows = visibleRows.filter(row => row.status === state.status);
+    const quotes = visibleQuotes();
     rows.forEach((tr, index) => {
-      const quote = visibleRows[index];
+      const quote = quotes[index];
       const actions = tr.querySelector('.actions');
       if (!quote || !actions || actions.querySelector('[data-quote-decision], [data-commercial-status]')) return;
 
@@ -63,7 +99,10 @@
   const originalRenderResource = window.renderResource;
   window.renderResource = function(resource) {
     const result = originalRenderResource(resource);
-    if (resource === 'quotes') addDecisionButtons();
+    if (resource === 'quotes') {
+      enhanceCommercialStatuses();
+      addDecisionButtons();
+    }
     return result;
   };
 

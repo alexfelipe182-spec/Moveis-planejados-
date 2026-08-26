@@ -75,6 +75,13 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
     assert fetched_body["ai_analysis"] == body["ai_analysis"]
     assert fetched_body["ai_analyzed_at"] == body["ai_analyzed_at"]
 
+    status_bypass = client.put(
+        f"/api/v1/quotes/{body['id']}",
+        json={"status": "accepted"},
+        headers=csrf_headers(client),
+    )
+    assert status_bypass.status_code == 409
+
     share_before_approval = client.post(
         f"/api/v1/quotes/{body['id']}/shared",
         headers=csrf_headers(client),
@@ -88,6 +95,13 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
     )
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "approved"
+
+    edit_after_approval = client.put(
+        f"/api/v1/quotes/{body['id']}",
+        json={"description": "Tentativa de alterar proposta já aprovada"},
+        headers=csrf_headers(client),
+    )
+    assert edit_after_approval.status_code == 409
 
     shared = client.post(
         f"/api/v1/quotes/{body['id']}/shared",
