@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import crud
@@ -66,6 +67,15 @@ def _quote_calculation(payload: QuoteCreate | QuoteUpdate, current: Quote | None
     )
 
 
+def _commit_quote_write(db: Session, item: Quote) -> None:
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Não foi possível concluir a alteração do orçamento") from exc
+
+
 @quotes_router.get(
     "",
     response_model=list[QuoteRead],
@@ -87,12 +97,12 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
     data.update({"suggested_total": pricing["suggested_total"], "total": pricing["suggested_total"], "status": "analysis",
                  "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
     try:
-        item = crud.create_item(db, Quote(**data))
+        item = crud.create_item(db, Quote(**data), commit=False)
         db.add(Activity(user_id=current_user.id, action="created", entity="quote", entity_id=item.id,
                         description=f"Criou quote #{item.id} com análise inteligente"))
-        db.commit()
-        db.refresh(item)
+        _commit_quote_write(db, item)
     except ValueError as exc:
+        db.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     engine.emit("quote.created", {"entity": "quote", "item_id": item.id, "user_id": current_user.id,
                                    "base_cost": pricing["base_cost"], "suggested_total": pricing["suggested_total"],
@@ -134,12 +144,12 @@ def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depend
                  "status": "analysis",
                  "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
     try:
-        item = crud.update_item(db, item, data)
+        item = crud.update_item(db, item, data, commit=False)
         db.add(Activity(user_id=current_user.id, action="updated", entity="quote", entity_id=item.id,
                         description=f"Atualizou quote #{item.id} e recalculou análise inteligente"))
-        db.commit()
-        db.refresh(item)
+        _commit_quote_write(db, item)
     except ValueError as exc:
+        db.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     engine.emit("quote.updated", {"entity": "quote", "item_id": item.id, "user_id": current_user.id,
                                    "suggested_total": pricing["suggested_total"], "profit_margin": pricing["profit_margin"]})
