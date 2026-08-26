@@ -28,8 +28,8 @@
 <main class="page">
 <header><div><div class="brand">Marcenaria Ideal</div><div class="muted">Móveis planejados • Projeto sob medida</div></div><div><strong>Orçamento #${safe(quote.id)}</strong><br><span class="muted">${safe(date)}</span><br><span class="badge">${safe(status)}</span></div></header>
 <section class="grid"><div class="card"><h3>Cliente</h3><strong>${safe(customer.name || customerName(quote))}</strong><p class="muted">${safe(customer.email || '')}<br>${safe(customer.phone || '')}<br>${safe(customer.address || '')}</p></div><div class="card"><h3>Projeto</h3><div class="description">${safe(quote.description)}</div><p><strong>Medidas:</strong> ${safe(quote.measurements)}</p><p><strong>Materiais:</strong> ${safe(quote.materials)}</p></div></section>
-<section class="grid"><div class="card"><h3>Custos do projeto</h3><p>Material: <strong>${money(quote.material_cost)}</strong></p><p>Ferragens: <strong>${money(quote.hardware_cost)}</strong></p><p>Mão de obra: <strong>${money(quote.labor_cost)}</strong></p><p>Acabamento: <strong>${money(quote.finishing_cost)}</strong></p></div><div class="card"><h3>Condições</h3><p>Margem aplicada: <strong>${safe(quote.profit_margin ?? 0)}%</strong></p><p>Status: <strong>${safe(status)}</strong></p><p class="muted">Valores calculados pelo sistema e sujeitos à validação final de medidas, materiais e condições comerciais.</p></div></section>
-<div class="total"><span>Valor total do orçamento</span><strong>${money(quote.total ?? quote.suggested_total)}</strong></div>
+<section class="card"><h3>Condições comerciais</h3><p>Status: <strong>${safe(status)}</strong></p><p class="muted">O valor considera o escopo descrito nesta proposta e pode ser ajustado após conferência final de medidas, materiais, ferragens, acabamento, prazo e condições de instalação.</p></section>
+<div class="total"><span>Valor total da proposta</span><strong>${money(quote.total ?? quote.suggested_total)}</strong></div>
 <div class="actions"><button class="print" onclick="window.print()">Imprimir / Salvar em PDF</button></div>
 <footer>Marcenaria Ideal • Proposta comercial gerada pelo painel administrativo.</footer>
 </main>
@@ -40,8 +40,9 @@
   function openQuoteProposal(quoteId) {
     const quote = state.rows.find(item => item.id === quoteId);
     if (!quote) return toast('Orçamento não encontrado.', 'error');
-    const popup = window.open('', '_blank', 'noopener');
+    const popup = window.open('', '_blank');
     if (!popup) return toast('Permita pop-ups para visualizar a proposta.', 'error');
+    popup.opener = null;
     popup.document.open();
     popup.document.write(proposalHtml(quote));
     popup.document.close();
