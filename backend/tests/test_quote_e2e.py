@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
@@ -60,9 +62,15 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
     assert body["suggested_total"] == "3250.00"
     assert body["total"] == "3250.00"
     assert body["status"] == "analysis"
-    assert body["ai_analysis"] is None
-    assert body["ai_analyzed_at"] is None
+    assert body["ai_analysis"] is not None
+    analysis = json.loads(body["ai_analysis"])
+    assert analysis["source"] == "local-analysis"
+    assert analysis["financial_values_locked"] is True
+    assert body["ai_analyzed_at"] is not None
 
     fetched = client.get(f"/api/v1/quotes/{body['id']}")
     assert fetched.status_code == 200
-    assert fetched.json()["suggested_total"] == "3250.00"
+    fetched_body = fetched.json()
+    assert fetched_body["suggested_total"] == "3250.00"
+    assert fetched_body["ai_analysis"] == body["ai_analysis"]
+    assert fetched_body["ai_analyzed_at"] == body["ai_analyzed_at"]
