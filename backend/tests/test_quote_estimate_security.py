@@ -14,6 +14,15 @@ ESTIMATE_PAYLOAD = {
 }
 
 
+def test_quote_listing_requires_authentication():
+    client = TestClient(app)
+
+    response = client.get("/api/v1/quotes")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Autenticação necessária"
+
+
 def test_quote_estimate_requires_authentication():
     client = TestClient(app)
 
