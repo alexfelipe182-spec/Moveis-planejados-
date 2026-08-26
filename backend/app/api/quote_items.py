@@ -27,15 +27,16 @@ def _get_quote(db: Session, quote_id: int) -> Quote:
 
 
 def _recalculate_quote_total(db: Session, quote_id: int) -> Decimal:
+    items = db.query(QuoteItem).filter(QuoteItem.quote_id == quote_id).all()
     total = sum(
         (
             Decimal(item.subtotal)
             if item.subtotal is not None
             else Decimal("0")
-        )
-        for item in db.query(QuoteItem).filter(QuoteItem.quote_id == quote_id).all()
-    , start=Decimal("0"))
-    total = total.quantize(Decimal("0.01"))
+            for item in items
+        ),
+        Decimal("0"),
+    ).quantize(Decimal("0.01"))
     quote = _get_quote(db, quote_id)
     quote.total = total
     quote.suggested_total = total
