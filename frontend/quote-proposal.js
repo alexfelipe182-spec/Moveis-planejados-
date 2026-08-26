@@ -8,10 +8,11 @@
   };
 
   const safe = value => escapeHtml(value ?? '—');
-  const customerName = quote => state.customers.find(item => item.id === quote.customer_id)?.name || `Cliente #${quote.customer_id}`;
+  const customerFor = quote => state.customers.find(item => item.id === quote.customer_id) || {};
+  const customerName = quote => customerFor(quote).name || `Cliente #${quote.customer_id}`;
 
   function proposalHtml(quote) {
-    const customer = state.customers.find(item => item.id === quote.customer_id) || {};
+    const customer = customerFor(quote);
     const status = proposalStatusLabels[quote.status] || quote.status || '—';
     const date = quote.created_at ? new Date(quote.created_at).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
     return `<!doctype html>
@@ -48,6 +49,23 @@
     popup.document.close();
   }
 
+  async function shareQuote(quoteId) {
+    const quote = state.rows.find(item => item.id === quoteId);
+    if (!quote) return toast('Orçamento não encontrado.', 'error');
+    if (quote.status !== 'approved') return toast('A proposta precisa estar aprovada antes do envio.', 'error');
+    const customer = customerFor(quote);
+    const phone = String(customer.phone || '').replace(/\D/g, '');
+    if (!phone) return toast('Cadastre o telefone do cliente antes de enviar.', 'error');
+    try {
+      await api(`/quotes/${quote.id}/shared`, { method: 'POST' });
+      const message = `Olá, ${customer.name || 'cliente'}! Sua proposta da Marcenaria Ideal está pronta. Orçamento #${quote.id} no valor de ${money(quote.total ?? quote.suggested_total)}. Vou enviar o PDF da proposta nesta conversa.`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+      toast(`Envio da proposta #${quote.id} registrado no histórico.`);
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  }
+
   function addProposalButtons() {
     const section = document.querySelector('#quotes');
     if (!section || section.classList.contains('hidden')) return;
@@ -65,6 +83,15 @@
       button.textContent = quote.status === 'approved' ? 'Proposta' : 'Visualizar';
       button.addEventListener('click', () => openQuoteProposal(quote.id));
       actions.prepend(button);
+      if (quote.status === 'approved') {
+        const share = document.createElement('button');
+        share.type = 'button';
+        share.className = 'small-btn';
+        share.dataset.quoteShare = String(quote.id);
+        share.textContent = 'WhatsApp';
+        share.addEventListener('click', () => shareQuote(quote.id));
+        actions.prepend(share);
+      }
     });
   }
 
@@ -76,4 +103,5 @@
   };
 
   window.openQuoteProposal = openQuoteProposal;
+  window.shareQuote = shareQuote;
 })();

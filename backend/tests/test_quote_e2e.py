@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
 from app.main import app
-from app.models import User
+from app.models import Activity, User
 
 
 def csrf_headers(client):
@@ -36,7 +36,7 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
 
     customer = client.post(
         "/api/v1/customers",
-        json={"name": "Cliente E2E", "email": "cliente.e2e@example.com"},
+        json={"name": "Cliente E2E", "email": "cliente.e2e@example.com", "phone": "+5513999999999"},
         headers=csrf_headers(client),
     )
     assert customer.status_code == 201
@@ -75,6 +75,12 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
     assert fetched_body["ai_analysis"] == body["ai_analysis"]
     assert fetched_body["ai_analyzed_at"] == body["ai_analyzed_at"]
 
+    share_before_approval = client.post(
+        f"/api/v1/quotes/{body['id']}/shared",
+        headers=csrf_headers(client),
+    )
+    assert share_before_approval.status_code == 409
+
     approved = client.patch(
         f"/api/v1/quotes/{body['id']}/decision",
         json={"status": "approved"},
@@ -82,6 +88,23 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
     )
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "approved"
+
+    shared = client.post(
+        f"/api/v1/quotes/{body['id']}/shared",
+        headers=csrf_headers(client),
+    )
+    assert shared.status_code == 204
+
+    db = SessionLocal()
+    try:
+        activity = (
+            db.query(Activity)
+            .filter(Activity.entity == "quote", Activity.entity_id == body["id"], Activity.action == "shared")
+            .one()
+        )
+        assert "envio da proposta" in activity.description
+    finally:
+        db.close()
 
     second_decision = client.patch(
         f"/api/v1/quotes/{body['id']}/decision",
