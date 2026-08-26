@@ -32,7 +32,7 @@ def decide_quote(
     item = crud.get_item(db, Quote, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-    if item.status not in {"analysis", "approved", "rejected"}:
+    if item.status != "analysis":
         raise HTTPException(
             status_code=409,
             detail="Orçamento precisa estar em análise para aprovação ou rejeição",
