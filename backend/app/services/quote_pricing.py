@@ -11,6 +11,11 @@ def _decimal(value: Decimal | int | float | str) -> Decimal:
     return Decimal(str(value))
 
 
+def _money(value: Decimal) -> Decimal:
+    """Round monetary values to cents using conventional financial rounding."""
+    return value.quantize(MONEY, rounding=ROUND_HALF_UP)
+
+
 def calculate_quote_suggestion(
     material_cost: Decimal | int | float | str = Decimal("0"),
     hardware_cost: Decimal | int | float | str = Decimal("0"),
@@ -31,16 +36,14 @@ def calculate_quote_suggestion(
         raise ValueError("A margem de lucro deve estar entre 0 e 100")
 
     base_cost = sum(values, Decimal("0"))
-    suggested_total = (base_cost * (Decimal("1") + profit_margin / Decimal("100"))).quantize(
-        MONEY, rounding=ROUND_HALF_UP
-    )
+    suggested_total = base_cost * (Decimal("1") + profit_margin / Decimal("100"))
 
     return {
-        "material_cost": material_cost.quantize(MONEY),
-        "hardware_cost": hardware_cost.quantize(MONEY),
-        "labor_cost": labor_cost.quantize(MONEY),
-        "finishing_cost": finishing_cost.quantize(MONEY),
-        "base_cost": base_cost.quantize(MONEY),
-        "profit_margin": profit_margin.quantize(MONEY),
-        "suggested_total": suggested_total,
+        "material_cost": _money(material_cost),
+        "hardware_cost": _money(hardware_cost),
+        "labor_cost": _money(labor_cost),
+        "finishing_cost": _money(finishing_cost),
+        "base_cost": _money(base_cost),
+        "profit_margin": _money(profit_margin),
+        "suggested_total": _money(suggested_total),
     }
