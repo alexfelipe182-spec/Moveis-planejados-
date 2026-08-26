@@ -50,4 +50,9 @@
   };
 
   window.decideQuote = decideQuote;
+
+  const proposalScript = document.createElement('script');
+  proposalScript.src = './quote-proposal.js';
+  proposalScript.defer = true;
+  document.head.appendChild(proposalScript);
 })();
