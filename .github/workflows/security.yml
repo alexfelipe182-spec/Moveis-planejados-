@@ -46,6 +46,7 @@ jobs:
           set +e
           "$GITLEAKS_BIN" detect \
             --source=. \
+            --config=.gitleaks.toml \
             --no-banner \
             --redact \
             --report-format=json \
