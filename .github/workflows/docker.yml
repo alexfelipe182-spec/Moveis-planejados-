@@ -38,16 +38,36 @@ jobs:
         run: |
           test "$(docker image inspect moveis-planejados-api:ci --format '{{.Config.User}}')" = "appuser"
           test "$(docker image inspect moveis-planejados-api:ci --format '{{json .Config.ExposedPorts}}')" = '{"8000/tcp":{}}'
+      - name: Start smoke-test PostgreSQL
+        run: |
+          docker network create moveis-ci
+          docker run -d --name moveis-db-ci --network moveis-ci \
+            -e POSTGRES_DB=marcenaria_db_ci \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            postgres:16-bookworm
+          for i in {1..30}; do
+            if docker exec moveis-db-ci pg_isready -U postgres -d marcenaria_db_ci; then exit 0; fi
+            sleep 1
+          done
+          docker logs moveis-db-ci
+          exit 1
       - name: Start API container
         run: |
-          docker run -d --rm --name moveis-api-ci -p 8000:8000 \
+          docker run -d --name moveis-api-ci --network moveis-ci -p 8000:8000 \
+            -e DATABASE_URL=postgresql+psycopg://postgres:postgres@moveis-db-ci:5432/marcenaria_db_ci \
             -e SECRET_KEY=docker-test-secret-key-at-least-32-bytes-long \
             -e ENVIRONMENT=test \
+            -e CORS_ORIGINS='["http://localhost:3000"]' \
             moveis-planejados-api:ci
       - name: Smoke test API container
         run: |
           for i in {1..30}; do
             if curl --fail --silent --show-error http://127.0.0.1:8000/health; then exit 0; fi
+            if ! docker inspect moveis-api-ci --format '{{.State.Running}}' | grep -qx true; then
+              docker logs moveis-api-ci
+              exit 1
+            fi
             sleep 1
           done
           docker logs moveis-api-ci
@@ -60,11 +80,13 @@ jobs:
         if: failure()
         run: |
           docker compose -f docker-compose.test.yml logs --no-color
+          docker logs moveis-db-ci 2>/dev/null || true
           docker logs moveis-api-ci 2>/dev/null || true
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f moveis-api-ci 2>/dev/null || true
+          docker rm -f moveis-api-ci moveis-db-ci 2>/dev/null || true
+          docker network rm moveis-ci 2>/dev/null || true
           docker compose -f docker-compose.test.yml down -v --remove-orphans
 
   publish-image:
