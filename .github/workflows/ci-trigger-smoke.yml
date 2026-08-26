@@ -1,0 +1,31 @@
+name: CI Trigger Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trigger-smoke-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trigger:
+    name: Workflow trigger health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Show event context
+        run: |
+          echo "event=${{ github.event_name }}"
+          echo "ref=${{ github.ref }}"
+          echo "sha=${{ github.sha }}"
+      - name: Confirm runner execution
+        run: echo "GitHub Actions runner is executing workflows correctly."

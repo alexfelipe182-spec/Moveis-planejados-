@@ -1,18 +1,24 @@
 name: Security Gates
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
 
 permissions:
   contents: read
 
 concurrency:
-  group: security-${{ github.workflow }}-${{ github.ref }}
+  group: security-${{ github.event_name }}-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   secrets:
@@ -78,9 +84,24 @@ jobs:
 
       - name: Install dependencies and pip-audit
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt pip-audit
 
       - name: Audit dependencies
         working-directory: backend
         run: pip-audit -r requirements.txt
+
+  security-summary:
+    name: Security summary
+    if: always()
+    needs: [secrets, python-audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Enforce security gates
+        run: |
+          echo "secrets=${{ needs.secrets.result }}"
+          echo "python-audit=${{ needs.python-audit.result }}"
+          test "${{ needs.secrets.result }}" = success
+          test "${{ needs.python-audit.result }}" = success

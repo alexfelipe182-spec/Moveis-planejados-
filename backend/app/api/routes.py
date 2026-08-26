@@ -9,7 +9,7 @@ from app.api.activity import router as activity_router
 from app.api.admin import router as admin_router
 from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
-from app.api.deps import require_admin, require_cookie_csrf
+from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.api.protected import router as protected_router
 from app.api.quote_items import router as quote_items_router
 from app.database import get_db
@@ -65,7 +65,11 @@ def _quote_calculation(payload: QuoteCreate | QuoteUpdate, current: Quote | None
     )
 
 
-@quotes_router.get("", response_model=list[QuoteRead])
+@quotes_router.get(
+    "",
+    response_model=list[QuoteRead],
+    dependencies=[Depends(get_current_user)],
+)
 def list_quotes(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
@@ -95,7 +99,11 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
     return item
 
 
-@quotes_router.post("/estimate", response_model=QuoteEstimateResponse)
+@quotes_router.post(
+    "/estimate",
+    response_model=QuoteEstimateResponse,
+    dependencies=[Depends(require_admin)],
+)
 def estimate_quote(payload: QuoteEstimateRequest):
     pricing = calculate_quote_suggestion(**payload.model_dump())
     return analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"],
