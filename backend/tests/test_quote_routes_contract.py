@@ -1,17 +1,17 @@
 from collections import Counter
 
-from fastapi.routing import APIRoute
-
 from app.api.routes import api_router
 
 
 def _route_keys() -> list[tuple[str, str]]:
-    routes = [route for route in api_router.routes if isinstance(route, APIRoute)]
-    return [
-        (method, route.path)
-        for route in routes
-        for method in (route.methods or set())
-    ]
+    keys: list[tuple[str, str]] = []
+    for route in api_router.routes:
+        path = getattr(route, "path", None)
+        methods = getattr(route, "methods", None)
+        if not path or not methods:
+            continue
+        keys.extend((method, path) for method in methods)
+    return keys
 
 
 def test_api_router_has_no_duplicate_methods_and_paths():
