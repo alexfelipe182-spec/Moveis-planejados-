@@ -42,7 +42,21 @@ jobs:
       - name: Scan repository for secrets
         env:
           GITLEAKS_BIN: ${{ runner.temp }}/bin/gitleaks
-        run: "$GITLEAKS_BIN detect --source=. --no-banner --redact"
+        run: |
+          set +e
+          "$GITLEAKS_BIN" detect \
+            --source=. \
+            --no-banner \
+            --redact \
+            --report-format=json \
+            --report-path="$RUNNER_TEMP/gitleaks-report.json"
+          status=$?
+          set -e
+          if [ -s "$RUNNER_TEMP/gitleaks-report.json" ]; then
+            echo "Sanitized Gitleaks findings:"
+            jq '[.[] | {RuleID, Description, File, StartLine, Commit, Fingerprint}]' "$RUNNER_TEMP/gitleaks-report.json"
+          fi
+          exit "$status"
 
   python-audit:
     name: Python dependency audit
