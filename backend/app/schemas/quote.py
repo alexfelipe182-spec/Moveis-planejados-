@@ -12,16 +12,16 @@ class QuoteBase(BaseModel):
     description: str = Field(min_length=3, max_length=3000)
     measurements: str | None = Field(default=None, max_length=2000)
     materials: str | None = Field(default=None, max_length=2000)
-    total: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    total: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
     status: QuoteStatus = "pending"
 
 
 class QuoteCreate(QuoteBase):
-    material_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
-    hardware_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
-    labor_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
-    finishing_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
-    profit_margin: Decimal = Field(default=30, ge=0, le=100, max_digits=5, decimal_places=2)
+    material_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
+    hardware_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
+    labor_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
+    finishing_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
+    profit_margin: Decimal = Field(default=Decimal("30"), ge=0, le=100, max_digits=5, decimal_places=2)
 
 
 class QuoteUpdate(BaseModel):
