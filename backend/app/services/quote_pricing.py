@@ -4,13 +4,26 @@ from decimal import Decimal, ROUND_HALF_UP
 MONEY = Decimal("0.01")
 
 
+def _decimal(value: Decimal | int | float | str) -> Decimal:
+    """Normalize supported numeric inputs without introducing float artifacts."""
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
 def calculate_quote_suggestion(
-    material_cost: Decimal = Decimal("0"),
-    hardware_cost: Decimal = Decimal("0"),
-    labor_cost: Decimal = Decimal("0"),
-    finishing_cost: Decimal = Decimal("0"),
-    profit_margin: Decimal = Decimal("30"),
+    material_cost: Decimal | int | float | str = Decimal("0"),
+    hardware_cost: Decimal | int | float | str = Decimal("0"),
+    labor_cost: Decimal | int | float | str = Decimal("0"),
+    finishing_cost: Decimal | int | float | str = Decimal("0"),
+    profit_margin: Decimal | int | float | str = Decimal("30"),
 ) -> dict[str, Decimal]:
+    material_cost = _decimal(material_cost)
+    hardware_cost = _decimal(hardware_cost)
+    labor_cost = _decimal(labor_cost)
+    finishing_cost = _decimal(finishing_cost)
+    profit_margin = _decimal(profit_margin)
+
     values = [material_cost, hardware_cost, labor_cost, finishing_cost]
     if any(value < 0 for value in values):
         raise ValueError("Os custos não podem ser negativos")
