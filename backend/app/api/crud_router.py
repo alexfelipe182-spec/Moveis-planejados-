@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import crud
@@ -8,8 +9,9 @@ from app.models import Activity, User
 from app.services.automation import engine
 
 
-def _database_conflict(exc: ValueError) -> HTTPException:
-    return HTTPException(status_code=409, detail=str(exc))
+def _database_conflict(exc: ValueError | IntegrityError) -> HTTPException:
+    detail = str(exc) if isinstance(exc, ValueError) else "Não foi possível concluir a operação no banco de dados"
+    return HTTPException(status_code=409, detail=detail)
 
 
 def _entity_name(model) -> str:
@@ -30,7 +32,6 @@ def _log(db: Session, user: User, action: str, model, item_id: int | None, descr
             description=description,
         )
     )
-    db.commit()
 
 
 def _emit(action: str, model, item_id: int, user_id: int) -> None:
@@ -45,6 +46,14 @@ def _payload_data(payload) -> dict:
     if "photos" in data and data["photos"] is not None:
         data["photos"] = [str(photo) for photo in data["photos"]]
     return data
+
+
+def _commit_or_conflict(db: Session) -> None:
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise _database_conflict(exc) from exc
 
 
 def make_router(
@@ -103,11 +112,14 @@ def make_router(
             db: Session = Depends(get_db),
         ):
             try:
-                item = crud.create_item(db, model(**_payload_data(payload)))
+                item = crud.create_item(db, model(**_payload_data(payload)), commit=False)
                 _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
+                _commit_or_conflict(db)
+                db.refresh(item)
                 _emit("created", model, item.id, current_user.id)
                 return item
             except ValueError as exc:
+                db.rollback()
                 raise _database_conflict(exc) from exc
 
     if include_update:
@@ -127,11 +139,14 @@ def make_router(
             if not item:
                 raise HTTPException(status_code=404, detail="Registro não encontrado")
             try:
-                item = crud.update_item(db, item, _payload_data(payload))
+                item = crud.update_item(db, item, _payload_data(payload), commit=False)
                 _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
+                _commit_or_conflict(db)
+                db.refresh(item)
                 _emit("updated", model, item.id, current_user.id)
                 return item
             except ValueError as exc:
+                db.rollback()
                 raise _database_conflict(exc) from exc
 
     if include_delete:
@@ -150,10 +165,12 @@ def make_router(
             if not item:
                 raise HTTPException(status_code=404, detail="Registro não encontrado")
             try:
-                crud.delete_item(db, item)
+                crud.delete_item(db, item, commit=False)
                 _log(db, current_user, "deleted", model, item_id, f"Excluiu {_entity_name(model)} #{item_id}")
+                _commit_or_conflict(db)
                 _emit("deleted", model, item_id, current_user.id)
             except ValueError as exc:
+                db.rollback()
                 raise _database_conflict(exc) from exc
 
     return router
