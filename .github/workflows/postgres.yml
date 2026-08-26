@@ -149,7 +149,7 @@ jobs:
           PY
       - name: Run tests
         working-directory: backend
-        run: python -m pytest -q tests --maxfail=1 --strict-config --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=junit.xml
+        run: python -m pytest -q tests --maxfail=1 --strict-config --cov=app --cov-fail-under=80 --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=junit.xml
       - name: Audit dependencies
         working-directory: backend
         run: python -m pip_audit -r requirements.txt
