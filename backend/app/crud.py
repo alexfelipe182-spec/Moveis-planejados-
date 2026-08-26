@@ -12,10 +12,13 @@ def get_item(db: Session, model, item_id: int):
     return db.get(model, item_id)
 
 
-def create_item(db: Session, obj):
+def create_item(db: Session, obj, *, commit: bool = True):
     try:
         db.add(obj)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         db.refresh(obj)
         return obj
     except IntegrityError:
@@ -23,20 +26,26 @@ def create_item(db: Session, obj):
         raise ValueError("Não foi possível criar o registro: dados duplicados ou referência inválida") from None
 
 
-def delete_item(db: Session, obj):
+def delete_item(db: Session, obj, *, commit: bool = True):
     try:
         db.delete(obj)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except IntegrityError:
         db.rollback()
         raise ValueError("Não foi possível excluir o registro porque ele está sendo utilizado") from None
 
 
-def update_item(db: Session, obj, data: dict):
+def update_item(db: Session, obj, data: dict, *, commit: bool = True):
     for key, value in data.items():
         setattr(obj, key, value)
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         db.refresh(obj)
         return obj
     except IntegrityError:
