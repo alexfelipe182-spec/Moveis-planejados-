@@ -95,7 +95,11 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
     return item
 
 
-@quotes_router.post("/estimate", response_model=QuoteEstimateResponse)
+@quotes_router.post(
+    "/estimate",
+    response_model=QuoteEstimateResponse,
+    dependencies=[Depends(require_admin)],
+)
 def estimate_quote(payload: QuoteEstimateRequest):
     pricing = calculate_quote_suggestion(**payload.model_dump())
     return analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"],
