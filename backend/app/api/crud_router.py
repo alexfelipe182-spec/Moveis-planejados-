@@ -69,7 +69,11 @@ def make_router(
         tags=[prefix.strip("/").capitalize() or "Resource"],
         dependencies=[Depends(get_current_user)],
     )
-    collection_path = "/" if not prefix else ""
+    # Empty prefixes are used when the CRUD router is nested below a specialized
+    # parent router (for example /quotes). Register the collection at "" so GET
+    # and POST share the exact parent path instead of splitting /quotes and
+    # /quotes/, which can otherwise produce a 405 before redirect handling.
+    collection_path = ""
 
     @router.get(collection_path, response_model=list[read_schema])
     def list_all(
