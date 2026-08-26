@@ -28,7 +28,7 @@ jobs:
         run: docker compose --env-file .env.production.example -f docker-compose.prod.yml config -q
       - name: Build and test stack
         env:
-          SECRET_KEY: docker-test-secret-key-only
+          SECRET_KEY: docker-test-secret-key-at-least-32-bytes-long
           ENVIRONMENT: test
         run: |
           docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from app --remove-orphans
@@ -41,7 +41,7 @@ jobs:
       - name: Start API container
         run: |
           docker run -d --rm --name moveis-api-ci -p 8000:8000 \
-            -e SECRET_KEY=docker-test-secret-key-only \
+            -e SECRET_KEY=docker-test-secret-key-at-least-32-bytes-long \
             -e ENVIRONMENT=test \
             moveis-planejados-api:ci
       - name: Smoke test API container
