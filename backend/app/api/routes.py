@@ -113,15 +113,25 @@ def estimate_quote(payload: QuoteEstimateRequest):
 
 @quotes_router.put("/{item_id}", response_model=QuoteRead, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
 def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """Atualiza orçamento e recalcula sempre; total não pode ser informado manualmente."""
+    """Atualiza dados técnicos antes da decisão; transições de status usam endpoints dedicados."""
     item = crud.get_item(db, Quote, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-    data = payload.model_dump(exclude_unset=True)
+    if payload.status is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Status do orçamento só pode ser alterado pelos fluxos de decisão e comercial",
+        )
+    if item.status not in {"pending", "analysis"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Orçamento com decisão registrada não pode ser alterado; crie uma nova revisão",
+        )
+    data = payload.model_dump(exclude_unset=True, exclude={"status"})
     pricing = _quote_calculation(payload, item)
     analysis = analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"], profit_margin=pricing["profit_margin"])
     data.update({"suggested_total": pricing["suggested_total"], "total": pricing["suggested_total"],
-                 "status": "analysis" if payload.status is None else payload.status,
+                 "status": "analysis",
                  "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
     try:
         item = crud.update_item(db, item, data)
