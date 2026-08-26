@@ -138,7 +138,11 @@ def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(
         raise HTTPException(status_code=400, detail="Usuário inválido ou inativo")
     user.password_hash = hash_password(payload.new_password)
     record.used_at = _now()
-    db.add(Activity(user_id=user.id, action="password_reset", entity="user", entity_id=user.id, description="Senha redefinida com sucesso"))
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+        RefreshToken.revoked.is_(False),
+    ).update({"revoked": True}, synchronize_session=False)
+    db.add(Activity(user_id=user.id, action="password_reset", entity="user", entity_id=user.id, description="Senha redefinida com sucesso e sessões renováveis revogadas"))
     db.commit()
     return {"message": "Senha redefinida com sucesso. Faça login novamente."}
 
