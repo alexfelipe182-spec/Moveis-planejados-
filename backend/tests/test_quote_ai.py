@@ -1,7 +1,7 @@
 import json
 import sys
 from decimal import Decimal
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 from app.services.quote_ai import analyze_quote
 
@@ -107,3 +107,38 @@ def test_external_ai_failure_falls_back_without_breaking_quote(monkeypatch):
     assert result["suggested_total"] == Decimal("1300.00")
     assert result["requires_approval"] is True
     assert json.loads(result["ai_analysis"])["source"] == "local-analysis"
+
+
+def test_external_ai_success_replaces_only_analysis_text(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_MODEL", "test-model")
+
+    fake_openai = ModuleType("openai")
+    calls = []
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                output_text='{"summary":"ok","warnings":[],"recommendations":[]}'
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.responses = FakeResponses()
+
+    fake_openai.OpenAI = FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", fake_openai)
+
+    result = analyze_quote(
+        base_cost=Decimal("1000.00"),
+        suggested_total=Decimal("1350.00"),
+        profit_margin=Decimal("35"),
+    )
+
+    assert result["base_cost"] == Decimal("1000.00")
+    assert result["suggested_total"] == Decimal("1350.00")
+    assert result["profit_margin"] == Decimal("35")
+    assert result["ai_analysis"] == '{"summary":"ok","warnings":[],"recommendations":[]}'
+    assert result["requires_approval"] is True
+    assert calls[0]["model"] == "test-model"
