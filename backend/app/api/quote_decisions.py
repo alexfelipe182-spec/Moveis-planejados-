@@ -67,3 +67,44 @@ def decide_quote(
         },
     )
     return item
+
+
+@router.post(
+    "/{item_id}/shared",
+    status_code=204,
+    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+)
+def record_quote_share(
+    item_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    item = crud.get_item(db, Quote, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    if item.status != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail="Somente orçamentos aprovados podem ser enviados ao cliente",
+        )
+
+    db.add(
+        Activity(
+            user_id=current_user.id,
+            action="shared",
+            entity="quote",
+            entity_id=item.id,
+            description=f"Registrou envio da proposta do quote #{item.id} ao cliente",
+        )
+    )
+    db.commit()
+    engine.emit(
+        "quote.shared",
+        {
+            "entity": "quote",
+            "item_id": item.id,
+            "user_id": current_user.id,
+            "status": item.status,
+            "suggested_total": item.suggested_total,
+        },
+    )
