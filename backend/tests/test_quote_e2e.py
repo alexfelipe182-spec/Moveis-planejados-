@@ -74,3 +74,18 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
     assert fetched_body["suggested_total"] == "3250.00"
     assert fetched_body["ai_analysis"] == body["ai_analysis"]
     assert fetched_body["ai_analyzed_at"] == body["ai_analyzed_at"]
+
+    approved = client.patch(
+        f"/api/v1/quotes/{body['id']}/decision",
+        json={"status": "approved"},
+        headers=csrf_headers(client),
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["status"] == "approved"
+
+    second_decision = client.patch(
+        f"/api/v1/quotes/{body['id']}/decision",
+        json={"status": "rejected"},
+        headers=csrf_headers(client),
+    )
+    assert second_decision.status_code == 409
