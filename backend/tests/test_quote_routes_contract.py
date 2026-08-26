@@ -1,11 +1,19 @@
 from collections import Counter
+import importlib
 
-from app.main import app
+from fastapi import FastAPI
+
+import app.api.routes as routes_module
 
 
 def _route_keys() -> list[tuple[str, str]]:
+    """Build a fresh API router so prior tests cannot mutate this contract check."""
+    module = importlib.reload(routes_module)
+    fresh_app = FastAPI()
+    fresh_app.include_router(module.api_router)
+
     keys: list[tuple[str, str]] = []
-    for route in app.routes:
+    for route in fresh_app.routes:
         path = getattr(route, "path", None)
         methods = getattr(route, "methods", None)
         if not path or not methods:
@@ -14,7 +22,7 @@ def _route_keys() -> list[tuple[str, str]]:
     return keys
 
 
-def test_app_has_no_duplicate_methods_and_paths():
+def test_api_router_has_no_duplicate_methods_and_paths():
     counts = Counter(_route_keys())
     duplicates = {key: count for key, count in counts.items() if count > 1}
     assert duplicates == {}
