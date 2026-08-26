@@ -20,7 +20,7 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/marcenaria_db_test
-      SECRET_KEY: ${SECRET_KEY:-docker-test-secret-key-only}
+      SECRET_KEY: ${SECRET_KEY:-docker-test-secret-key-at-least-32-bytes-long}
       ENVIRONMENT: test
       PYTHONPATH: /app
       CORS_ORIGINS: '["http://localhost:3000"]'
