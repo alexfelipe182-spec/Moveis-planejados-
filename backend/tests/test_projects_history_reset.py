@@ -73,6 +73,10 @@ def test_password_reset_token_expires_and_can_be_used_once():
     new_password = "Senha-Nova-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Reset Test", "email": email, "password": old_password}).status_code == 201
 
+    old_login = client.post("/api/v1/auth/login", data={"username": email, "password": old_password})
+    assert old_login.status_code == 200
+    old_csrf = csrf_headers(client)
+
     request = client.post("/api/v1/auth/password-reset/request", json={"email": email})
     assert request.status_code == 200
     token = request.json()["debug_token"]
@@ -82,6 +86,9 @@ def test_password_reset_token_expires_and_can_be_used_once():
     assert confirm.status_code == 200
     reused = client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "new_password": old_password})
     assert reused.status_code == 400
+
+    revoked_session = client.post("/api/v1/auth/refresh", headers=old_csrf)
+    assert revoked_session.status_code == 401
 
     login = client.post("/api/v1/auth/login", data={"username": email, "password": new_password})
     assert login.status_code == 200
