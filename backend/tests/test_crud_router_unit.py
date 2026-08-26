@@ -72,6 +72,19 @@ def test_payload_data_normalizes_photos():
     }
 
 
+def test_list_and_get_success(monkeypatch):
+    router = build_router()
+    list_endpoint = endpoint_for(router, "GET")
+    get_endpoint = endpoint_for(router, "GET", item=True)
+    items = [SimpleNamespace(id=1, name="A"), SimpleNamespace(id=2, name="B")]
+
+    monkeypatch.setattr(crud_router.crud, "list_items", lambda db, model, offset, limit: items)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: items[0])
+
+    assert list_endpoint(offset=0, limit=100, db=object()) == items
+    assert get_endpoint(item_id=1, db=object()) is items[0]
+
+
 def test_get_one_returns_404_when_missing(monkeypatch):
     router = build_router()
     endpoint = endpoint_for(router, "GET", item=True)
@@ -82,6 +95,28 @@ def test_get_one_returns_404_when_missing(monkeypatch):
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Registro não encontrado"
+
+
+def test_create_success_logs_and_emits(monkeypatch):
+    router = build_router()
+    endpoint = endpoint_for(router, "POST")
+    created = SimpleNamespace(id=7, name="Criado")
+    logged = []
+    emitted = []
+
+    monkeypatch.setattr(crud_router.crud, "create_item", lambda db, obj: created)
+    monkeypatch.setattr(crud_router, "_log", lambda *args: logged.append(args))
+    monkeypatch.setattr(crud_router, "_emit", lambda *args: emitted.append(args))
+
+    result = endpoint(
+        payload=CreateSchema(name="Criado"),
+        current_user=SimpleNamespace(id=42),
+        db=object(),
+    )
+
+    assert result is created
+    assert logged
+    assert emitted == [("created", FakeModel, 7, 42)]
 
 
 def test_create_maps_value_error_to_409(monkeypatch):
@@ -102,6 +137,31 @@ def test_create_maps_value_error_to_409(monkeypatch):
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == "duplicado"
+
+
+def test_update_success_logs_and_emits(monkeypatch):
+    router = build_router()
+    endpoint = endpoint_for(router, "PUT", item=True)
+    existing = SimpleNamespace(id=10, name="Antigo")
+    updated = SimpleNamespace(id=10, name="Novo")
+    logged = []
+    emitted = []
+
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: existing)
+    monkeypatch.setattr(crud_router.crud, "update_item", lambda db, item, data: updated)
+    monkeypatch.setattr(crud_router, "_log", lambda *args: logged.append(args))
+    monkeypatch.setattr(crud_router, "_emit", lambda *args: emitted.append(args))
+
+    result = endpoint(
+        item_id=10,
+        payload=UpdateSchema(name="Novo"),
+        current_user=SimpleNamespace(id=42),
+        db=object(),
+    )
+
+    assert result is updated
+    assert logged
+    assert emitted == [("updated", FakeModel, 10, 42)]
 
 
 def test_update_handles_missing_and_conflict(monkeypatch):
@@ -134,6 +194,27 @@ def test_update_handles_missing_and_conflict(monkeypatch):
         )
     assert conflict.value.status_code == 409
     assert conflict.value.detail == "atualização inválida"
+
+
+def test_delete_success_logs_and_emits(monkeypatch):
+    router = build_router()
+    endpoint = endpoint_for(router, "DELETE", item=True)
+    existing = SimpleNamespace(id=20, name="Excluir")
+    deleted = []
+    logged = []
+    emitted = []
+
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: existing)
+    monkeypatch.setattr(crud_router.crud, "delete_item", lambda db, item: deleted.append(item))
+    monkeypatch.setattr(crud_router, "_log", lambda *args: logged.append(args))
+    monkeypatch.setattr(crud_router, "_emit", lambda *args: emitted.append(args))
+
+    result = endpoint(item_id=20, current_user=SimpleNamespace(id=42), db=object())
+
+    assert result is None
+    assert deleted == [existing]
+    assert logged
+    assert emitted == [("deleted", FakeModel, 20, 42)]
 
 
 def test_delete_handles_missing_and_conflict(monkeypatch):
