@@ -1,11 +1,11 @@
 from collections import Counter
 
-from app.api.routes import api_router
+from app.main import app
 
 
 def _route_keys() -> list[tuple[str, str]]:
     keys: list[tuple[str, str]] = []
-    for route in api_router.routes:
+    for route in app.routes:
         path = getattr(route, "path", None)
         methods = getattr(route, "methods", None)
         if not path or not methods:
@@ -14,7 +14,7 @@ def _route_keys() -> list[tuple[str, str]]:
     return keys
 
 
-def test_api_router_has_no_duplicate_methods_and_paths():
+def test_app_has_no_duplicate_methods_and_paths():
     counts = Counter(_route_keys())
     duplicates = {key: count for key, count in counts.items() if count > 1}
     assert duplicates == {}
