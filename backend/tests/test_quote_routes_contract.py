@@ -1,35 +1,31 @@
 from collections import Counter
-import importlib
 
-from fastapi import FastAPI
-
-import app.api.routes as routes_module
+from app.main import app
 
 
-def _route_keys() -> list[tuple[str, str]]:
-    """Build a fresh API router so prior tests cannot mutate this contract check."""
-    module = importlib.reload(routes_module)
-    fresh_app = FastAPI()
-    fresh_app.include_router(module.api_router)
-
+def _snapshot_route_keys() -> tuple[tuple[str, str], ...]:
+    """Capture the mounted HTTP contract before tests exercise shared app state."""
     keys: list[tuple[str, str]] = []
-    for route in fresh_app.routes:
+    for route in app.routes:
         path = getattr(route, "path", None)
         methods = getattr(route, "methods", None)
         if not path or not methods:
             continue
         keys.extend((method, path) for method in methods)
-    return keys
+    return tuple(keys)
 
 
-def test_api_router_has_no_duplicate_methods_and_paths():
-    counts = Counter(_route_keys())
+ROUTE_KEYS = _snapshot_route_keys()
+
+
+def test_app_has_no_duplicate_methods_and_paths():
+    counts = Counter(ROUTE_KEYS)
     duplicates = {key: count for key, count in counts.items() if count > 1}
     assert duplicates == {}
 
 
 def test_quote_routes_are_explicit_and_not_duplicated():
-    keys = set(_route_keys())
+    keys = set(ROUTE_KEYS)
     prefix = "/api/v1/quotes"
     assert ("POST", prefix) in keys
     assert ("POST", f"{prefix}/estimate") in keys
