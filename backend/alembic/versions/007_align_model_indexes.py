@@ -1,0 +1,72 @@
+"""align schema indexes and constraints with models
+
+Revision ID: 007_align_model_indexes
+Revises: 006_quote_items
+"""
+
+import sqlalchemy as sa
+from alembic import op
+
+revision = "007_align_model_indexes"
+down_revision = "006_quote_items"
+branch_labels = None
+depends_on = None
+
+
+def upgrade():
+    # Replace legacy UNIQUE constraints with explicit indexes matching the ORM.
+    op.drop_constraint("categories_name_key", "categories", type_="unique")
+    op.create_index("ix_categories_name", "categories", ["name"], unique=True)
+
+    op.drop_constraint("password_reset_tokens_token_hash_key", "password_reset_tokens", type_="unique")
+    op.create_index("ix_password_reset_tokens_token_hash", "password_reset_tokens", ["token_hash"], unique=True)
+
+    op.drop_constraint("refresh_tokens_token_jti_key", "refresh_tokens", type_="unique")
+    op.create_index("ix_refresh_tokens_token_jti", "refresh_tokens", ["token_jti"], unique=True)
+
+    op.drop_constraint("users_email_key", "users", type_="unique")
+    op.create_index("ix_users_email", "users", ["email"], unique=True)
+
+    # Add indexes declared by the ORM for lookup-heavy fields.
+    op.create_index("ix_customers_email", "customers", ["email"], unique=False)
+    op.create_index("ix_customers_name", "customers", ["name"], unique=False)
+    op.create_index("ix_products_category_id", "products", ["category_id"], unique=False)
+    op.create_index("ix_products_name", "products", ["name"], unique=False)
+    op.create_index("ix_quotes_customer_id", "quotes", ["customer_id"], unique=False)
+    op.create_index("ix_quotes_status", "quotes", ["status"], unique=False)
+
+    # Quote.updated_at is required by the ORM contract.
+    op.alter_column(
+        "quotes",
+        "updated_at",
+        existing_type=sa.DateTime(),
+        nullable=False,
+    )
+
+
+def downgrade():
+    op.alter_column(
+        "quotes",
+        "updated_at",
+        existing_type=sa.DateTime(),
+        nullable=True,
+    )
+
+    op.drop_index("ix_quotes_status", table_name="quotes")
+    op.drop_index("ix_quotes_customer_id", table_name="quotes")
+    op.drop_index("ix_products_name", table_name="products")
+    op.drop_index("ix_products_category_id", table_name="products")
+    op.drop_index("ix_customers_name", table_name="customers")
+    op.drop_index("ix_customers_email", table_name="customers")
+
+    op.drop_index("ix_users_email", table_name="users")
+    op.create_unique_constraint("users_email_key", "users", ["email"])
+
+    op.drop_index("ix_refresh_tokens_token_jti", table_name="refresh_tokens")
+    op.create_unique_constraint("refresh_tokens_token_jti_key", "refresh_tokens", ["token_jti"])
+
+    op.drop_index("ix_password_reset_tokens_token_hash", table_name="password_reset_tokens")
+    op.create_unique_constraint("password_reset_tokens_token_hash_key", "password_reset_tokens", ["token_hash"])
+
+    op.drop_index("ix_categories_name", table_name="categories")
+    op.create_unique_constraint("categories_name_key", "categories", ["name"])
