@@ -54,6 +54,7 @@ def make_router(
     update_schema,
     prefix: str,
     *,
+    include_list: bool = True,
     include_create: bool = True,
     include_update: bool = True,
     include_delete: bool = True,
@@ -69,19 +70,17 @@ def make_router(
         tags=[prefix.strip("/").capitalize() or "Resource"],
         dependencies=[Depends(get_current_user)],
     )
-    # Empty prefixes are used when the CRUD router is nested below a specialized
-    # parent router (for example /quotes). Register the collection at "" so GET
-    # and POST share the exact parent path instead of splitting /quotes and
-    # /quotes/, which can otherwise produce a 405 before redirect handling.
-    collection_path = ""
+    collection_path = "" if prefix else "/"
 
-    @router.get(collection_path, response_model=list[read_schema])
-    def list_all(
-        offset: int = Query(0, ge=0),
-        limit: int = Query(100, ge=1, le=100),
-        db: Session = Depends(get_db),
-    ):
-        return crud.list_items(db, model, offset=offset, limit=limit)
+    if include_list:
+
+        @router.get(collection_path, response_model=list[read_schema])
+        def list_all(
+            offset: int = Query(0, ge=0),
+            limit: int = Query(100, ge=1, le=100),
+            db: Session = Depends(get_db),
+        ):
+            return crud.list_items(db, model, offset=offset, limit=limit)
 
     @router.get("/{item_id}", response_model=read_schema)
     def get_one(item_id: int, db: Session = Depends(get_db)):
