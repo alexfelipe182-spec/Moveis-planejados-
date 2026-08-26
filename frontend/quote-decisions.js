@@ -6,7 +6,7 @@
     const action = decisionLabels[decision].toLowerCase();
     if (!confirm(`${decisionLabels[decision]} o orçamento #${quoteId}?`)) return;
     try {
-      await api(`/quotes/${quoteId}/decision`, { method: 'PATCH', body: { decision } });
+      await api(`/quotes/${quoteId}/decision`, { method: 'PATCH', body: { status: decision } });
       toast(`Orçamento #${quoteId} ${action === 'aprovar' ? 'aprovado' : 'rejeitado'} com sucesso.`);
       await loadResource('quotes');
     } catch (error) {
@@ -24,7 +24,7 @@
       const quote = visibleRows[index];
       const actions = tr.querySelector('.actions');
       if (!quote || !actions || actions.querySelector('[data-quote-decision]')) return;
-      if (!['analysis', 'pending'].includes(quote.status)) return;
+      if (quote.status !== 'analysis') return;
       const approve = document.createElement('button');
       approve.type = 'button';
       approve.className = 'small-btn';
