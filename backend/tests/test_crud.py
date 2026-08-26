@@ -33,6 +33,17 @@ def test_create_item_commits_and_refreshes():
     db.refresh.assert_called_once_with(obj)
 
 
+def test_create_item_can_defer_commit_for_atomic_audit_write():
+    db = MagicMock()
+    obj = MagicMock()
+
+    assert crud.create_item(db, obj, commit=False) is obj
+    db.add.assert_called_once_with(obj)
+    db.flush.assert_called_once_with()
+    db.commit.assert_not_called()
+    db.refresh.assert_called_once_with(obj)
+
+
 def test_create_item_rolls_back_integrity_error():
     db = MagicMock()
     db.commit.side_effect = _integrity_error()
@@ -51,6 +62,17 @@ def test_delete_item_commits():
 
     db.delete.assert_called_once_with(obj)
     db.commit.assert_called_once_with()
+
+
+def test_delete_item_can_defer_commit():
+    db = MagicMock()
+    obj = MagicMock()
+
+    crud.delete_item(db, obj, commit=False)
+
+    db.delete.assert_called_once_with(obj)
+    db.flush.assert_called_once_with()
+    db.commit.assert_not_called()
 
 
 def test_delete_item_rolls_back_integrity_error():
@@ -76,6 +98,20 @@ def test_update_item_applies_changes_commits_and_refreshes():
     assert obj.name == "new"
     assert obj.active is True
     db.commit.assert_called_once_with()
+    db.refresh.assert_called_once_with(obj)
+
+
+def test_update_item_can_defer_commit():
+    db = MagicMock()
+
+    class Item:
+        name = "old"
+
+    obj = Item()
+    assert crud.update_item(db, obj, {"name": "new"}, commit=False) is obj
+    assert obj.name == "new"
+    db.flush.assert_called_once_with()
+    db.commit.assert_not_called()
     db.refresh.assert_called_once_with(obj)
 
 
