@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -65,6 +65,15 @@ def _quote_calculation(payload: QuoteCreate | QuoteUpdate, current: Quote | None
     )
 
 
+@quotes_router.get("", response_model=list[QuoteRead])
+def list_quotes(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return crud.list_items(db, Quote, offset=offset, limit=limit)
+
+
 @quotes_router.post("", response_model=QuoteRead, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
 def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     pricing = _quote_calculation(payload)
@@ -118,6 +127,17 @@ def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depend
     return item
 
 
-quotes_router.include_router(make_router(Quote, QuoteCreate, QuoteRead, QuoteUpdate, "", include_create=False, include_update=False))
+quotes_router.include_router(
+    make_router(
+        Quote,
+        QuoteCreate,
+        QuoteRead,
+        QuoteUpdate,
+        "",
+        include_list=False,
+        include_create=False,
+        include_update=False,
+    )
+)
 api_router.include_router(quotes_router)
 api_router.include_router(quote_items_router)
