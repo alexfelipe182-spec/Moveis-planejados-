@@ -27,4 +27,9 @@
       } catch (error) { toast(error.message, 'error'); button.disabled = false; button.textContent = 'Calcular e analisar com IA'; }
     };
   };
+
+  const originalCreateItem = window.createItem;
+  window.createItem = resource => resource === 'quotes'
+    ? window.openSmartQuote()
+    : originalCreateItem(resource);
 })();
