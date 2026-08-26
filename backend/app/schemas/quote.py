@@ -4,7 +4,16 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-QuoteStatus = Literal["pending", "analysis", "approved", "rejected", "completed"]
+QuoteStatus = Literal[
+    "pending",
+    "analysis",
+    "approved",
+    "sent",
+    "accepted",
+    "declined",
+    "rejected",
+    "completed",
+]
 
 
 class QuoteBase(BaseModel):

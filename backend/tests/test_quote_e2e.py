@@ -93,16 +93,45 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
         f"/api/v1/quotes/{body['id']}/shared",
         headers=csrf_headers(client),
     )
-    assert shared.status_code == 204
+    assert shared.status_code == 200, shared.text
+    assert shared.json()["status"] == "sent"
+
+    second_share = client.post(
+        f"/api/v1/quotes/{body['id']}/shared",
+        headers=csrf_headers(client),
+    )
+    assert second_share.status_code == 409
+
+    accepted = client.patch(
+        f"/api/v1/quotes/{body['id']}/commercial-status",
+        json={"status": "accepted"},
+        headers=csrf_headers(client),
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["status"] == "accepted"
+
+    second_commercial_decision = client.patch(
+        f"/api/v1/quotes/{body['id']}/commercial-status",
+        json={"status": "declined"},
+        headers=csrf_headers(client),
+    )
+    assert second_commercial_decision.status_code == 409
 
     db = SessionLocal()
     try:
-        activity = (
+        shared_activity = (
             db.query(Activity)
             .filter(Activity.entity == "quote", Activity.entity_id == body["id"], Activity.action == "shared")
             .one()
         )
-        assert "envio da proposta" in activity.description
+        assert "envio da proposta" in shared_activity.description
+
+        accepted_activity = (
+            db.query(Activity)
+            .filter(Activity.entity == "quote", Activity.entity_id == body["id"], Activity.action == "accepted")
+            .one()
+        )
+        assert "cliente aceitou" in accepted_activity.description
     finally:
         db.close()
 

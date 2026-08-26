@@ -1,5 +1,6 @@
 (() => {
   const decisionLabels = { approved: 'Aprovar', rejected: 'Rejeitar' };
+  const commercialLabels = { accepted: 'Cliente aceitou', declined: 'Cliente recusou' };
 
   async function decideQuote(quoteId, decision) {
     if (!decisionLabels[decision]) throw new Error('Decisão de orçamento inválida.');
@@ -14,6 +15,28 @@
     }
   }
 
+  async function setCommercialStatus(quoteId, status) {
+    if (!commercialLabels[status]) throw new Error('Status comercial inválido.');
+    if (!confirm(`${commercialLabels[status]} na proposta #${quoteId}?`)) return;
+    try {
+      await api(`/quotes/${quoteId}/commercial-status`, { method: 'PATCH', body: { status } });
+      toast(`Resposta do cliente registrada na proposta #${quoteId}.`);
+      await loadResource('quotes');
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  }
+
+  function button(text, className, dataset, onClick) {
+    const element = document.createElement('button');
+    element.type = 'button';
+    element.className = className;
+    Object.entries(dataset).forEach(([key, value]) => { element.dataset[key] = value; });
+    element.textContent = text;
+    element.addEventListener('click', onClick);
+    return element;
+  }
+
   function addDecisionButtons() {
     const section = document.querySelector('#quotes');
     if (!section || section.classList.contains('hidden')) return;
@@ -23,22 +46,17 @@
     rows.forEach((tr, index) => {
       const quote = visibleRows[index];
       const actions = tr.querySelector('.actions');
-      if (!quote || !actions || actions.querySelector('[data-quote-decision]')) return;
-      if (quote.status !== 'analysis') return;
-      const approve = document.createElement('button');
-      approve.type = 'button';
-      approve.className = 'small-btn';
-      approve.dataset.quoteDecision = 'approved';
-      approve.textContent = 'Aprovar';
-      approve.addEventListener('click', () => decideQuote(quote.id, 'approved'));
-      const reject = document.createElement('button');
-      reject.type = 'button';
-      reject.className = 'small-btn danger';
-      reject.dataset.quoteDecision = 'rejected';
-      reject.textContent = 'Rejeitar';
-      reject.addEventListener('click', () => decideQuote(quote.id, 'rejected'));
-      actions.prepend(reject);
-      actions.prepend(approve);
+      if (!quote || !actions || actions.querySelector('[data-quote-decision], [data-commercial-status]')) return;
+
+      if (quote.status === 'analysis') {
+        actions.prepend(button('Rejeitar', 'small-btn danger', { quoteDecision: 'rejected' }, () => decideQuote(quote.id, 'rejected')));
+        actions.prepend(button('Aprovar', 'small-btn', { quoteDecision: 'approved' }, () => decideQuote(quote.id, 'approved')));
+      }
+
+      if (quote.status === 'sent') {
+        actions.prepend(button('Cliente recusou', 'small-btn danger', { commercialStatus: 'declined' }, () => setCommercialStatus(quote.id, 'declined')));
+        actions.prepend(button('Cliente aceitou', 'small-btn', { commercialStatus: 'accepted' }, () => setCommercialStatus(quote.id, 'accepted')));
+      }
     });
   }
 
@@ -50,9 +68,5 @@
   };
 
   window.decideQuote = decideQuote;
-
-  const proposalScript = document.createElement('script');
-  proposalScript.src = './quote-proposal.js';
-  proposalScript.defer = true;
-  document.head.appendChild(proposalScript);
+  window.setQuoteCommercialStatus = setCommercialStatus;
 })();

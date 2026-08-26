@@ -18,6 +18,10 @@ class QuoteDecisionRequest(BaseModel):
     status: Literal["approved", "rejected"]
 
 
+class QuoteCommercialStatusRequest(BaseModel):
+    status: Literal["accepted", "declined"]
+
+
 @router.patch(
     "/{item_id}/decision",
     response_model=QuoteRead,
@@ -71,7 +75,7 @@ def decide_quote(
 
 @router.post(
     "/{item_id}/shared",
-    status_code=204,
+    response_model=QuoteRead,
     dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
 )
 def record_quote_share(
@@ -88,6 +92,8 @@ def record_quote_share(
             detail="Somente orçamentos aprovados podem ser enviados ao cliente",
         )
 
+    previous_status = item.status
+    item.status = "sent"
     db.add(
         Activity(
             user_id=current_user.id,
@@ -98,13 +104,64 @@ def record_quote_share(
         )
     )
     db.commit()
+    db.refresh(item)
     engine.emit(
         "quote.shared",
         {
             "entity": "quote",
             "item_id": item.id,
             "user_id": current_user.id,
+            "previous_status": previous_status,
             "status": item.status,
             "suggested_total": item.suggested_total,
         },
     )
+    return item
+
+
+@router.patch(
+    "/{item_id}/commercial-status",
+    response_model=QuoteRead,
+    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+)
+def update_quote_commercial_status(
+    item_id: int,
+    payload: QuoteCommercialStatusRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    item = crud.get_item(db, Quote, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    if item.status != "sent":
+        raise HTTPException(
+            status_code=409,
+            detail="A proposta precisa estar enviada e aguardando o cliente",
+        )
+
+    previous_status = item.status
+    item.status = payload.status
+    label = "aceitou" if payload.status == "accepted" else "recusou"
+    db.add(
+        Activity(
+            user_id=current_user.id,
+            action=payload.status,
+            entity="quote",
+            entity_id=item.id,
+            description=f"Registrou que o cliente {label} a proposta do quote #{item.id}",
+        )
+    )
+    db.commit()
+    db.refresh(item)
+    engine.emit(
+        f"quote.{payload.status}",
+        {
+            "entity": "quote",
+            "item_id": item.id,
+            "user_id": current_user.id,
+            "previous_status": previous_status,
+            "status": item.status,
+            "suggested_total": item.suggested_total,
+        },
+    )
+    return item

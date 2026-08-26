@@ -2,7 +2,10 @@
   const proposalStatusLabels = {
     analysis: 'Em análise',
     approved: 'Aprovado',
-    rejected: 'Recusado',
+    sent: 'Enviado • aguardando cliente',
+    accepted: 'Aceito pelo cliente',
+    declined: 'Recusado pelo cliente',
+    rejected: 'Rejeitado internamente',
     pending: 'Pendente',
     completed: 'Concluído',
   };
@@ -56,12 +59,19 @@
     const customer = customerFor(quote);
     const phone = String(customer.phone || '').replace(/\D/g, '');
     if (!phone) return toast('Cadastre o telefone do cliente antes de enviar.', 'error');
+
+    const whatsapp = window.open('', '_blank');
+    if (!whatsapp) return toast('Permita pop-ups para abrir o WhatsApp.', 'error');
+    whatsapp.opener = null;
+
     try {
       await api(`/quotes/${quote.id}/shared`, { method: 'POST' });
       const message = `Olá, ${customer.name || 'cliente'}! Sua proposta da Marcenaria Ideal está pronta. Orçamento #${quote.id} no valor de ${money(quote.total ?? quote.suggested_total)}. Vou enviar o PDF da proposta nesta conversa.`;
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
-      toast(`Envio da proposta #${quote.id} registrado no histórico.`);
+      whatsapp.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      toast(`Proposta #${quote.id} marcada como enviada e registrada no histórico.`);
+      await loadResource('quotes');
     } catch (error) {
+      whatsapp.close();
       toast(error.message, 'error');
     }
   }
@@ -80,7 +90,7 @@
       button.type = 'button';
       button.className = 'small-btn';
       button.dataset.quoteProposal = String(quote.id);
-      button.textContent = quote.status === 'approved' ? 'Proposta' : 'Visualizar';
+      button.textContent = ['approved', 'sent', 'accepted', 'declined'].includes(quote.status) ? 'Proposta' : 'Visualizar';
       button.addEventListener('click', () => openQuoteProposal(quote.id));
       actions.prepend(button);
       if (quote.status === 'approved') {
