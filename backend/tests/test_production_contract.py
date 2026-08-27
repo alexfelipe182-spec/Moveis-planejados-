@@ -30,6 +30,9 @@ def test_production_env_example_matches_runtime_contract():
         "CORS_ORIGINS",
         "FRONTEND_URL",
         "PASSWORD_RESET_EXPIRE_MINUTES",
+        "SMTP_STARTTLS",
+        "SMTP_USE_SSL",
+        "SMTP_TIMEOUT_SECONDS",
     }
     assert required <= values.keys()
     assert values["ENVIRONMENT"] == "production"
@@ -42,6 +45,14 @@ def test_production_env_example_matches_runtime_contract():
     origins = json.loads(values["CORS_ORIGINS"])
     assert origins == ["https://ideal-marcenaria.onrender.com"]
     assert values["FRONTEND_URL"] == origins[0]
+
+
+def test_password_reset_token_uses_url_fragment():
+    auth_source = (ROOT / "backend" / "app" / "api" / "auth.py").read_text(encoding="utf-8")
+    frontend_source = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
+
+    assert '/#reset_token={token}' in auth_source
+    assert "location.hash.slice(1)" in frontend_source
 
 
 def test_render_blueprint_keeps_readiness_probe_and_production_origin():
