@@ -44,3 +44,26 @@ def test_partial_smtp_configuration_is_rejected():
 def test_production_settings_reject_insecure_values(overrides):
     with pytest.raises(ValidationError):
         production_settings(**overrides)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"database_connect_timeout_seconds": 0},
+        {"database_connect_timeout_seconds": 1},
+        {"database_connect_timeout_seconds": -1},
+        {"redis_timeout_seconds": 0},
+        {"redis_timeout_seconds": -1},
+        {"redis_timeout_seconds": float("inf")},
+        {"redis_timeout_seconds": float("nan")},
+    ],
+)
+def test_dependency_timeouts_reject_unbounded_or_invalid_values(overrides):
+    with pytest.raises(ValidationError):
+        production_settings(**overrides)
+
+
+def test_dependency_timeouts_accept_custom_positive_values():
+    settings = production_settings(database_connect_timeout_seconds=8, redis_timeout_seconds=0.5)
+    assert settings.database_connect_timeout_seconds == 8
+    assert settings.redis_timeout_seconds == 0.5

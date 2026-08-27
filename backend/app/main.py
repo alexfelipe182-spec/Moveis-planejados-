@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -29,6 +30,7 @@ REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 rate_limiter = DistributedRateLimiter(
     settings.redis_url,
     limit=settings.rate_limit_per_minute,
+    redis_timeout_seconds=settings.redis_timeout_seconds,
 )
 
 
@@ -270,19 +272,25 @@ def health_check(response: Response):
     return {"status": "ok", "service": settings.app_name}
 
 
+def _check_postgres() -> None:
+    # The engine is synchronous; connection, query and cleanup all belong on
+    # the worker thread so a slow database cannot freeze the API event loop.
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+
+
 @app.get("/ready", tags=["system"])
 async def readiness_check(response: Response):
     dependencies = {"postgres": "ok", "redis": "ok"}
 
     try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
+        await run_in_threadpool(_check_postgres)
     except Exception as exc:
         logger.warning("readiness_failed dependency=postgres error_type=%s", type(exc).__name__)
         dependencies["postgres"] = "unhealthy"
 
     try:
-        redis_ok = bool(await rate_limiter.redis.ping())
+        redis_ok = await rate_limiter.ping()
     except Exception as exc:
         logger.warning("readiness_failed dependency=redis error_type=%s", type(exc).__name__)
         redis_ok = False

@@ -7,6 +7,8 @@ import time
 from dataclasses import dataclass
 
 from redis.asyncio import Redis
+from redis.asyncio.retry import Retry
+from redis.backoff import NoBackoff
 
 
 @dataclass(frozen=True)
@@ -23,10 +25,25 @@ class DistributedRateLimiter:
     bounded by periodic cleanup.
     """
 
-    def __init__(self, redis_url: str, limit: int = 120, window_seconds: int = 60) -> None:
+    def __init__(
+        self,
+        redis_url: str,
+        limit: int = 120,
+        window_seconds: int = 60,
+        *,
+        redis_timeout_seconds: float = 1.0,
+    ) -> None:
         self.limit = limit
         self.window_seconds = window_seconds
-        self.redis: Redis = Redis.from_url(redis_url, decode_responses=True)
+        self.redis_timeout_seconds = redis_timeout_seconds
+        self.redis: Redis = Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=redis_timeout_seconds,
+            socket_timeout=redis_timeout_seconds,
+            # An INCR may have succeeded even if its response was lost. Never replay it.
+            retry=Retry(NoBackoff(), 0),
+        )
         self._local: dict[str, tuple[int, float]] = {}
         self._lock = asyncio.Lock()
 
@@ -35,14 +52,22 @@ class DistributedRateLimiter:
         bucket = now // self.window_seconds
         redis_key = f"rate:{bucket}:{key}"
         try:
-            count = await self.redis.incr(redis_key)
-            if count == 1:
-                await self.redis.expire(redis_key, self.window_seconds + 1)
+            # Bound the whole operation, including connection/pool acquisition
+            # and both commands, rather than only each individual socket read.
+            async with asyncio.timeout(self.redis_timeout_seconds):
+                count = await self.redis.incr(redis_key)
+                if count == 1:
+                    await self.redis.expire(redis_key, self.window_seconds + 1)
             if count > self.limit:
                 return RateLimitDecision(False, self.window_seconds - (now % self.window_seconds))
             return RateLimitDecision(True, 0)
         except Exception:
-            return await self._allow_local(key, now)
+            return await self._allow_local(key, int(time.time()))
+
+    async def ping(self) -> bool:
+        """Readiness must report a Redis outage, not silently use the fallback."""
+        async with asyncio.timeout(self.redis_timeout_seconds):
+            return bool(await self.redis.ping())
 
     async def _allow_local(self, key: str, now: int) -> RateLimitDecision:
         async with self._lock:

@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     app_name: str = "Moveis Planejados API"
     environment: str = "development"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/marcenaria_db"
+    database_connect_timeout_seconds: int = Field(default=5, ge=2)
     redis_url: str = "redis://localhost:6379/0"
+    redis_timeout_seconds: float = Field(default=1.0, gt=0, allow_inf_nan=False)
     secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30

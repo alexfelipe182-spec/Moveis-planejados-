@@ -5,6 +5,7 @@ from app.core.config import settings
 
 engine = create_engine(
     settings.database_url,
+    connect_args={"connect_timeout": settings.database_connect_timeout_seconds},
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
