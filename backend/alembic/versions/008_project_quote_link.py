@@ -4,9 +4,8 @@ Revision ID: 008_project_quote_link
 Revises: 007_align_model_indexes
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = "008_project_quote_link"
 down_revision = "007_align_model_indexes"
