@@ -80,3 +80,40 @@ def test_security_headers_are_present():
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
     assert "Permissions-Policy" in response.headers
+
+
+def test_request_id_is_generated_and_returned():
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    request_id = response.headers["X-Request-ID"]
+    assert len(request_id) == 32
+    assert request_id.isalnum()
+
+
+def test_safe_request_id_is_preserved():
+    with TestClient(app) as client:
+        response = client.get("/health", headers={"X-Request-ID": "frontend-check_123"})
+
+    assert response.headers["X-Request-ID"] == "frontend-check_123"
+
+
+def test_unsafe_request_id_is_replaced():
+    with TestClient(app) as client:
+        response = client.get("/health", headers={"X-Request-ID": "unsafe request id"})
+
+    assert response.headers["X-Request-ID"] != "unsafe request id"
+    assert len(response.headers["X-Request-ID"]) == 32
+
+
+def test_request_log_has_correlation_fields(caplog):
+    caplog.set_level("DEBUG", logger="app.main")
+
+    with TestClient(app) as client:
+        response = client.get("/health", headers={"X-Request-ID": "observability-test"})
+
+    assert response.status_code == 200
+    assert any(
+        "request_completed request_id=observability-test method=GET path=/health status=200 duration_ms=" in record.message
+        for record in caplog.records
+    )

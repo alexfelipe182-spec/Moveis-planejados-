@@ -1,5 +1,8 @@
 import logging
+import re
+import time
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -18,6 +21,7 @@ from app.database import engine
 
 
 logger = logging.getLogger(__name__)
+REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 rate_limiter = DistributedRateLimiter(
     settings.redis_url,
@@ -43,6 +47,45 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         if settings.environment == "production":
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
+
+
+class ObservabilityMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        supplied_request_id = request.headers.get("x-request-id", "")
+        request_id = supplied_request_id if REQUEST_ID_PATTERN.fullmatch(supplied_request_id) else uuid4().hex
+        request.state.request_id = request_id
+        started = time.perf_counter()
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            logger.exception(
+                "request_failed request_id=%s method=%s path=%s duration_ms=%.2f",
+                request_id,
+                request.method,
+                request.url.path,
+                duration_ms,
+            )
+            raise
+
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        response.headers["X-Request-ID"] = request_id
+        if response.status_code >= 500:
+            log_method = logger.warning
+        elif request.url.path in {"/health", "/ready"}:
+            log_method = logger.debug
+        else:
+            log_method = logger.info
+        log_method(
+            "request_completed request_id=%s method=%s path=%s status=%s duration_ms=%.2f",
+            request_id,
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
         return response
 
 
@@ -76,11 +119,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    expose_headers=["X-Request-ID"],
 )
 app.add_middleware(
     TrafficProtectionMiddleware,
     limiter=rate_limiter,
 )
+app.add_middleware(ObservabilityMiddleware)
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(api_router)
@@ -216,14 +261,14 @@ async def readiness_check(response: Response):
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-    except Exception:
-        logger.warning("PostgreSQL readiness check failed", exc_info=True)
+    except Exception as exc:
+        logger.warning("readiness_failed dependency=postgres error_type=%s", type(exc).__name__)
         dependencies["postgres"] = "unhealthy"
 
     try:
         redis_ok = bool(await rate_limiter.redis.ping())
-    except Exception:
-        logger.warning("Redis readiness check failed", exc_info=True)
+    except Exception as exc:
+        logger.warning("readiness_failed dependency=redis error_type=%s", type(exc).__name__)
         redis_ok = False
     if not redis_ok:
         dependencies["redis"] = "unhealthy"
