@@ -74,6 +74,8 @@ def test_auth_flow(client):
 
     login = client.post("/api/v1/auth/login", data={"username": email, "password": password})
     assert login.status_code == 200
+    assert login.headers["cache-control"] == "no-store"
+    assert login.headers["pragma"] == "no-cache"
     assert login.json()["token_type"] == "bearer"
     assert "access_token" in client.cookies
     assert "refresh_token" in client.cookies
@@ -89,6 +91,7 @@ def test_auth_flow(client):
     old_refresh = client.cookies.get("refresh_token")
     refresh = client.post("/api/v1/auth/refresh", headers=csrf_headers(client))
     assert refresh.status_code == 200
+    assert refresh.headers["cache-control"] == "no-store"
     new_refresh = client.cookies.get("refresh_token")
     assert new_refresh != old_refresh
 
@@ -99,6 +102,7 @@ def test_auth_flow(client):
     client.cookies.set("refresh_token", new_refresh, domain="testserver.local", path="/api/v1/auth")
     logout = client.post("/api/v1/auth/logout", headers=csrf_headers(client))
     assert logout.status_code == 204
+    assert logout.headers["cache-control"] == "no-store"
     assert "refresh_token" not in client.cookies
     assert "csrf_token" not in client.cookies
     logged_out_refresh = client.post("/api/v1/auth/refresh")
@@ -107,6 +111,13 @@ def test_auth_flow(client):
 
 def test_protected_endpoint_requires_auth(client):
     assert client.get("/api/v1/me").status_code == 401
+
+
+def test_csrf_response_is_not_cacheable(client):
+    response = client.get("/api/v1/auth/csrf")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
 
 
 def test_non_admin_cannot_access_admin_endpoint(client):
