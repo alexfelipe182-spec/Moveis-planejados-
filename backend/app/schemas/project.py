@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 ProjectStatus = Literal[
     "planning",
+    "in_progress",
     "measurement",
     "technical_design",
     "purchasing",
