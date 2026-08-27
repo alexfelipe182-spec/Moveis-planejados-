@@ -8,9 +8,40 @@ const csrf = () => state.csrfToken || document.cookie.split('; ').find(x=>x.star
 const escapeHtml = (v='') => String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const money = v => Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 let refreshPromise = null;
+let sessionVersion = 0;
 function toast(message,type='success'){const el=$('#toast');if(!el)return;el.textContent=message;el.className=`toast show ${type}`;clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.className='toast',3500)}
-async function refreshSession(){if(!refreshPromise)refreshPromise=api('/auth/refresh',{method:'POST'},false).then(()=>true).catch(()=>false).finally(()=>{refreshPromise=null});return refreshPromise}
-async function api(path,options={},retryAuth=true){const opts={credentials:'include',...options,headers:{...(options.headers||{})}};if(opts.body&&!(opts.body instanceof URLSearchParams)&&typeof opts.body!=='string'){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(opts.body)}if(['POST','PUT','PATCH','DELETE'].includes(opts.method)&&csrf())opts.headers['X-CSRF-Token']=csrf();const res=await fetch(API+path,opts);if(res.status===204)return null;const data=await res.json().catch(()=>({}));if(data.csrf_token)state.csrfToken=data.csrf_token;if(res.status===401&&retryAuth&&!path.startsWith('/auth/')&&await refreshSession())return api(path,options,false);if(!res.ok)throw new Error(data.detail||(res.status===401?'Sessão expirada. Faça login novamente.':`Erro ${res.status}`));return data}
+async function refreshSession() {
+  if (!refreshPromise) {
+    refreshPromise = api('/auth/refresh', { method: 'POST' }, false)
+      .finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
+async function api(path, options = {}, retryAuth = true) {
+  const requestVersion = sessionVersion;
+  const opts = { credentials: 'include', ...options, headers: { ...(options.headers || {}) } };
+  if (opts.body && !(opts.body instanceof URLSearchParams) && typeof opts.body !== 'string') {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(opts.method) && csrf()) {
+    opts.headers['X-CSRF-Token'] = csrf();
+  }
+  const res = await fetch(API + path, opts);
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && retryAuth && !path.startsWith('/auth/')) {
+    // A delayed response may belong to the session another request already renewed.
+    if (requestVersion === sessionVersion) await refreshSession();
+    return api(path, options, false);
+  }
+  if (!res.ok) {
+    throw new Error(data.detail || (res.status === 401 ? 'Sessão expirada. Faça login novamente.' : `Erro ${res.status}`));
+  }
+  if (typeof data?.csrf_token === 'string') state.csrfToken = data.csrf_token;
+  if (path === '/auth/login' || path === '/auth/refresh') sessionVersion += 1;
+  return data;
+}
 function openAuth(view='login'){const o=$('#auth-overlay');o.classList.remove('hidden');o.setAttribute('aria-hidden','false');showAuth(view)}
 function closeAuth(){const o=$('#auth-overlay');o.classList.add('hidden');o.setAttribute('aria-hidden','true')}
 function showAuth(view){['login','register','recovery','reset'].forEach(v=>$(`#${v}-view`)?.classList.toggle('hidden',v!==view))}
