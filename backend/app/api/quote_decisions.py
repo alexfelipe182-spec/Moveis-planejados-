@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
-from app.models import Activity, Quote, User
+from app.models import Activity, Project, Quote, User
 from app.schemas import QuoteRead
 from app.services.automation import engine
 
@@ -142,6 +142,8 @@ def update_quote_commercial_status(
     previous_status = item.status
     item.status = payload.status
     label = "aceitou" if payload.status == "accepted" else "recusou"
+    created_project: Project | None = None
+
     db.add(
         Activity(
             user_id=current_user.id,
@@ -151,8 +153,42 @@ def update_quote_commercial_status(
             description=f"Registrou que o cliente {label} a proposta do quote #{item.id}",
         )
     )
+
+    if payload.status == "accepted":
+        existing_project = db.query(Project).filter(Project.quote_id == item.id).one_or_none()
+        if existing_project:
+            raise HTTPException(
+                status_code=409,
+                detail="Este orçamento já possui um projeto vinculado",
+            )
+
+        created_project = Project(
+            customer_id=item.customer_id,
+            quote_id=item.id,
+            name=f"Projeto do orçamento #{item.id}",
+            description=item.description,
+            measurements=item.measurements,
+            materials=item.materials,
+            status="planning",
+        )
+        db.add(created_project)
+        db.flush()
+        db.add(
+            Activity(
+                user_id=current_user.id,
+                action="created_from_quote",
+                entity="project",
+                entity_id=created_project.id,
+                description=(
+                    f"Criou automaticamente o projeto #{created_project.id} "
+                    f"a partir do quote #{item.id} aceito pelo cliente"
+                ),
+            )
+        )
+
     db.commit()
     db.refresh(item)
+
     engine.emit(
         f"quote.{payload.status}",
         {
@@ -162,6 +198,19 @@ def update_quote_commercial_status(
             "previous_status": previous_status,
             "status": item.status,
             "suggested_total": item.suggested_total,
+            "project_id": created_project.id if created_project else None,
         },
     )
+    if created_project:
+        engine.emit(
+            "project.created",
+            {
+                "entity": "project",
+                "item_id": created_project.id,
+                "user_id": current_user.id,
+                "quote_id": item.id,
+                "customer_id": item.customer_id,
+                "status": created_project.status,
+            },
+        )
     return item
