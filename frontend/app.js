@@ -241,6 +241,8 @@ async function openForm(resource, id = null) {
   $('#modal-title').textContent = `${id ? 'Editar' : 'Novo'} ${resource === 'quotes' ? 'orçamento' : resource === 'customers' ? 'cliente' : resource === 'projects' ? 'projeto' : resource === 'products' ? 'produto' : resource === 'categories' ? 'serviço' : 'usuário'}`;
   const form = $('#item-form');
   form.innerHTML = `<div class="form-grid">${resource === 'quotes' ? quoteTechnicalForm(row) : formHtml(resource, row)}</div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button type="submit" class="btn primary">${id ? 'Salvar alterações' : 'Cadastrar'}</button></div>`;
+  // Production stages now use the dedicated /projects/{id}/status workflow.
+  if (resource === 'projects') form.querySelector('select[name="status"]')?.closest('label')?.remove();
   $('#modal').classList.remove('hidden'); $('#modal').setAttribute('aria-hidden', 'false');
   await setupRecordLookups(form);
 }
@@ -258,6 +260,7 @@ async function submitItem(e) {
   }
   if (resource === 'projects') { payload.customer_id = Number(payload.customer_id); payload.project_date = payload.project_date || null; payload.photos = String(payload.photos || '').split(/\n|,/).map(value => value.trim()).filter(Boolean); }
   if (resource === 'users') { payload.is_active = payload.is_active === 'true'; payload.is_admin = payload.is_admin === 'true'; }
+  if (resource === 'projects') delete payload.status;
   const button = $('button[type="submit"]', e.target);
   if (button) button.disabled = true;
   try {

@@ -66,7 +66,9 @@ def invoke_transition(operation, db):
 )
 def test_transitions_take_the_same_row_lock_before_checking_status(monkeypatch, operation, initial, expected):
     db = MagicMock()
-    item = SimpleNamespace(id=7, status=initial, suggested_total=Decimal("100"))
+    item = SimpleNamespace(id=7, status=initial, suggested_total=Decimal("100"), customer_id=1,
+                           description="Test quote", measurements=None, materials=None)
+    db.query.return_value.filter.return_value.one_or_none.return_value = None
     db.get.return_value = item
     monkeypatch.setattr(quote_decisions.engine, "emit", MagicMock())
     assert invoke_transition(operation, db) is item

@@ -12,17 +12,21 @@ from app.api.admin import router as admin_router
 from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
 from app.api.deps import require_admin, require_cookie_csrf
+from app.api.production_costs import router as production_costs_router
+from app.api.project_workflow import router as project_workflow_router
 from app.api.protected import router as protected_router
 from app.api.quote_decisions import router as quote_decisions_router
 from app.api.quote_items import router as quote_items_router
 from app.database import get_db
-from app.models import Activity, Category, Customer, Product, Project, Quote, User
+from app.models import Activity, Category, Customer, Material, Product, Project, Quote, Supplier, User
 from app.schemas import (
     CategoryCreate, CategoryRead, CategoryUpdate,
     CustomerCreate, CustomerRead, CustomerUpdate,
+    MaterialCreate, MaterialRead, MaterialUpdate,
     ProductCreate, ProductRead, ProductUpdate,
     ProjectCreate, ProjectRead, ProjectUpdate,
     QuoteCreate, QuoteEstimateResponse, QuoteRead, QuoteUpdate,
+    SupplierCreate, SupplierRead, SupplierUpdate,
 )
 from app.services.automation import engine
 from app.services.quote_ai import analyze_quote
@@ -45,7 +49,11 @@ api_router.include_router(customer_history_router)
 api_router.include_router(make_router(Category, CategoryCreate, CategoryRead, CategoryUpdate, "/categories"))
 api_router.include_router(make_router(Product, ProductCreate, ProductRead, ProductUpdate, "/products"))
 api_router.include_router(make_router(Customer, CustomerCreate, CustomerRead, CustomerUpdate, "/customers"))
+api_router.include_router(make_router(Supplier, SupplierCreate, SupplierRead, SupplierUpdate, "/suppliers"))
+api_router.include_router(make_router(Material, MaterialCreate, MaterialRead, MaterialUpdate, "/materials"))
 api_router.include_router(make_router(Project, ProjectCreate, ProjectRead, ProjectUpdate, "/projects"))
+api_router.include_router(project_workflow_router)
+api_router.include_router(production_costs_router)
 
 quotes_router = APIRouter(prefix="/quotes", tags=["Quotes"])
 

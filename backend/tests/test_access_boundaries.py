@@ -127,10 +127,11 @@ def test_release_workflow_and_approved_quote_integrity(access_client, monkeypatc
     assert sent.status_code == 200
     accepted = access_client.patch(f"/api/v1/quotes/{quote_id}/commercial-status", json={"status": "accepted"})
     assert accepted.status_code == 200
-    project = access_client.post("/api/v1/projects", json={"customer_id": customer_id, "name": "Projeto homologado"})
-    assert project.status_code == 201
-    finished = access_client.put(f"/api/v1/projects/{project.json()['id']}", json={"status": "completed"})
-    assert finished.status_code == 200
+    projects = access_client.get("/api/v1/projects").json()
+    project = next(row for row in projects if row["quote_id"] == quote_id)
+    for stage in ("measurement", "technical_design", "purchasing", "production", "installation", "delivered", "completed"):
+        finished = access_client.patch(f"/api/v1/projects/{project['id']}/status", json={"status": stage})
+        assert finished.status_code == 200
     assert finished.json()["status"] == "completed"
     activities = access_client.get("/api/v1/activities").json()
-    assert {"created", "approved", "shared", "accepted", "updated"} <= {entry["action"] for entry in activities}
+    assert {"created", "approved", "shared", "accepted", "status_changed"} <= {entry["action"] for entry in activities}

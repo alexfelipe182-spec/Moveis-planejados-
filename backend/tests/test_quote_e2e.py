@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
 from app.main import app
-from app.models import Activity, User
+from app.models import Activity, Project, User
 
 
 def csrf_headers(client):
@@ -146,6 +146,25 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
             .one()
         )
         assert "cliente aceitou" in accepted_activity.description
+
+        project = db.query(Project).filter(Project.quote_id == body["id"]).one()
+        assert project.customer_id == customer_id
+        assert project.name == f"Projeto do orçamento #{body['id']}"
+        assert project.description == "Cozinha planejada E2E"
+        assert project.measurements == "3,00m x 2,50m"
+        assert project.materials == "MDF 18mm"
+        assert project.status == "planning"
+
+        project_activity = (
+            db.query(Activity)
+            .filter(
+                Activity.entity == "project",
+                Activity.entity_id == project.id,
+                Activity.action == "created_from_quote",
+            )
+            .one()
+        )
+        assert f"quote #{body['id']}" in project_activity.description
     finally:
         db.close()
 
