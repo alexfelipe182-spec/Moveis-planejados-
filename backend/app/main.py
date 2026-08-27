@@ -1,7 +1,9 @@
 import logging
+import os
 import re
 import time
 from contextlib import asynccontextmanager
+from ipaddress import ip_address
 from uuid import uuid4
 
 from fastapi import Cookie, FastAPI, Header, HTTPException, Request
@@ -28,6 +30,23 @@ rate_limiter = DistributedRateLimiter(
     settings.redis_url,
     limit=settings.rate_limit_per_minute,
 )
+
+
+def _client_rate_limit_key(request: Request) -> str:
+    # Render's public edge overwrites CF-Connecting-IP. Never trust arbitrary
+    # forwarding headers in local or non-Render deployments.
+    if os.getenv("RENDER") == "true" and os.getenv("RENDER_SERVICE_TYPE") == "web":
+        candidate = request.headers.get("cf-connecting-ip", "").strip()
+        try:
+            return str(ip_address(candidate))
+        except ValueError:
+            pass
+
+    client = request.client.host if request.client else "unknown"
+    try:
+        return str(ip_address(client))
+    except ValueError:
+        return client[:128] or "unknown"
 
 
 @asynccontextmanager
@@ -98,34 +117,30 @@ class TrafficProtectionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.url.path in {"/health", "/ready"}:
             return await call_next(request)
-        forwarded = request.headers.get("x-forwarded-for")
-        client = forwarded.split(",", 1)[0].strip() if forwarded else (request.client.host if request.client else "unknown")
-        decision = await self.limiter.allow(client)
+        decision = await self.limiter.allow(_client_rate_limit_key(request))
         if not decision.allowed:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Muitas requisições. Tente novamente em instantes."},
-                headers={"Retry-After": str(decision.retry_after)},
+                headers={"Retry-After": str(decision.retry_after), "X-RateLimit-Limit": str(self.limiter.limit)},
             )
         response = await call_next(request)
-        response.headers.setdefault("X-RateLimit-Limit", str(settings.rate_limit_per_minute))
+        response.headers.setdefault("X-RateLimit-Limit", str(self.limiter.limit))
         return response
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None, lifespan=lifespan)
-app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(TrafficProtectionMiddleware, limiter=rate_limiter)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "Retry-After", "X-RateLimit-Limit"],
 )
-app.add_middleware(
-    TrafficProtectionMiddleware,
-    limiter=rate_limiter,
-)
+# Wrap early 429 responses too; CORS preflight is handled before the limiter.
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ObservabilityMiddleware)
 
 app.include_router(auth_router, prefix="/api/v1")
