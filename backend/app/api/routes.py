@@ -11,6 +11,7 @@ from app.api.admin import router as admin_router
 from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
+from app.api.project_workflow import router as project_workflow_router
 from app.api.protected import router as protected_router
 from app.api.quote_decisions import router as quote_decisions_router
 from app.api.quote_items import router as quote_items_router
@@ -45,6 +46,7 @@ api_router.include_router(make_router(Category, CategoryCreate, CategoryRead, Ca
 api_router.include_router(make_router(Product, ProductCreate, ProductRead, ProductUpdate, "/products"))
 api_router.include_router(make_router(Customer, CustomerCreate, CustomerRead, CustomerUpdate, "/customers"))
 api_router.include_router(make_router(Project, ProjectCreate, ProjectRead, ProjectUpdate, "/projects"))
+api_router.include_router(project_workflow_router)
 
 quotes_router = APIRouter(prefix="/quotes", tags=["Quotes"])
 
