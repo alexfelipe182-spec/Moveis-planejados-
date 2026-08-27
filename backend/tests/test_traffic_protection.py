@@ -1,9 +1,19 @@
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import pytest
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
 import app.main as main_module
 from app.core.resilience import RateLimitDecision
+
+
+@pytest.fixture(autouse=True)
+def isolated_redis_client(monkeypatch):
+    # Middleware behavior uses stubbed decisions, not Redis integration. Do not
+    # close a shared connection pool created on another TestClient event loop.
+    monkeypatch.setattr(main_module.rate_limiter, "redis", SimpleNamespace(aclose=AsyncMock()))
 
 
 def request_with(headers=None, client=("192.0.2.10", 12345)):
