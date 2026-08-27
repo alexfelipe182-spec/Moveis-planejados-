@@ -20,7 +20,7 @@ from app.core.resilience import DistributedRateLimiter
 from app.database import engine
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 logger.setLevel(logging.INFO)
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
