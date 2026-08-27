@@ -1,7 +1,9 @@
 import logging
+import os
 import re
 import time
 from contextlib import asynccontextmanager
+from ipaddress import ip_address
 from uuid import uuid4
 
 from fastapi import Cookie, FastAPI, Header, HTTPException, Request
@@ -28,6 +30,23 @@ rate_limiter = DistributedRateLimiter(
     settings.redis_url,
     limit=settings.rate_limit_per_minute,
 )
+
+
+def _client_rate_limit_key(request: Request) -> str:
+    # Render's public edge overwrites CF-Connecting-IP. Never trust arbitrary
+    # forwarding headers in local or non-Render deployments.
+    if os.getenv("RENDER") == "true" and os.getenv("RENDER_SERVICE_TYPE") == "web":
+        candidate = request.headers.get("cf-connecting-ip", "").strip()
+        try:
+            return str(ip_address(candidate))
+        except ValueError:
+            pass
+
+    client = request.client.host if request.client else "unknown"
+    try:
+        return str(ip_address(client))
+    except ValueError:
+        return client[:128] or "unknown"
 
 
 @asynccontextmanager
@@ -98,9 +117,7 @@ class TrafficProtectionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.url.path in {"/health", "/ready"}:
             return await call_next(request)
-        forwarded = request.headers.get("x-forwarded-for")
-        client = forwarded.split(",", 1)[0].strip() if forwarded else (request.client.host if request.client else "unknown")
-        decision = await self.limiter.allow(client)
+        decision = await self.limiter.allow(_client_rate_limit_key(request))
         if not decision.allowed:
             return JSONResponse(
                 status_code=429,

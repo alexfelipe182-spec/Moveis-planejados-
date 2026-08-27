@@ -3,6 +3,7 @@ import logging
 from starlette.testclient import TestClient
 
 import app.main as main_module
+from app.core.resilience import RateLimitDecision
 from app.main import app
 
 
@@ -124,3 +125,40 @@ def test_request_log_has_correlation_fields(caplog):
 def test_application_logger_emits_info_in_production_runtime():
     assert main_module.logger.name == "uvicorn.error"
     assert main_module.logger.level == logging.INFO
+
+
+def test_rate_limit_uses_proxy_observed_ip_not_spoofed_prefix(monkeypatch):
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("RENDER_SERVICE_TYPE", "web")
+    keys = []
+
+    async def capture_key(key):
+        keys.append(key)
+        return RateLimitDecision(allowed=True, retry_after=0)
+
+    monkeypatch.setattr(main_module.rate_limiter, "allow", capture_key)
+
+    with TestClient(app) as client:
+        first = client.get("/", headers={"X-Forwarded-For": "198.51.100.1", "CF-Connecting-IP": "203.0.113.9"})
+        second = client.get("/", headers={"X-Forwarded-For": "198.51.100.2", "CF-Connecting-IP": "203.0.113.9"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert keys == ["203.0.113.9", "203.0.113.9"]
+
+
+def test_rate_limit_ignores_forwarding_headers_outside_render(monkeypatch):
+    monkeypatch.delenv("RENDER", raising=False)
+    keys = []
+
+    async def capture_key(key):
+        keys.append(key)
+        return RateLimitDecision(allowed=True, retry_after=0)
+
+    monkeypatch.setattr(main_module.rate_limiter, "allow", capture_key)
+
+    with TestClient(app) as client:
+        response = client.get("/", headers={"X-Forwarded-For": "198.51.100.1", "CF-Connecting-IP": "203.0.113.9"})
+
+    assert response.status_code == 200
+    assert keys == ["testclient"]
