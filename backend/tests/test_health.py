@@ -1,3 +1,5 @@
+import logging
+
 from starlette.testclient import TestClient
 
 import app.main as main_module
@@ -117,3 +119,7 @@ def test_request_log_has_correlation_fields(caplog):
         "request_completed request_id=observability-test method=GET path=/health status=200 duration_ms=" in record.message
         for record in caplog.records
     )
+
+
+def test_application_logger_emits_info_in_production_runtime():
+    assert main_module.logger.level == logging.INFO
