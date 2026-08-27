@@ -68,6 +68,35 @@
       category:fd.get('category'), description:String(fd.get('description') || '').trim(),
       quantity:Number(fd.get('quantity')), unit_cost:Number(fd.get('unit_cost')) };
   }
+  const pendingViews = new WeakSet();
+  async function performMutation(view, write, refresh, successMessage) {
+    if (pendingViews.has(view) || !view.isConnected) return;
+    pendingViews.add(view);
+    const controls = Array.from(view.querySelectorAll('button, input, select'), control => [control, control.disabled]);
+    controls.forEach(([control]) => { control.disabled = true; });
+    view.setAttribute('aria-busy', 'true');
+    const previousMessage = view.querySelector('[data-production-message]');
+    if (previousMessage) previousMessage.textContent = '';
+    let saved = false;
+    try {
+      await write();
+      saved = true;
+      if (!view.isConnected) return;
+      const refreshed = await refresh();
+      if (view.isConnected) toast(refreshed === true ? successMessage : 'Salvo, mas a tela não foi atualizada. Reabra para conferir; não repita o lançamento.', refreshed === true ? 'success' : 'error');
+    } catch (error) {
+      if (view.isConnected) {
+        const message = view.querySelector('[data-production-message]');
+        const text = saved ? 'Salvo, mas a tela não foi atualizada. Reabra para conferir; não repita o lançamento.' : error.message + ' Confira a lista antes de repetir um envio com falha de conexão.';
+        if (message) message.textContent = text;
+        else toast(text, 'error');
+      }
+    } finally {
+      controls.forEach(([control, disabled]) => { control.disabled = disabled; });
+      view.removeAttribute('aria-busy');
+      pendingViews.delete(view);
+    }
+  }
   async function openProduction(projectId) {
     const view = modal('Produção e custos — projeto #' + projectId);
     let offset = 0, request = 0;
@@ -96,39 +125,32 @@
         $('[data-production-close]',view).addEventListener('click', closeModal);
         $('[data-cost-prev]',view).addEventListener('click', () => { offset = Math.max(0, offset - 25); load(); });
         $('[data-cost-next]',view).addEventListener('click', () => { offset += 25; load(); });
-        $('[data-advance]',view)?.addEventListener('click', async event => {
-          const button = event.currentTarget; button.disabled = true;
-          try {
-            await api('/projects/' + projectId + '/status',{method:'PATCH',body:{status:next}});
+        $('[data-advance]',view)?.addEventListener('click', () => performMutation(view,
+          () => api('/projects/' + projectId + '/status',{method:'PATCH',body:{status:next}}),
+          async () => {
             if (state.listResource === 'projects') await loadResource('projects');
-            if (view.isConnected) await load();
-          } catch (error) {
-            if (view.isConnected) $('[data-production-message]',view).textContent = error.message + ' Feche e reabra para atualizar a etapa.';
-            button.disabled = false;
-          }
-        });
-        $('[data-cost-save]',view).addEventListener('click', async event => {
+            return view.isConnected ? load() : false;
+          }, 'Etapa atualizada.'));
+        $('[data-cost-save]',view).addEventListener('click', async () => {
           const form = $('#item-form');
           if (!form.reportValidity()) return;
-          const button = event.currentTarget; button.disabled = true;
-          try {
-            await api('/project-costs',{method:'POST',body:costPayload(form,projectId)});
-            if (view.isConnected) { offset = 0; await load(); toast('Custo registrado. Total atualizado.'); }
-          } catch (error) {
-            if (view.isConnected) $('[data-production-message]',view).textContent = error.message + ' Confira a lista antes de repetir um envio com falha de conexão.';
-            button.disabled = false;
-          }
+          // Capture before controls are disabled: disabled fields are omitted by FormData.
+          const payload = costPayload(form,projectId);
+          await performMutation(view, () => api('/project-costs',{method:'POST',body:payload}),
+            () => { offset = 0; return load(); }, 'Custo registrado. Total atualizado.');
         });
         await setupRecordLookups(view);
+        return true;
       } catch (error) {
         if (!view.isConnected || version !== request) return;
         view.innerHTML = '<p role="alert">' + escapeHtml(error.message) + '</p><button type="button" class="btn secondary" data-retry>Tentar novamente</button>';
         $('[data-retry]',view).addEventListener('click', load);
+        return false;
       }
     }
     await load();
   }
-  window.productionTools = Object.freeze({ stages, nextStage, supplierForm, materialForm, costPayload });
+  window.productionTools = Object.freeze({ stages, nextStage, supplierForm, materialForm, costPayload, performMutation });
   window.openProduction = openProduction;
   const nav = $('#admin-nav'), main = $('.admin-main');
   if (nav && main) {
