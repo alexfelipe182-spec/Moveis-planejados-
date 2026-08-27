@@ -26,7 +26,7 @@ def _pct(value: Decimal) -> Decimal:
 
 
 def _history(db: Session) -> tuple[list[Decimal], list[Decimal]]:
-    margins: list[Decimal] = []
+    markups: list[Decimal] = []
     variances: list[Decimal] = []
 
     projects = db.query(Project).filter(Project.quote_id.is_not(None)).all()
@@ -45,7 +45,7 @@ def _history(db: Session) -> tuple[list[Decimal], list[Decimal]]:
         sold_total = Decimal(quote.total or 0)
         if sold_total <= 0:
             continue
-        real_margin = (sold_total - real_cost) / sold_total * Decimal("100")
+        realized_markup = (sold_total - real_cost) / real_cost * Decimal("100")
 
         expected_cost = (
             Decimal(quote.material_cost or 0)
@@ -58,10 +58,25 @@ def _history(db: Session) -> tuple[list[Decimal], list[Decimal]]:
             if expected_cost > 0
             else Decimal("0")
         )
-        margins.append(_pct(real_margin))
+        markups.append(_pct(realized_markup))
         variances.append(_pct(variance))
 
-    return margins, variances
+    return markups, variances
+
+
+def build_quote_recommendation(
+    *,
+    db: Session,
+    base_cost: Decimal,
+    requested_margin: Decimal,
+) -> dict[str, Decimal | int | str]:
+    markups, variances = _history(db)
+    return recommend_from_history(
+        base_cost=base_cost,
+        requested_margin=requested_margin,
+        historical_markups=markups,
+        historical_cost_variances=variances,
+    )
 
 
 @router.post(
@@ -75,12 +90,10 @@ def recommend_quote(payload: QuoteRecommendationRequest, db: Session = Depends(g
         + payload.labor_cost
         + payload.finishing_cost
     )
-    margins, variances = _history(db)
-    result = recommend_from_history(
+    result = build_quote_recommendation(
+        db=db,
         base_cost=base_cost,
         requested_margin=payload.requested_margin,
-        historical_margins=margins,
-        historical_cost_variances=variances,
     )
     return {
         "base_cost": format(base_cost, ".2f"),
