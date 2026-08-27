@@ -18,6 +18,7 @@ class ProjectStatusRequest(BaseModel):
 
 NEXT_STATUS = {
     "planning": "measurement",
+    "in_progress": "production",
     "measurement": "technical_design",
     "technical_design": "purchasing",
     "purchasing": "production",
