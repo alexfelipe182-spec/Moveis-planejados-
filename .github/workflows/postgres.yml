@@ -216,7 +216,7 @@ jobs:
           python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &
           pid=$!; trap 'kill $pid 2>/dev/null || true' EXIT
           for i in {1..20}; do curl --fail --silent http://127.0.0.1:8080/ >/tmp/frontend.html && break; sleep 1; done
-          grep -q 'Marcenaria Ideal' /tmp/frontend.html
+          grep -q 'Multi-Marcenarias' /tmp/frontend.html
           grep -q 'smart-quotes.js' /tmp/frontend.html
           grep -q 'quote-decisions.js' /tmp/frontend.html
           grep -q 'quote-proposal.js' /tmp/frontend.html
