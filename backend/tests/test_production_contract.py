@@ -65,6 +65,15 @@ def test_frontend_keeps_cross_origin_csrf_token_in_memory():
     assert "await api('/auth/csrf')" in frontend_source
 
 
+def test_frontend_refreshes_expired_access_session_once():
+    frontend_source = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
+
+    assert "let refreshPromise = null" in frontend_source
+    assert "api('/auth/refresh',{method:'POST'},false)" in frontend_source
+    assert "res.status===401&&retryAuth&&!path.startsWith('/auth/')" in frontend_source
+    assert "return api(path,options,false)" in frontend_source
+
+
 def test_render_blueprint_keeps_readiness_probe_and_production_origin():
     blueprint = (ROOT / "render.yaml").read_text(encoding="utf-8")
     assert "healthCheckPath: /ready" in blueprint
