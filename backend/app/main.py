@@ -122,27 +122,25 @@ class TrafficProtectionMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Muitas requisições. Tente novamente em instantes."},
-                headers={"Retry-After": str(decision.retry_after)},
+                headers={"Retry-After": str(decision.retry_after), "X-RateLimit-Limit": str(self.limiter.limit)},
             )
         response = await call_next(request)
-        response.headers.setdefault("X-RateLimit-Limit", str(settings.rate_limit_per_minute))
+        response.headers.setdefault("X-RateLimit-Limit", str(self.limiter.limit))
         return response
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None, lifespan=lifespan)
-app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(TrafficProtectionMiddleware, limiter=rate_limiter)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "Retry-After", "X-RateLimit-Limit"],
 )
-app.add_middleware(
-    TrafficProtectionMiddleware,
-    limiter=rate_limiter,
-)
+# Wrap early 429 responses too; CORS preflight is handled before the limiter.
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ObservabilityMiddleware)
 
 app.include_router(auth_router, prefix="/api/v1")
