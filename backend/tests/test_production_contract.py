@@ -61,17 +61,14 @@ def test_frontend_keeps_cross_origin_csrf_token_in_memory():
     frontend_source = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
 
     assert "csrfToken:''" in frontend_source
-    assert "if(data.csrf_token)state.csrfToken=data.csrf_token" in frontend_source
+    assert "state.csrfToken = data.csrf_token" in frontend_source
     assert "await api('/auth/csrf')" in frontend_source
 
 
-def test_frontend_refreshes_expired_access_session_once():
-    frontend_source = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
-
-    assert "let refreshPromise = null" in frontend_source
-    assert "api('/auth/refresh',{method:'POST'},false)" in frontend_source
-    assert "res.status===401&&retryAuth&&!path.startsWith('/auth/')" in frontend_source
-    assert "return api(path,options,false)" in frontend_source
+def test_frontend_session_behavior_is_required_in_ci():
+    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "postgres.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["frontend"]["steps"]
+    assert any(step.get("run") == "node frontend/app.test.cjs" for step in steps)
 
 
 def test_render_blueprint_keeps_readiness_probe_and_production_origin():
