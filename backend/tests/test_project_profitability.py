@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
 from app.main import app
-from app.models import User
+from app.models import Project, User
 
 
 def csrf_headers(client):
@@ -54,12 +54,29 @@ def test_project_profitability_compares_sale_expected_and_real_cost():
     assert quote.status_code == 201, quote.text
     quote_id = quote.json()["id"]
 
-    accepted = client.post(f"/api/v1/quotes/{quote_id}/accept", headers=headers)
+    approved = client.patch(
+        f"/api/v1/quotes/{quote_id}/decision",
+        json={"status": "approved"},
+        headers=headers,
+    )
+    assert approved.status_code == 200, approved.text
+
+    shared = client.post(f"/api/v1/quotes/{quote_id}/shared", headers=headers)
+    assert shared.status_code == 200, shared.text
+
+    accepted = client.patch(
+        f"/api/v1/quotes/{quote_id}/commercial-status",
+        json={"status": "accepted"},
+        headers=headers,
+    )
     assert accepted.status_code == 200, accepted.text
 
-    project = client.post(f"/api/v1/quotes/{quote_id}/project", headers=headers)
-    assert project.status_code in {200, 201}, project.text
-    project_id = project.json()["id"]
+    db = SessionLocal()
+    try:
+        project = db.query(Project).filter(Project.quote_id == quote_id).one()
+        project_id = project.id
+    finally:
+        db.close()
 
     cost = client.post(
         "/api/v1/project-costs",
