@@ -31,7 +31,7 @@ def recommend_from_history(
         confidence = "high" if sample_size >= 10 else "medium" if sample_size >= 3 else "low"
 
     recommended_margin = min(max(recommended_margin, Decimal("5")), Decimal("80"))
-    recommended_total = base_cost / (Decimal("1") - recommended_margin / Decimal("100")) if base_cost > 0 else Decimal("0")
+    recommended_total = base_cost * (Decimal("1") + recommended_margin / Decimal("100"))
 
     risk_score = Decimal("20")
     if sample_size == 0:
