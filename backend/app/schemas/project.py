@@ -35,3 +35,4 @@ class ProjectUpdate(BaseModel):
 class ProjectRead(ProjectBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    quote_id: int | None = None
