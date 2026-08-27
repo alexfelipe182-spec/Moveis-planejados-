@@ -31,6 +31,8 @@ def _cookies(response: Response, access: str, refresh: str) -> str:
     response.set_cookie("access_token", access, httponly=True, secure=secure, samesite=samesite, max_age=settings.access_token_expire_minutes * 60, path="/")
     response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite=samesite, max_age=settings.refresh_token_expire_days * 86400, path="/api/v1/auth")
     response.set_cookie(CSRF_COOKIE, csrf, httponly=False, secure=secure, samesite=samesite, max_age=settings.refresh_token_expire_days * 86400, path="/")
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
     return csrf
 
 
@@ -66,6 +68,8 @@ def get_csrf_token(response: Response, csrf_token: str | None = Cookie(default=N
             max_age=settings.refresh_token_expire_days * 86400,
             path="/",
         )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
     return {"csrf_token": csrf_token}
 
 
@@ -130,7 +134,11 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
 @router.post("/password-reset/confirm")
 def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
-    record = db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash))
+    record = db.scalar(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == token_hash)
+        .with_for_update()
+    )
     if not record or record.used_at is not None or record.expires_at <= _now():
         raise HTTPException(status_code=400, detail="Token inválido, expirado ou já utilizado")
     user = db.get(User, record.user_id)
@@ -157,13 +165,19 @@ def refresh(response: Response, _: None = Depends(require_csrf), refresh_token: 
         raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado") from None
     if payload.get("type") != "refresh" or not payload.get("sub") or not payload.get("jti"):
         raise HTTPException(status_code=401, detail="Refresh token inválido")
-    stored = db.scalar(select(RefreshToken).where(RefreshToken.token_jti == payload["jti"]))
+    stored = db.scalar(
+        select(RefreshToken)
+        .where(RefreshToken.token_jti == payload["jti"])
+        .with_for_update()
+    )
     if not stored or stored.revoked or stored.expires_at <= _now():
         raise HTTPException(status_code=401, detail="Refresh token revogado ou expirado")
     try:
         user_id = int(payload["sub"])
     except (TypeError, ValueError):
         raise HTTPException(status_code=401, detail="Usuário inválido") from None
+    if stored.user_id != user_id:
+        raise HTTPException(status_code=401, detail="Refresh token inválido")
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuário inválido")
@@ -190,3 +204,5 @@ def logout(response: Response, _: None = Depends(require_csrf), db: Session = De
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/api/v1/auth")
     response.delete_cookie(CSRF_COOKIE, path="/")
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
