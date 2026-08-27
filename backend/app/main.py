@@ -1,7 +1,8 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Cookie, FastAPI, Header, Request
+from fastapi import Cookie, FastAPI, Header, HTTPException, Request
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
@@ -88,6 +89,16 @@ app.include_router(api_router)
 @app.get("/docs", include_in_schema=False)
 def swagger_docs():
     """Swagger UI com fluxo de autenticação compatível com dispositivos móveis."""
+    if settings.environment == "production":
+        response = get_swagger_ui_html(
+            openapi_url=app.openapi_url,
+            title=f"{app.title} - Swagger",
+            swagger_ui_parameters={"tryItOutEnabled": False},
+        )
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
     html = """
     <!doctype html>
     <html lang="pt-BR">
@@ -180,9 +191,15 @@ def swagger_docs():
     return response
 
 
-@app.get("/api/v1/auth/cookie-diagnostic", tags=["authentication-diagnostics"])
+@app.get(
+    "/api/v1/auth/cookie-diagnostic",
+    tags=["authentication-diagnostics"],
+    include_in_schema=settings.environment != "production",
+)
 def cookie_diagnostic(request: Request, refresh_token: str | None = Cookie(default=None), csrf_token: str | None = Cookie(default=None), csrf_header: str | None = Header(default=None, alias="X-CSRF-Token")):
     """Diagnóstico seguro: retorna apenas presença/comparação, nunca tokens."""
+    if settings.environment == "production":
+        raise HTTPException(status_code=404, detail="Not Found")
     return {"has_refresh_token": bool(refresh_token), "has_csrf_cookie": bool(csrf_token), "csrf_header_received": bool(csrf_header), "csrf_matches": bool(csrf_token and csrf_header and csrf_token == csrf_header), "origin": request.headers.get("origin")}
 
 

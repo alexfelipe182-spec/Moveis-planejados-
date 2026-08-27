@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.database import SessionLocal
 from app.main import app
 from app.models import User
+from app.core.config import settings
 
 
 @pytest.fixture
@@ -48,6 +49,20 @@ def test_swagger_page_and_cookie_diagnostic(client):
     assert body["has_csrf_cookie"] is True
     assert body["csrf_header_received"] is True
     assert body["csrf_matches"] is True
+
+
+def test_production_docs_hide_auth_test_and_cookie_diagnostic(client, monkeypatch):
+    monkeypatch.setattr(settings, "environment", "production")
+
+    docs = client.get("/docs")
+    assert docs.status_code == 200
+    assert 'id="swagger-ui"' in docs.text
+    assert "tryItOutEnabled" in docs.text
+    assert "Testar Login + Refresh" not in docs.text
+    assert "ideal-user" not in docs.text
+
+    diagnostic = client.get("/api/v1/auth/cookie-diagnostic")
+    assert diagnostic.status_code == 404
 
 
 def test_auth_flow(client):
