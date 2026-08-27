@@ -1,13 +1,13 @@
 """persist quote intelligence recommendations
 
-Revision ID: 010_quote_intelligence_persistence
+Revision ID: 010_quote_intelligence
 Revises: 009_materials_production_costs
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "010_quote_intelligence_persistence"
+revision = "010_quote_intelligence"
 down_revision = "009_materials_production_costs"
 branch_labels = None
 depends_on = None
