@@ -139,7 +139,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
-    expose_headers=["X-Request-ID", "Retry-After", "X-RateLimit-Limit"],
+    expose_headers=[
+        "X-Request-ID", "Retry-After", "X-RateLimit-Limit",
+        "X-Total-Count", "X-Page-Offset", "X-Page-Limit",
+    ],
 )
 # Wrap early 429 responses too; CORS preflight is handled before the limiter.
 app.add_middleware(SecurityHeadersMiddleware)

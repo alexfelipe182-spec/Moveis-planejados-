@@ -43,9 +43,8 @@
   }
 
   function visibleQuotes() {
-    let rows = state.rows.filter(row => !state.search || Object.values(row).some(value => String(value ?? '').toLowerCase().includes(state.search.toLowerCase())));
-    if (state.status) rows = rows.filter(row => row.status === state.status);
-    return rows;
+    // Search also matches related customer fields on the server.
+    return state.rows;
   }
 
   function enhanceCommercialStatuses() {
@@ -65,8 +64,8 @@
     }
 
     const quotes = visibleQuotes();
-    [...section.querySelectorAll('tbody tr')].forEach((tr, index) => {
-      const quote = quotes[index];
+    [...section.querySelectorAll('tbody tr')].forEach(tr => {
+      const quote = quotes.find(item => String(item.id) === tr.dataset.rowId);
       if (!quote || !quoteStatusLabels[quote.status]) return;
       const statusCell = tr.querySelectorAll('td')[3];
       const badge = statusCell?.querySelector('.badge');
@@ -79,8 +78,8 @@
     if (!section || section.classList.contains('hidden')) return;
     const rows = [...section.querySelectorAll('tbody tr')];
     const quotes = visibleQuotes();
-    rows.forEach((tr, index) => {
-      const quote = quotes[index];
+    rows.forEach(tr => {
+      const quote = quotes.find(item => String(item.id) === tr.dataset.rowId);
       const actions = tr.querySelector('.actions');
       if (!quote || !actions || actions.querySelector('[data-quote-decision], [data-commercial-status]')) return;
 

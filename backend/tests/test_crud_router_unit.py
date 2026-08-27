@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 from pydantic import BaseModel, ConfigDict
 
 from app.api import crud_router
@@ -73,16 +73,26 @@ def test_payload_data_normalizes_photos():
     }
 
 
+def test_partial_update_preserves_unsupplied_fields():
+    payload = UpdateSchema(name="Novo")
+    assert crud_router._payload_data(payload, exclude_unset=True) == {"name": "Novo"}
+    assert crud_router._payload_data(UpdateSchema(photos=[]), exclude_unset=True) == {"photos": []}
+    assert crud_router._payload_data(UpdateSchema(photos=None), exclude_unset=True) == {"photos": None}
+
+
 def test_list_and_get_success(monkeypatch):
     router = build_router()
     list_endpoint = endpoint_for(router, "GET")
     get_endpoint = endpoint_for(router, "GET", item=True)
     items = [SimpleNamespace(id=1, name="A"), SimpleNamespace(id=2, name="B")]
 
-    monkeypatch.setattr(crud_router.crud, "list_items", lambda db, model, offset, limit: items)
+    monkeypatch.setattr(crud_router.crud, "list_items", lambda db, model, **kwargs: items)
+    monkeypatch.setattr(crud_router.crud, "count_items", lambda db, model, **kwargs: len(items))
     monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: items[0])
 
-    assert list_endpoint(offset=0, limit=100, db=object()) == items
+    response = Response()
+    assert list_endpoint(response=response, offset=0, limit=100, db=object()) == items
+    assert response.headers["X-Total-Count"] == "2"
     assert get_endpoint(item_id=1, db=object()) is items[0]
 
 

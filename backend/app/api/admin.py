@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import crud
 from app.api.deps import require_admin, require_cookie_csrf
 from app.core.config import settings
 from app.database import get_db
@@ -30,8 +33,17 @@ def dashboard(_: User = Depends(require_admin), db: Session = Depends(get_db)):
 
 
 @router.get("/users", response_model=list[UserRead])
-def list_users(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=100), _: User = Depends(require_admin), db: Session = Depends(get_db)):
-    return db.scalars(select(User).order_by(User.id).offset(offset).limit(limit)).all()
+def list_users(
+    response: Response,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    total = crud.count_items(db, User, q=q)
+    crud.pagination_headers(response, total=total, offset=offset, limit=limit)
+    return crud.list_items(db, User, offset=offset, limit=limit, q=q)
 
 
 @router.patch("/users/{user_id}", response_model=UserRead, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])

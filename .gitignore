@@ -149,8 +149,15 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
+!.env.production.example
+*.dump
+*.dump.json
+.browser-artifacts/
 .envrc
 .venv
+node_modules/
 env/
 venv/
 ENV/

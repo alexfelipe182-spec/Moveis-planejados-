@@ -45,7 +45,7 @@ jobs:
             -e POSTGRES_DB=marcenaria_db_ci \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
-            postgres:16-bookworm
+            postgres:18-bookworm
           for i in {1..30}; do
             if docker exec moveis-db-ci pg_isready -U postgres -d marcenaria_db_ci; then exit 0; fi
             sleep 1

@@ -1,6 +1,7 @@
+from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, model_validator
+from pydantic import EmailStr, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,10 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     rate_limit_per_minute: int = 120
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    email_provider: Literal["smtp", "resend", "disabled"] = "smtp"
+    email_from: EmailStr | None = None
+    resend_api_key: SecretStr | None = Field(default=None, repr=False)
+    email_timeout_seconds: float = Field(default=10.0, gt=0, le=30, allow_inf_nan=False)
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_user: str | None = None
@@ -28,7 +33,19 @@ class Settings(BaseSettings):
     password_reset_expire_minutes: int = 30
     frontend_url: str = "http://localhost:3000"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
+
+    @field_validator("email_provider", mode="before")
+    @classmethod
+    def normalize_email_provider(cls, value):
+        return value.strip().lower() if isinstance(value, str) else value
+
+    @field_validator("email_from", "resend_api_key", mode="before")
+    @classmethod
+    def normalize_optional_email_values(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
     @model_validator(mode="after")
     def validate_security_settings(self):
@@ -46,6 +63,12 @@ class Settings(BaseSettings):
             raise ValueError("Os tempos de expiração devem ser maiores que zero")
         if self.password_reset_expire_minutes < 5:
             raise ValueError("PASSWORD_RESET_EXPIRE_MINUTES deve ser pelo menos 5")
+        if self.resend_api_key is not None:
+            key = self.resend_api_key.get_secret_value()
+            if not key or any(not 33 <= ord(character) <= 126 for character in key):
+                raise ValueError("RESEND_API_KEY deve conter uma chave válida sem espaços")
+        if self.email_provider == "resend" and not (self.resend_api_key and self.email_from):
+            raise ValueError("EMAIL_PROVIDER=resend exige RESEND_API_KEY e EMAIL_FROM")
         if not 1 <= self.smtp_port <= 65535:
             raise ValueError("SMTP_PORT deve estar entre 1 e 65535")
         if self.smtp_timeout_seconds < 1:

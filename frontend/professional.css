@@ -64,3 +64,12 @@ body{overflow-x:hidden}
 }
 @media (max-width:420px){.stats{grid-template-columns:1fr}.topbar h1{font-size:1.25rem}.user-pill{max-width:105px}.side-brand strong{font-size:.85rem}.nav span{display:none}.nav{padding:9px}.admin-section{padding:14px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Server-side lists and searchable references stay usable on narrow screens. */
+.pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.pagination label{display:flex;align-items:center;gap:8px;white-space:nowrap}.pagination label select{width:auto;min-width:70px}
+.pagination>div,.lookup-pagination{display:flex;align-items:center;gap:8px}.pagination>span{color:var(--muted);font-size:.9rem}
+.record-lookup{min-width:0}.record-lookup select{max-width:100%;text-overflow:ellipsis}.record-lookup input{margin-bottom:3px}
+.lookup-pagination{justify-content:space-between;margin-top:8px}.lookup-pagination small{color:var(--muted);text-align:center;overflow-wrap:anywhere}
+button:disabled{opacity:.55;cursor:not-allowed}.lookup-pagination .small-btn{font-size:.78rem;padding:7px}
+@media(max-width:560px){.pagination{justify-content:center}.pagination>div{width:100%}.pagination>div .btn{flex:1}.pagination>span{text-align:center}.record-lookup{grid-column:1/-1}.lookup-pagination{flex-wrap:wrap}.lookup-pagination small{flex:1;min-width:90px}}

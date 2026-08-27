@@ -80,12 +80,18 @@
     const section = document.querySelector('#quotes');
     if (!section || section.classList.contains('hidden')) return;
     const rows = [...section.querySelectorAll('tbody tr')];
-    let visibleRows = state.rows.filter(row => !state.search || Object.values(row).some(value => String(value ?? '').toLowerCase().includes(state.search.toLowerCase())));
-    if (state.status) visibleRows = visibleRows.filter(row => row.status === state.status);
-    rows.forEach((tr, index) => {
-      const quote = visibleRows[index];
+    const visibleRows = state.rows;
+    rows.forEach(tr => {
+      const quote = visibleRows.find(item => String(item.id) === tr.dataset.rowId);
       const actions = tr.querySelector('.actions');
       if (!quote || !actions || actions.querySelector('[data-quote-proposal]')) return;
+      const editable = ['pending', 'analysis'].includes(quote.status);
+      if (!editable) actions.querySelector(`button[onclick="editItem('quotes',${quote.id})"]`)?.remove();
+      const items = document.createElement('button');
+      items.type = 'button'; items.className = 'small-btn'; items.dataset.quoteItems = String(quote.id);
+      items.textContent = editable ? 'Itens' : 'Ver itens';
+      items.addEventListener('click', () => window.openQuoteItems(quote.id, quote.description).catch(error => toast(error.message, 'error')));
+      actions.prepend(items);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'small-btn';
