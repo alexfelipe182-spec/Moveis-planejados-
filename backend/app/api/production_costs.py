@@ -18,6 +18,10 @@ def _money(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _money_text(value: Decimal) -> str:
+    return format(_money(value), ".2f")
+
+
 @router.get(
     "/project/{project_id}",
     response_model=list[ProjectCostRead],
@@ -37,7 +41,7 @@ def project_cost_total(project_id: int, db: Session = Depends(get_db)):
     if not crud.get_item(db, Project, project_id):
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
     total = db.query(func.coalesce(func.sum(ProjectCost.total_cost), 0)).filter(ProjectCost.project_id == project_id).scalar()
-    return {"project_id": project_id, "total_cost": _money(Decimal(total))}
+    return {"project_id": project_id, "total_cost": _money_text(Decimal(total))}
 
 
 @router.post(
