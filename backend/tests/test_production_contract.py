@@ -57,6 +57,14 @@ def test_password_reset_token_uses_url_fragment():
     assert "location.hash.slice(1)" in frontend_source
 
 
+def test_frontend_keeps_cross_origin_csrf_token_in_memory():
+    frontend_source = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
+
+    assert "csrfToken:''" in frontend_source
+    assert "if(data.csrf_token)state.csrfToken=data.csrf_token" in frontend_source
+    assert "await api('/auth/csrf')" in frontend_source
+
+
 def test_render_blueprint_keeps_readiness_probe_and_production_origin():
     blueprint = (ROOT / "render.yaml").read_text(encoding="utf-8")
     assert "healthCheckPath: /ready" in blueprint
