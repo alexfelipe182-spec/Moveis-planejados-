@@ -43,10 +43,12 @@ def _send_reset_email(user: User, token: str) -> bool:
     msg["Subject"] = "Recuperação de acesso — Marcenaria Ideal"
     msg["From"] = settings.smtp_from
     msg["To"] = user.email
-    link = f"{settings.frontend_url}/?reset_token={token}"
+    link = f"{settings.frontend_url}/#reset_token={token}"
     msg.set_content(f"Olá, {user.name}.\n\nUse este link para redefinir sua senha:\n{link}\n\nO link expira em {settings.password_reset_expire_minutes} minutos.\nSe você não solicitou a alteração, ignore este e-mail.")
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
-        smtp.starttls()
+    smtp_class = smtplib.SMTP_SSL if settings.smtp_use_ssl else smtplib.SMTP
+    with smtp_class(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
+        if settings.smtp_starttls:
+            smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_password)
         smtp.send_message(msg)
     return True
@@ -112,7 +114,7 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
     return {"access_token": access, "token_type": "bearer", "expires_in": settings.access_token_expire_minutes * 60, "csrf_token": csrf}
 
 
-@router.post("/password-reset/request", response_model=PasswordResetResponse)
+@router.post("/password-reset/request", response_model=PasswordResetResponse, response_model_exclude_none=True)
 def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
     email = str(payload.email).lower()
     user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
