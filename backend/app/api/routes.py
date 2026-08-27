@@ -16,6 +16,7 @@ from app.api.project_profitability import router as project_profitability_router
 from app.api.project_workflow import router as project_workflow_router
 from app.api.protected import router as protected_router
 from app.api.quote_decisions import router as quote_decisions_router
+from app.api.quote_intelligence import router as quote_intelligence_router
 from app.api.quote_items import router as quote_items_router
 from app.database import get_db
 from app.models import Activity, Category, Customer, Material, Product, Project, Quote, Supplier, User
@@ -55,6 +56,7 @@ api_router.include_router(make_router(Project, ProjectCreate, ProjectRead, Proje
 api_router.include_router(project_workflow_router)
 api_router.include_router(production_costs_router)
 api_router.include_router(project_profitability_router)
+api_router.include_router(quote_intelligence_router)
 
 quotes_router = APIRouter(prefix="/quotes", tags=["Quotes"])
 

@@ -12,7 +12,7 @@ def csrf_headers(client):
 
 
 def test_quote_items_crud_and_subtotal():
-    client = TestClient(app)
+    client = TestClient(app, client=("quote-items-e2e", 50000))
     email = "quote.items.e2e@example.com"
     password = "Senha-Forte-123!"
 
