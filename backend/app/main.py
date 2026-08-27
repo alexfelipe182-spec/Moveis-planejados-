@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Cookie, FastAPI, Header, Request
@@ -14,6 +15,8 @@ from app.core.config import settings
 from app.core.resilience import DistributedRateLimiter
 from app.database import engine
 
+
+logger = logging.getLogger(__name__)
 
 rate_limiter = DistributedRateLimiter(
     settings.redis_url,
@@ -184,18 +187,39 @@ def cookie_diagnostic(request: Request, refresh_token: str | None = Cookie(defau
 
 
 @app.get("/health", tags=["system"])
-def health_check():
+def health_check(response: Response):
+    response.headers["Cache-Control"] = "no-store"
     return {"status": "ok", "service": settings.app_name}
 
 
 @app.get("/ready", tags=["system"])
-async def readiness_check():
-    with engine.connect() as connection:
-        connection.execute(text("SELECT 1"))
-    redis_ok = await rate_limiter.redis.ping()
+async def readiness_check(response: Response):
+    dependencies = {"postgres": "ok", "redis": "ok"}
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        logger.warning("PostgreSQL readiness check failed", exc_info=True)
+        dependencies["postgres"] = "unhealthy"
+
+    try:
+        redis_ok = bool(await rate_limiter.redis.ping())
+    except Exception:
+        logger.warning("Redis readiness check failed", exc_info=True)
+        redis_ok = False
     if not redis_ok:
-        return JSONResponse(status_code=503, content={"status": "not_ready", "service": settings.app_name, "dependencies": {"postgres": "ok", "redis": "unhealthy"}})
-    return {"status": "ready", "service": settings.app_name, "dependencies": {"postgres": "ok", "redis": "ok"}}
+        dependencies["redis"] = "unhealthy"
+
+    if "unhealthy" in dependencies.values():
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "service": settings.app_name, "dependencies": dependencies},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    response.headers["Cache-Control"] = "no-store"
+    return {"status": "ready", "service": settings.app_name, "dependencies": dependencies}
 
 
 @app.get("/", tags=["system"])
