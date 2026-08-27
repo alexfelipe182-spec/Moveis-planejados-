@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: str | None = None
     smtp_from: str | None = None
+    smtp_starttls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_timeout_seconds: int = 10
     password_reset_expire_minutes: int = 30
     frontend_url: str = "http://localhost:3000"
 
@@ -41,6 +44,15 @@ class Settings(BaseSettings):
             raise ValueError("Os tempos de expiração devem ser maiores que zero")
         if self.password_reset_expire_minutes < 5:
             raise ValueError("PASSWORD_RESET_EXPIRE_MINUTES deve ser pelo menos 5")
+        if not 1 <= self.smtp_port <= 65535:
+            raise ValueError("SMTP_PORT deve estar entre 1 e 65535")
+        if self.smtp_timeout_seconds < 1:
+            raise ValueError("SMTP_TIMEOUT_SECONDS deve ser maior que zero")
+        if self.smtp_starttls and self.smtp_use_ssl:
+            raise ValueError("SMTP_STARTTLS e SMTP_USE_SSL não podem estar ativos ao mesmo tempo")
+        smtp_values = [self.smtp_host, self.smtp_user, self.smtp_password, self.smtp_from]
+        if any(smtp_values) and not all(smtp_values):
+            raise ValueError("SMTP_HOST, SMTP_USER, SMTP_PASSWORD e SMTP_FROM devem ser configurados juntos")
         if self.rate_limit_per_minute < 1:
             raise ValueError("RATE_LIMIT_PER_MINUTE deve ser maior que zero")
         if not self.redis_url.startswith(("redis://", "rediss://")):
