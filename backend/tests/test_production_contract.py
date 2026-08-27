@@ -1,0 +1,51 @@
+import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _read_env(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
+def test_production_env_example_matches_runtime_contract():
+    values = _read_env(ROOT / ".env.production.example")
+    required = {
+        "ENVIRONMENT",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "RATE_LIMIT_PER_MINUTE",
+        "SECRET_KEY",
+        "JWT_ALGORITHM",
+        "ACCESS_TOKEN_EXPIRE_MINUTES",
+        "REFRESH_TOKEN_EXPIRE_DAYS",
+        "CORS_ORIGINS",
+        "FRONTEND_URL",
+        "PASSWORD_RESET_EXPIRE_MINUTES",
+    }
+    assert required <= values.keys()
+    assert values["ENVIRONMENT"] == "production"
+    assert values["JWT_ALGORITHM"] == "HS256"
+    assert int(values["RATE_LIMIT_PER_MINUTE"]) > 0
+    assert int(values["ACCESS_TOKEN_EXPIRE_MINUTES"]) > 0
+    assert int(values["REFRESH_TOKEN_EXPIRE_DAYS"]) > 0
+    assert int(values["PASSWORD_RESET_EXPIRE_MINUTES"]) >= 5
+
+    origins = json.loads(values["CORS_ORIGINS"])
+    assert origins == ["https://ideal-marcenaria.onrender.com"]
+    assert values["FRONTEND_URL"] == origins[0]
+
+
+def test_render_blueprint_keeps_readiness_probe_and_production_origin():
+    blueprint = (ROOT / "render.yaml").read_text(encoding="utf-8")
+    assert "healthCheckPath: /ready" in blueprint
+    assert 'value: \'["https://ideal-marcenaria.onrender.com"]\'' in blueprint
+    assert "value: https://ideal-marcenaria.onrender.com" in blueprint
