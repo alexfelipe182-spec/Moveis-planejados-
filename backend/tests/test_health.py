@@ -109,7 +109,7 @@ def test_unsafe_request_id_is_replaced():
 
 
 def test_request_log_has_correlation_fields(caplog):
-    caplog.set_level("DEBUG", logger="app.main")
+    caplog.set_level("DEBUG", logger="uvicorn.error")
 
     with TestClient(app) as client:
         response = client.get("/health", headers={"X-Request-ID": "observability-test"})
@@ -122,4 +122,5 @@ def test_request_log_has_correlation_fields(caplog):
 
 
 def test_application_logger_emits_info_in_production_runtime():
+    assert main_module.logger.name == "uvicorn.error"
     assert main_module.logger.level == logging.INFO
