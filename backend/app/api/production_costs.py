@@ -1,11 +1,11 @@
 from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import crud
-from app.api.deps import get_current_user, require_admin, require_cookie_csrf
+from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Material, Project, ProjectCost, User
 from app.schemas.production_cost import ProjectCostCreate, ProjectCostRead
@@ -25,17 +25,21 @@ def _money_text(value: Decimal) -> str:
 @router.get(
     "/project/{project_id}",
     response_model=list[ProjectCostRead],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_admin)],
 )
-def list_project_costs(project_id: int, db: Session = Depends(get_db)):
+def list_project_costs(project_id: int, response: Response, offset: int = Query(0, ge=0),
+                       limit: int = Query(100, ge=1, le=100), db: Session = Depends(get_db)):
     if not crud.get_item(db, Project, project_id):
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
-    return db.query(ProjectCost).filter(ProjectCost.project_id == project_id).order_by(ProjectCost.id).all()
+    filters = (ProjectCost.project_id == project_id,)
+    total = crud.count_items(db, ProjectCost, filters=filters)
+    crud.pagination_headers(response, total=total, offset=offset, limit=limit)
+    return crud.list_items(db, ProjectCost, filters=filters, offset=offset, limit=limit)
 
 
 @router.get(
     "/project/{project_id}/total",
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_admin)],
 )
 def project_cost_total(project_id: int, db: Session = Depends(get_db)):
     if not crud.get_item(db, Project, project_id):

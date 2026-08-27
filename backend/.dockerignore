@@ -12,3 +12,6 @@ venv
 htmlcov
 build
 dist
+tests/local_preview.py
+*.dump
+*.dump.json

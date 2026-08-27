@@ -1,0 +1,94 @@
+name: Recovery - PostgreSQL 18 backup and restore
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recovery-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recovery-drill:
+    name: Isolated PG18 recovery drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: recovery_source_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d recovery_source_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    # Public dummy credentials for the job's disposable service only.
+    # Never add Render secrets, production URLs, artifact uploads, or a schedule.
+    env:
+      PYTHONPATH: backend
+      ENVIRONMENT: test
+      SECRET_KEY: recovery-ci-secret-never-used-in-production
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/recovery_source_ci
+      BACKUP_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/recovery_source_ci
+      RESTORE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/restore_ci
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install app dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Install matching PostgreSQL 18 clients
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common ca-certificates
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+      - name: Validate recovery tools and Compose contract
+        run: |
+          python -m ruff check scripts
+          python -m pytest scripts/tests -q
+          pg_dump --version
+          pg_restore --version
+      - name: Apply real migrations to disposable source
+        working-directory: backend
+        run: python -m alembic upgrade head
+      - name: Seed synthetic data and create empty isolated target
+        run: |
+          python scripts/recovery_drill.py seed
+          createdb --no-password --template=template0 restore_ci
+      - name: Export, validate, and restore
+        run: |
+          set -euo pipefail
+          python scripts/database_recovery.py backup --output "$RUNNER_TEMP/recovery.dump"
+          python scripts/database_recovery.py verify --archive "$RUNNER_TEMP/recovery.dump"
+          python scripts/database_recovery.py restore --archive "$RUNNER_TEMP/recovery.dump" --confirm-target restore_ci
+      - name: Compare every table and the Alembic revision
+        run: python scripts/recovery_drill.py verify
+      - name: Refuse overwrite of populated destination
+        run: |
+          if python scripts/database_recovery.py restore --archive "$RUNNER_TEMP/recovery.dump" --confirm-target restore_ci; then
+            echo "Safety failure: populated target was accepted"
+            exit 1
+          fi

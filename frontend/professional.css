@@ -1,5 +1,5 @@
-/* Camada visual profissional — Marcenaria Ideal */
-:root{--focus:rgba(182,132,79,.28)}
+/* Camada visual profissional — Multi-Marcenarias */
+:root{--focus:#9b6936}
 *:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 html{scroll-padding-top:90px}
 body{overflow-x:hidden}
@@ -64,3 +64,21 @@ body{overflow-x:hidden}
 }
 @media (max-width:420px){.stats{grid-template-columns:1fr}.topbar h1{font-size:1.25rem}.user-pill{max-width:105px}.side-brand strong{font-size:.85rem}.nav span{display:none}.nav{padding:9px}.admin-section{padding:14px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Server-side lists and searchable references stay usable on narrow screens. */
+/* Typographic MM identity remains legible without downloading an image. */
+.logo-mark{flex:0 0 43px;letter-spacing:-.08em;border:1px solid var(--accent);box-shadow:inset 0 0 0 3px var(--brand)}
+.logo>span:last-child,.side-brand>div,.auth-brand>div{min-width:0}
+.logo strong,.side-brand strong,.auth-brand strong{overflow-wrap:anywhere;line-height:1.25}
+.auth-brand{padding-right:28px}.side-brand strong{font-size:.9rem}
+.dark{--focus:#e9bd83}
+@media(max-width:800px){.site-header{height:auto;min-height:72px;flex-wrap:wrap;padding:14px 18px;gap:12px}.site-nav{display:flex;order:3;width:100%;overflow-x:auto}.site-nav a{flex:0 0 auto;padding:8px 0}.site-header .logo{flex:1 1 190px}.header-actions{flex-wrap:wrap}.sidebar nav{min-width:0}.sidebar .nav{min-width:44px;min-height:44px}}
+@media(max-width:420px){.site-header .logo strong{font-size:.95rem}.site-header .header-actions{width:100%;justify-content:flex-end}.auth-brand strong{font-size:.95rem}}
+.production-summary{margin:20px 0;padding:16px;background:var(--bg);border:1px solid var(--line);border-radius:12px}.production-summary>strong{font-size:1.6rem}.production-modal{min-width:0}.production-modal .form-grid{margin-top:16px}.production-modal p{overflow-wrap:anywhere}.record-lookup{display:flex;flex-direction:column;gap:6px}.sidebar{overflow-y:auto}
+.pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.pagination label{display:flex;align-items:center;gap:8px;white-space:nowrap}.pagination label select{width:auto;min-width:70px}
+.pagination>div,.lookup-pagination{display:flex;align-items:center;gap:8px}.pagination>span{color:var(--muted);font-size:.9rem}
+.record-lookup{min-width:0}.record-lookup select{max-width:100%;text-overflow:ellipsis}.record-lookup input{margin-bottom:3px}
+.lookup-pagination{justify-content:space-between;margin-top:8px}.lookup-pagination small{color:var(--muted);text-align:center;overflow-wrap:anywhere}
+button:disabled{opacity:.55;cursor:not-allowed}.lookup-pagination .small-btn{font-size:.78rem;padding:7px}
+@media(max-width:560px){.pagination{justify-content:center}.pagination>div{width:100%}.pagination>div .btn{flex:1}.pagination>span{text-align:center}.record-lookup{grid-column:1/-1}.lookup-pagination{flex-wrap:wrap}.lookup-pagination small{flex:1;min-width:90px}}

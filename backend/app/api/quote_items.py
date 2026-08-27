@@ -3,7 +3,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_admin, require_cookie_csrf
+from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Quote, QuoteItem, User
 from app.schemas.quote_item import QuoteItemCreate, QuoteItemRead, QuoteItemUpdate
@@ -11,7 +11,7 @@ from app.schemas.quote_item import QuoteItemCreate, QuoteItemRead, QuoteItemUpda
 router = APIRouter(
     prefix="/quotes/{quote_id}/items",
     tags=["Quote Items"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_admin)],
 )
 
 
@@ -23,6 +23,19 @@ def _get_quote(db: Session, quote_id: int) -> Quote:
     quote = db.get(Quote, quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    return quote
+
+
+def _get_editable_quote(db: Session, quote_id: int) -> Quote:
+    # Serialize item writes with decisions and refresh any cached ORM state.
+    quote = db.get(Quote, quote_id, with_for_update=True, populate_existing=True)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    if quote.status not in {"pending", "analysis"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Orçamento com decisão registrada não permite alterar itens; crie uma nova revisão",
+        )
     return quote
 
 
@@ -61,7 +74,7 @@ def create_item(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    _get_quote(db, quote_id)
+    _get_editable_quote(db, quote_id)
     data = payload.model_dump()
     data.update(
         quote_id=quote_id,
@@ -100,7 +113,7 @@ def update_item(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    _get_quote(db, quote_id)
+    _get_editable_quote(db, quote_id)
     item = (
         db.query(QuoteItem)
         .filter(QuoteItem.id == item_id, QuoteItem.quote_id == quote_id)
@@ -141,7 +154,7 @@ def delete_item(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    _get_quote(db, quote_id)
+    _get_editable_quote(db, quote_id)
     item = (
         db.query(QuoteItem)
         .filter(QuoteItem.id == item_id, QuoteItem.quote_id == quote_id)

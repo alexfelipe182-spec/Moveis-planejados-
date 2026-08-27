@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import crud
-from app.api.deps import get_current_user, require_admin, require_cookie_csrf
+from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, User
 from app.services.automation import engine
@@ -41,8 +43,8 @@ def _emit(action: str, model, item_id: int, user_id: int) -> None:
     )
 
 
-def _payload_data(payload) -> dict:
-    data = payload.model_dump()
+def _payload_data(payload, *, exclude_unset: bool = False) -> dict:
+    data = payload.model_dump(exclude_unset=exclude_unset)
     if "photos" in data and data["photos"] is not None:
         data["photos"] = [str(photo) for photo in data["photos"]]
     return data
@@ -77,7 +79,7 @@ def make_router(
     router = APIRouter(
         prefix=prefix,
         tags=[prefix.strip("/").capitalize() or "Resource"],
-        dependencies=[Depends(get_current_user)],
+        dependencies=[Depends(require_admin)],
     )
     collection_path = "" if prefix else "/"
 
@@ -85,11 +87,18 @@ def make_router(
 
         @router.get(collection_path, response_model=list[read_schema])
         def list_all(
+            response: Response,
             offset: int = Query(0, ge=0),
             limit: int = Query(100, ge=1, le=100),
+            q: Annotated[str | None, Query(max_length=200)] = None,
+            status: Annotated[str | None, Query(max_length=30)] = None,
+            ids: Annotated[list[int] | None, Query(max_length=100)] = None,
             db: Session = Depends(get_db),
         ):
-            return crud.list_items(db, model, offset=offset, limit=limit)
+            criteria = {"q": q, "status": status, "ids": ids}
+            total = crud.count_items(db, model, **criteria)
+            crud.pagination_headers(response, total=total, offset=offset, limit=limit)
+            return crud.list_items(db, model, offset=offset, limit=limit, **criteria)
 
     @router.get("/{item_id}", response_model=read_schema)
     def get_one(item_id: int, db: Session = Depends(get_db)):
@@ -139,7 +148,7 @@ def make_router(
             if not item:
                 raise HTTPException(status_code=404, detail="Registro não encontrado")
             try:
-                item = crud.update_item(db, item, _payload_data(payload), commit=False)
+                item = crud.update_item(db, item, _payload_data(payload, exclude_unset=True), commit=False)
                 _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
                 _commit_or_conflict(db)
                 db.refresh(item)

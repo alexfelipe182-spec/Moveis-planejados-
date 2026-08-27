@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app import crud
 from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Project, Quote, User
@@ -33,7 +32,7 @@ def decide_quote(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = crud.get_item(db, Quote, item_id)
+    item = db.get(Quote, item_id, with_for_update=True, populate_existing=True)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "analysis":
@@ -83,7 +82,7 @@ def record_quote_share(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = crud.get_item(db, Quote, item_id)
+    item = db.get(Quote, item_id, with_for_update=True, populate_existing=True)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "approved":
@@ -130,7 +129,7 @@ def update_quote_commercial_status(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = crud.get_item(db, Quote, item_id)
+    item = db.get(Quote, item_id, with_for_update=True, populate_existing=True)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "sent":

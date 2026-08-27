@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18-bookworm
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -188,21 +188,39 @@ jobs:
           test -s frontend/professional.css
           test -s frontend/app.js
           test -s frontend/app.test.cjs
+          test -s frontend/site-config.js
+          test -s frontend/public-contact.js
+          test -s frontend/public-contact.test.cjs
+          test -s frontend/pagination.test.cjs
+          test -s frontend/production.js
+          test -s frontend/production.test.cjs
           test -s frontend/smart-quotes.js
           test -s frontend/quote-decisions.js
           test -s frontend/quote-proposal.js
       - name: JavaScript syntax
         run: |
           node --check frontend/app.js
+          node --check frontend/production.js
           node --check frontend/app.test.cjs
+          node --check frontend/site-config.js
+          node --check frontend/public-contact.js
           node --check frontend/smart-quotes.js
           node --check frontend/quote-decisions.js
           node --check frontend/quote-proposal.js
       - name: Frontend behavior
         run: node frontend/app.test.cjs
+      - name: Public contact behavior
+        run: node frontend/public-contact.test.cjs
+      - name: Pagination and form behavior
+        run: node frontend/pagination.test.cjs
+      - name: Production panel behavior
+        run: node frontend/production.test.cjs
       - name: HTML assets
         run: |
           grep -q '<script src="./app.js"></script>' frontend/index.html
+          grep -q '<script src="./production.js"></script>' frontend/index.html
+          grep -q '<script src="./site-config.js"></script>' frontend/index.html
+          grep -q '<script src="./public-contact.js"></script>' frontend/index.html
           grep -q '<script src="./smart-quotes.js"></script>' frontend/index.html
           grep -q '<script src="./quote-decisions.js"></script>' frontend/index.html
           grep -q '<script src="./quote-proposal.js"></script>' frontend/index.html
@@ -216,7 +234,7 @@ jobs:
           python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &
           pid=$!; trap 'kill $pid 2>/dev/null || true' EXIT
           for i in {1..20}; do curl --fail --silent http://127.0.0.1:8080/ >/tmp/frontend.html && break; sleep 1; done
-          grep -q 'Marcenaria Ideal' /tmp/frontend.html
+          grep -q 'Multi-Marcenarias' /tmp/frontend.html
           grep -q 'smart-quotes.js' /tmp/frontend.html
           grep -q 'quote-decisions.js' /tmp/frontend.html
           grep -q 'quote-proposal.js' /tmp/frontend.html

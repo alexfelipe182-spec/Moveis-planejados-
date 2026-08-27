@@ -1,8 +1,6 @@
 import hashlib
 import secrets
-import smtplib
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -16,6 +14,7 @@ from app.database import get_db
 from app.models import Activity, PasswordResetToken, RefreshToken, User
 from app.schemas.password_reset import PasswordResetConfirm, PasswordResetRequest, PasswordResetResponse
 from app.schemas.user import UserCreate, UserRead
+from app.services.email_delivery import send_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -37,21 +36,13 @@ def _cookies(response: Response, access: str, refresh: str) -> str:
 
 
 def _send_reset_email(user: User, token: str) -> bool:
-    if not all([settings.smtp_host, settings.smtp_user, settings.smtp_password, settings.smtp_from]):
-        return False
-    msg = EmailMessage()
-    msg["Subject"] = "Recuperação de acesso — Marcenaria Ideal"
-    msg["From"] = settings.smtp_from
-    msg["To"] = user.email
     link = f"{settings.frontend_url}/#reset_token={token}"
-    msg.set_content(f"Olá, {user.name}.\n\nUse este link para redefinir sua senha:\n{link}\n\nO link expira em {settings.password_reset_expire_minutes} minutos.\nSe você não solicitou a alteração, ignore este e-mail.")
-    smtp_class = smtplib.SMTP_SSL if settings.smtp_use_ssl else smtplib.SMTP
-    with smtp_class(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
-        if settings.smtp_starttls:
-            smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
-        smtp.send_message(msg)
-    return True
+    return send_email(
+        recipient=user.email,
+        subject="Recuperação de acesso — Marcenaria Ideal",
+        text_body=f"Olá, {user.name}.\n\nUse este link para redefinir sua senha:\n{link}\n\nO link expira em {settings.password_reset_expire_minutes} minutos.\nSe você não solicitou a alteração, ignore este e-mail.",
+        config=settings,
+    )
 
 
 @router.get("/csrf")
@@ -125,10 +116,7 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
     db.add(PasswordResetToken(user_id=user.id, token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=_now() + timedelta(minutes=settings.password_reset_expire_minutes)))
     db.add(Activity(user_id=user.id, action="password_reset_requested", entity="user", entity_id=user.id, description="Solicitou recuperação de senha"))
     db.commit()
-    try:
-        sent = _send_reset_email(user, token)
-    except (OSError, smtplib.SMTPException):
-        sent = False
+    sent = _send_reset_email(user, token)
     debug = token if settings.environment != "production" and not sent else None
     return PasswordResetResponse(message="Se o e-mail estiver cadastrado, as instruções de recuperação serão enviadas.", debug_token=debug)
 

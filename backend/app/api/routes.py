@@ -1,6 +1,7 @@
 from decimal import Decimal
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from app.api.activity import router as activity_router
 from app.api.admin import router as admin_router
 from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
-from app.api.deps import get_current_user, require_admin, require_cookie_csrf
+from app.api.deps import require_admin, require_cookie_csrf
 from app.api.production_costs import router as production_costs_router
 from app.api.project_profitability import router as project_profitability_router
 from app.api.project_workflow import router as project_workflow_router
@@ -91,14 +92,19 @@ def _commit_quote_write(db: Session, item: Quote) -> None:
 @quotes_router.get(
     "",
     response_model=list[QuoteRead],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_admin)],
 )
 def list_quotes(
+    response: Response,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    status: Annotated[str | None, Query(max_length=30)] = None,
     db: Session = Depends(get_db),
 ):
-    return crud.list_items(db, Quote, offset=offset, limit=limit)
+    total = crud.count_items(db, Quote, q=q, status=status)
+    crud.pagination_headers(response, total=total, offset=offset, limit=limit)
+    return crud.list_items(db, Quote, offset=offset, limit=limit, q=q, status=status)
 
 
 @quotes_router.post("", response_model=QuoteRead, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
@@ -136,7 +142,9 @@ def estimate_quote(payload: QuoteEstimateRequest):
 @quotes_router.put("/{item_id}", response_model=QuoteRead, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
 def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     """Atualiza dados técnicos antes da decisão; transições de status usam endpoints dedicados."""
-    item = crud.get_item(db, Quote, item_id)
+    # Serialize edits with decisions and item updates, and re-read cached state
+    # after waiting for the lock so an approval cannot be silently reopened.
+    item = db.get(Quote, item_id, with_for_update=True, populate_existing=True)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if payload.status is not None:

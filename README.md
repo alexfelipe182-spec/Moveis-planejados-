@@ -22,6 +22,25 @@ Workflows principais:
 - `docker.yml` — build, smoke tests e publicação da imagem da API
 - `security.yml` — Gitleaks e auditoria das dependências Python
 - `codeql.yml` — análise estática de segurança do Python
+- `recovery.yml` — backup e restauração isolada em PostgreSQL 18, com dados sintéticos
+
+## Operação e conclusão da primeira versão
+
+O [roteiro de operação e aceite](docs/operations.md) separa as correções de código
+das pendências que dependem do responsável: banco definitivo, armazenamento e rotina
+de backup, remetente de e-mail e número comercial. O ensaio de recuperação do CI não
+é um backup dos dados de produção.
+
+- [Configuração de e-mail](docs/email-setup.md)
+- [Configuração do atendimento público](docs/public-contact.md)
+
+Os dados internos são restritos a administradores. O cadastro público não concede
+acesso administrativo. Listagens possuem paginação e busca no servidor; decisões e
+edições de orçamento usam bloqueio de linha para preservar valores aprovados.
+
+**Atenção ao Docker existente:** a stack usa PostgreSQL 18 e um volume novo.
+Instalações com PostgreSQL 16 precisam seguir o plano de migração do manual antes
+de aplicar o Compose atualizado. Nenhum volume antigo é convertido automaticamente.
 
 ## Estrutura do projeto
 
