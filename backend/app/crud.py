@@ -2,12 +2,14 @@ from sqlalchemy import false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Activity, Category, Customer, Product, Project, Quote, User
+from app.models import Activity, Category, Customer, Material, Product, Project, Quote, Supplier, User
 
 
 # Explicit fields prevent searching credentials or internal tokens as new columns
 # are added. Related names are searched in SQL, not only in the visible page.
 SEARCH_FIELDS = {
+    Supplier: ("name", "contact_name", "email", "phone", "notes"),
+    Material: ("name", "kind", "unit"),
     Category: ("name", "description"),
     Customer: ("name", "email", "phone", "address"),
     Product: ("name", "description"),
@@ -34,6 +36,8 @@ def _list_filters(model, *, q: str | None = None, status: str | None = None, ids
             matches.append(model.customer_id.in_(select(Customer.id).where(or_(*_text_matches(Customer, pattern)))))
         if model is Product:
             matches.append(Product.category_id.in_(select(Category.id).where(or_(*_text_matches(Category, pattern)))))
+        if model is Material:
+            matches.append(Material.supplier_id.in_(select(Supplier.id).where(or_(*_text_matches(Supplier, pattern)))))
         conditions.append(or_(*matches) if matches else false())
     if status:
         status_column = getattr(model, "status", None)

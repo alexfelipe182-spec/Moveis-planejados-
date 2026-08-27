@@ -15,6 +15,8 @@ from app.models import User
 
 
 INTERNAL_READS = [
+    "/api/v1/suppliers", "/api/v1/suppliers/1", "/api/v1/materials", "/api/v1/materials/1",
+    "/api/v1/project-costs/project/1", "/api/v1/project-costs/project/1/total",
     "/api/v1/customers", "/api/v1/customers/1", "/api/v1/customers/1/history",
     "/api/v1/quotes", "/api/v1/quotes/1", "/api/v1/quotes/1/items",
     "/api/v1/projects", "/api/v1/projects/1",

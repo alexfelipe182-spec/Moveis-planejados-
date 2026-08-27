@@ -66,6 +66,7 @@ body{overflow-x:hidden}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 
 /* Server-side lists and searchable references stay usable on narrow screens. */
+.production-summary{margin:20px 0;padding:16px;background:var(--bg);border:1px solid var(--line);border-radius:12px}.production-summary>strong{font-size:1.6rem}.production-modal{min-width:0}.production-modal .form-grid{margin-top:16px}.production-modal p{overflow-wrap:anywhere}.record-lookup{display:flex;flex-direction:column;gap:6px}.sidebar{overflow-y:auto}
 .pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
 .pagination label{display:flex;align-items:center;gap:8px;white-space:nowrap}.pagination label select{width:auto;min-width:70px}
 .pagination>div,.lookup-pagination{display:flex;align-items:center;gap:8px}.pagination>span{color:var(--muted);font-size:.9rem}

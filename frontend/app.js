@@ -98,9 +98,10 @@ async function loadResource(resource, { reset = false } = {}) {
     const rows = await api(`${cfg.endpoint}?${params}`);
     if (version !== listRequestVersion) return;
     if (!Array.isArray(rows)) throw new Error('A API retornou uma listagem inválida.');
-    if (['customers', 'categories'].includes(resource)) mergeReferences(resource, rows);
+    if (['customers', 'categories', 'suppliers', 'materials'].includes(resource)) mergeReferences(resource, rows);
     if (['quotes', 'projects'].includes(resource)) await ensureReferences('customers', rows.map(row => row.customer_id));
     if (resource === 'products') await ensureReferences('categories', rows.map(row => row.category_id));
+    if (resource === 'materials') await ensureReferences('suppliers', rows.map(row => row.supplier_id));
     if (version !== listRequestVersion) return;
     state.rows = rows; state.total = rows.pagination?.total ?? null;
     if (!rows.length && state.offset > 0) {
@@ -179,14 +180,14 @@ function selectField(label, name, options, value = '') {
   if (name === 'category_id') return recordLookupField(label, 'categories', name, value);
   return `<label>${label}<select name="${name}" required><option value="">Selecione...</option>${options.map(option => `<option value="${option.id}" ${String(option.id) === String(value) ? 'selected' : ''}>${escapeHtml(option.name)}</option>`).join('')}</select></label>`;
 }
-function recordLookupField(label, collection, name, value = '') {
+function recordLookupField(label, collection, name, value = '', required = true) {
   const selected = state[collection].find(row => String(row.id) === String(value));
-  return `<div class="record-lookup" data-collection="${collection}"><div>${escapeHtml(label)}</div><input type="search" data-lookup-search maxlength="200" autocomplete="off" placeholder="Pesquisar em todos os registros..." aria-label="Pesquisar ${escapeHtml(label.toLowerCase())}"><select name="${name}" aria-label="${escapeHtml(label)}" required data-lookup-selected="${escapeHtml(value)}"><option value="">Selecione...</option>${selected ? `<option value="${selected.id}" selected>${escapeHtml(selected.name)}</option>` : ''}</select><div class="lookup-pagination"><button type="button" class="small-btn" data-lookup-prev disabled>Anterior</button><small data-lookup-info aria-live="polite">Carregando opções...</small><button type="button" class="small-btn" data-lookup-next disabled>Próxima</button></div></div>`;
+  return `<div class="record-lookup" data-collection="${collection}"><div>${escapeHtml(label)}</div><input type="search" data-lookup-search maxlength="200" autocomplete="off" placeholder="Pesquisar em todos os registros..." aria-label="Pesquisar ${escapeHtml(label.toLowerCase())}"><select name="${name}" aria-label="${escapeHtml(label)}" ${required ? 'required' : ''} data-lookup-selected="${escapeHtml(value)}"><option value="">Selecione...</option>${selected ? `<option value="${selected.id}" selected>${escapeHtml(selected.name)}</option>` : ''}</select><div class="lookup-pagination"><button type="button" class="small-btn" data-lookup-prev disabled>Anterior</button><small data-lookup-info aria-live="polite">Carregando opções...</small><button type="button" class="small-btn" data-lookup-next disabled>Próxima</button></div></div>`;
 }
 async function setupRecordLookups(root) {
   await Promise.all($$('.record-lookup', root).map(async element => {
     const collection = element.dataset.collection;
-    if (!['customers', 'categories'].includes(collection)) return;
+    if (!['customers', 'categories', 'suppliers', 'materials'].includes(collection)) return;
     const input = $('[data-lookup-search]', element), select = $('select', element);
     const previous = $('[data-lookup-prev]', element), next = $('[data-lookup-next]', element), info = $('[data-lookup-info]', element);
     const pageSize = 25;
@@ -249,7 +250,7 @@ async function openForm(resource, id = null) {
 function createItem(resource){return openForm(resource).catch(error=>toast(error.message,'error'))}function editItem(resource,id){return openForm(resource,id).catch(error=>toast(error.message,'error'))}function closeModal(){$('#modal').classList.add('hidden');$('#modal').setAttribute('aria-hidden','true');$('#item-form').innerHTML=''}
 async function submitItem(e) {
   e.preventDefault();
-  if ($('.smart-quote-create', e.target) || $('.history-modal', e.target)) return;
+  if ($('.smart-quote-create', e.target) || $('.history-modal', e.target) || $('.production-modal', e.target)) return;
   const fd = new FormData(e.target), resource = state.resource, payload = {};
   for (const [key, value] of fd.entries()) payload[key] = value;
   if (resource === 'products') { payload.category_id = Number(payload.category_id); payload.price = Number(payload.price); payload.is_active = fd.has('is_active'); }
@@ -261,13 +262,23 @@ async function submitItem(e) {
   if (resource === 'projects') { payload.customer_id = Number(payload.customer_id); payload.project_date = payload.project_date || null; payload.photos = String(payload.photos || '').split(/\n|,/).map(value => value.trim()).filter(Boolean); }
   if (resource === 'users') { payload.is_active = payload.is_active === 'true'; payload.is_admin = payload.is_admin === 'true'; }
   if (resource === 'projects') delete payload.status;
+  if (resource === 'suppliers') {
+    payload.email = payload.email || null;
+    payload.is_active = fd.has('is_active');
+  }
+  if (resource === 'materials') {
+    payload.supplier_id = payload.supplier_id ? Number(payload.supplier_id) : null;
+    payload.unit_cost = Number(payload.unit_cost);
+    payload.waste_percent = Number(payload.waste_percent);
+    payload.is_active = fd.has('is_active');
+  }
   const button = $('button[type="submit"]', e.target);
   if (button) button.disabled = true;
   try {
     const endpoint = resource === 'users' ? `/admin/users/${state.id}` : state.id ? `${configs[resource].endpoint}/${state.id}` : configs[resource].endpoint;
     const method = resource === 'users' ? 'PATCH' : state.id ? 'PUT' : 'POST';
     const saved = await api(endpoint, { method, body: payload });
-    if (['customers', 'categories'].includes(resource)) mergeReferences(resource, [saved]);
+    if (['customers', 'categories', 'suppliers', 'materials'].includes(resource)) mergeReferences(resource, [saved]);
     closeModal(); toast(state.id ? 'Alterações salvas com sucesso.' : 'Cadastro realizado com sucesso.');
     await loadResource(resource);
   } catch (error) { toast(error.message, 'error'); }
