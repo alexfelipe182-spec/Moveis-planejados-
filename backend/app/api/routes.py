@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,6 +17,7 @@ from app.api.project_profitability import router as project_profitability_router
 from app.api.project_workflow import router as project_workflow_router
 from app.api.protected import router as protected_router
 from app.api.quote_decisions import router as quote_decisions_router
+from app.api.quote_intelligence import build_quote_recommendation
 from app.api.quote_intelligence import router as quote_intelligence_router
 from app.api.quote_items import router as quote_items_router
 from app.database import get_db
@@ -79,6 +81,23 @@ def _quote_calculation(payload: QuoteCreate | QuoteUpdate, current: Quote | None
     )
 
 
+def _quote_intelligence_fields(db: Session, pricing: dict[str, Decimal]) -> dict[str, object]:
+    recommendation = build_quote_recommendation(
+        db=db,
+        base_cost=pricing["base_cost"],
+        requested_margin=pricing["profit_margin"],
+    )
+    return {
+        "recommended_profit_margin": recommendation["recommended_margin_percent"],
+        "recommended_total": recommendation["recommended_total"],
+        "risk_score": recommendation["risk_score"],
+        "risk_level": recommendation["risk_level"],
+        "intelligence_confidence": recommendation["confidence"],
+        "intelligence_sample_size": recommendation["sample_size"],
+        "intelligence_analyzed_at": datetime.now(timezone.utc).replace(tzinfo=None),
+    }
+
+
 def _commit_quote_write(db: Session, item: Quote) -> None:
     try:
         db.commit()
@@ -108,6 +127,7 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
     data = payload.model_dump()
     data.update({"suggested_total": pricing["suggested_total"], "total": pricing["suggested_total"], "status": "analysis",
                  "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
+    data.update(_quote_intelligence_fields(db, pricing))
     try:
         item = crud.create_item(db, Quote(**data), commit=False)
         db.add(Activity(user_id=current_user.id, action="created", entity="quote", entity_id=item.id,
@@ -118,7 +138,8 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     engine.emit("quote.created", {"entity": "quote", "item_id": item.id, "user_id": current_user.id,
                                    "base_cost": pricing["base_cost"], "suggested_total": pricing["suggested_total"],
-                                   "profit_margin": pricing["profit_margin"]})
+                                   "profit_margin": pricing["profit_margin"], "risk_score": item.risk_score,
+                                   "risk_level": item.risk_level, "recommended_total": item.recommended_total})
     return item
 
 
@@ -155,6 +176,7 @@ def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depend
     data.update({"suggested_total": pricing["suggested_total"], "total": pricing["suggested_total"],
                  "status": "analysis",
                  "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
+    data.update(_quote_intelligence_fields(db, pricing))
     try:
         item = crud.update_item(db, item, data, commit=False)
         db.add(Activity(user_id=current_user.id, action="updated", entity="quote", entity_id=item.id,
@@ -164,7 +186,9 @@ def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depend
         db.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     engine.emit("quote.updated", {"entity": "quote", "item_id": item.id, "user_id": current_user.id,
-                                   "suggested_total": pricing["suggested_total"], "profit_margin": pricing["profit_margin"]})
+                                   "suggested_total": pricing["suggested_total"], "profit_margin": pricing["profit_margin"],
+                                   "risk_score": item.risk_score, "risk_level": item.risk_level,
+                                   "recommended_total": item.recommended_total})
     return item
 
 
