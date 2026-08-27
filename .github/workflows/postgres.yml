@@ -187,15 +187,19 @@ jobs:
           test -s frontend/styles.css
           test -s frontend/professional.css
           test -s frontend/app.js
+          test -s frontend/app.test.cjs
           test -s frontend/smart-quotes.js
           test -s frontend/quote-decisions.js
           test -s frontend/quote-proposal.js
       - name: JavaScript syntax
         run: |
           node --check frontend/app.js
+          node --check frontend/app.test.cjs
           node --check frontend/smart-quotes.js
           node --check frontend/quote-decisions.js
           node --check frontend/quote-proposal.js
+      - name: Frontend behavior
+        run: node frontend/app.test.cjs
       - name: HTML assets
         run: |
           grep -q '<script src="./app.js"></script>' frontend/index.html
