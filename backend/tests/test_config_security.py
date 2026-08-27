@@ -20,6 +20,16 @@ def test_production_settings_accept_secure_values():
     assert settings.environment == "production"
 
 
+def test_smtp_security_modes_are_mutually_exclusive():
+    with pytest.raises(ValidationError):
+        production_settings(smtp_starttls=True, smtp_use_ssl=True)
+
+
+def test_partial_smtp_configuration_is_rejected():
+    with pytest.raises(ValidationError):
+        production_settings(smtp_host="smtp.example.com")
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
