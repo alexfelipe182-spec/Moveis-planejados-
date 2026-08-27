@@ -52,4 +52,4 @@ Mudanças devem ser feitas em uma branch, abertas em Pull Request e mescladas na
 
 ## Deploy
 
-O arquivo `render.yaml` define a API, o frontend estático e o PostgreSQL para produção no Render. As migrações Alembic fazem parte do processo de inicialização/validação da aplicação.
+O arquivo `render.yaml` define a API, o frontend estático, o PostgreSQL e o Key Value (Redis) para produção no Render. As conexões com banco e Redis são injetadas por referências entre recursos, sem versionar credenciais. As migrações Alembic fazem parte do processo de inicialização/validação da aplicação.

@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -60,3 +62,27 @@ def test_render_blueprint_keeps_readiness_probe_and_production_origin():
     assert "healthCheckPath: /ready" in blueprint
     assert 'value: \'["https://ideal-marcenaria.onrender.com"]\'' in blueprint
     assert "value: https://ideal-marcenaria.onrender.com" in blueprint
+
+
+def test_render_blueprint_matches_linked_production_resources():
+    blueprint = yaml.safe_load((ROOT / "render.yaml").read_text(encoding="utf-8"))
+    services = {service["name"]: service for service in blueprint["services"]}
+    databases = {database["name"]: database for database in blueprint["databases"]}
+
+    assert set(services) == {
+        "ideal-marcenaria-api",
+        "ideal-marcenaria",
+        "ideal-marcenaria-redis",
+    }
+    assert set(databases) == {"Ideal"}
+
+    api_env = {entry["key"]: entry for entry in services["ideal-marcenaria-api"]["envVars"]}
+    assert api_env["DATABASE_URL"]["fromDatabase"] == {
+        "name": "Ideal",
+        "property": "connectionString",
+    }
+    assert api_env["REDIS_URL"]["fromService"] == {
+        "type": "keyvalue",
+        "name": "ideal-marcenaria-redis",
+        "property": "connectionString",
+    }

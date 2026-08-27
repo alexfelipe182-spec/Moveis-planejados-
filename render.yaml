@@ -1,18 +1,25 @@
 services:
   - type: web
-    name: moveis-planejados-api
+    name: ideal-marcenaria-api
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /ready
     plan: free
-    autoDeploy: true
+    region: oregon
+    autoDeployTrigger: commit
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
         fromDatabase:
-          name: moveis-planejados-db
+          name: Ideal
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: ideal-marcenaria-redis
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
@@ -30,12 +37,21 @@ services:
   - type: web
     name: ideal-marcenaria
     runtime: static
+    buildCommand: echo "Frontend pronto"
     staticPublishPath: ./frontend
+    autoDeployTrigger: commit
+
+  - type: keyvalue
+    name: ideal-marcenaria-redis
     plan: free
-    autoDeploy: true
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
 
 databases:
-  - name: moveis-planejados-db
+  - name: Ideal
     plan: free
-    databaseName: marcenaria_db
-    user: marcenaria
+    region: oregon
+    postgresMajorVersion: "18"
+    databaseName: ideal_1zre
+    user: ideal_1zre_user
