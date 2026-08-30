@@ -8,6 +8,7 @@ from app.models.project import Project
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
 from app.models.refresh_token import RefreshToken
+from app.models.tenant import Tenant
 from app.models.user import User
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "QuoteItem",
     "RefreshToken",
     "Supplier",
+    "Tenant",
     "User",
 ]
