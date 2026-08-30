@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -23,22 +23,51 @@ def _money_text(value: Decimal) -> str:
 
 
 @router.get("/project/{project_id}", response_model=list[ProjectCostRead])
-def list_project_costs(project_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_project_costs(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     if not tenant_get(db, Project, project_id, current_user):
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
-    return tenant_query(db, ProjectCost, current_user).filter(ProjectCost.project_id == project_id).order_by(ProjectCost.id).all()
+    return (
+        tenant_query(db, ProjectCost, current_user)
+        .filter(ProjectCost.project_id == project_id)
+        .order_by(ProjectCost.id)
+        .all()
+    )
 
 
 @router.get("/project/{project_id}/total")
-def project_cost_total(project_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def project_cost_total(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     if not tenant_get(db, Project, project_id, current_user):
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
-    total = db.query(func.coalesce(func.sum(ProjectCost.total_cost), 0)).filter(ProjectCost.tenant_id == current_user.tenant_id, ProjectCost.project_id == project_id).scalar()
+    total = (
+        db.query(func.coalesce(func.sum(ProjectCost.total_cost), 0))
+        .filter(
+            ProjectCost.tenant_id == current_user.tenant_id,
+            ProjectCost.project_id == project_id,
+        )
+        .scalar()
+    )
     return {"project_id": project_id, "total_cost": _money_text(Decimal(total))}
 
 
-@router.post("", response_model=ProjectCostRead, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
-def create_project_cost(payload: ProjectCostCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+@router.post(
+    "",
+    response_model=ProjectCostRead,
+    status_code=201,
+    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+)
+def create_project_cost(
+    payload: ProjectCostCreate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     project = tenant_get(db, Project, payload.project_id, current_user)
     if not project:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
@@ -54,9 +83,42 @@ def create_project_cost(payload: ProjectCostCreate, current_user: User = Depends
     if material is not None and material.waste_percent:
         waste_multiplier += Decimal(material.waste_percent) / Decimal("100")
     total_cost = _money(payload.quantity * unit_cost * waste_multiplier)
-    item = ProjectCost(tenant_id=current_user.tenant_id, project_id=payload.project_id, material_id=payload.material_id, category=payload.category, description=payload.description, quantity=payload.quantity, unit_cost=unit_cost, total_cost=total_cost)
-    db.add(item); db.flush()
-    db.add(Activity(tenant_id=current_user.tenant_id, user_id=current_user.id, action="cost_added", entity="project", entity_id=project.id, description=f"Adicionou custo de {total_cost} ao projeto #{project.id}: {payload.description}"))
-    db.commit(); db.refresh(item)
-    engine.emit("project.cost_added", {"tenant_id": current_user.tenant_id, "entity": "project", "item_id": project.id, "cost_id": item.id, "user_id": current_user.id, "total_cost": total_cost})
+    item = ProjectCost(
+        tenant_id=current_user.tenant_id,
+        project_id=payload.project_id,
+        material_id=payload.material_id,
+        category=payload.category,
+        description=payload.description,
+        quantity=payload.quantity,
+        unit_cost=unit_cost,
+        total_cost=total_cost,
+    )
+    db.add(item)
+    db.flush()
+    db.add(
+        Activity(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            action="cost_added",
+            entity="project",
+            entity_id=project.id,
+            description=(
+                f"Adicionou custo de {total_cost} ao projeto #{project.id}: "
+                f"{payload.description}"
+            ),
+        )
+    )
+    db.commit()
+    db.refresh(item)
+    engine.emit(
+        "project.cost_added",
+        {
+            "tenant_id": current_user.tenant_id,
+            "entity": "project",
+            "item_id": project.id,
+            "cost_id": item.id,
+            "user_id": current_user.id,
+            "total_cost": total_cost,
+        },
+    )
     return item

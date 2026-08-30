@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -21,24 +21,68 @@ def _percent(value: Decimal) -> str:
 
 
 @router.get("/{project_id}/profitability")
-def project_profitability(project_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def project_profitability(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     project = tenant_get(db, Project, project_id, current_user)
     if not project:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
     if project.quote_id is None:
-        raise HTTPException(status_code=409, detail="Projeto ainda não está ligado a um orçamento vendido")
+        raise HTTPException(
+            status_code=409,
+            detail="Projeto ainda não está ligado a um orçamento vendido",
+        )
     quote = tenant_get(db, Quote, project.quote_id, current_user)
     if not quote:
-        raise HTTPException(status_code=409, detail="Orçamento vinculado ao projeto não foi encontrado")
+        raise HTTPException(
+            status_code=409,
+            detail="Orçamento vinculado ao projeto não foi encontrado",
+        )
     sold_total = Decimal(quote.total or 0)
-    real_cost = Decimal(db.query(func.coalesce(func.sum(ProjectCost.total_cost), 0)).filter(ProjectCost.tenant_id == current_user.tenant_id, ProjectCost.project_id == project_id).scalar())
+    real_cost = Decimal(
+        db.query(func.coalesce(func.sum(ProjectCost.total_cost), 0))
+        .filter(
+            ProjectCost.tenant_id == current_user.tenant_id,
+            ProjectCost.project_id == project_id,
+        )
+        .scalar()
+    )
     real_profit = sold_total - real_cost
-    real_margin = (real_profit / sold_total * Decimal("100")) if sold_total > 0 else Decimal("0")
-    expected_base_cost = Decimal(quote.material_cost or 0) + Decimal(quote.hardware_cost or 0) + Decimal(quote.labor_cost or 0) + Decimal(quote.finishing_cost or 0)
+    real_margin = (
+        real_profit / sold_total * Decimal("100")
+        if sold_total > 0
+        else Decimal("0")
+    )
+    expected_base_cost = (
+        Decimal(quote.material_cost or 0)
+        + Decimal(quote.hardware_cost or 0)
+        + Decimal(quote.labor_cost or 0)
+        + Decimal(quote.finishing_cost or 0)
+    )
     cost_variance = real_cost - expected_base_cost
-    cost_variance_percent = cost_variance / expected_base_cost * Decimal("100") if expected_base_cost > 0 else Decimal("0")
+    cost_variance_percent = (
+        cost_variance / expected_base_cost * Decimal("100")
+        if expected_base_cost > 0
+        else Decimal("0")
+    )
     health = "healthy"
-    if real_profit < 0: health = "loss"
-    elif real_margin < Decimal("10"): health = "critical"
-    elif real_margin < Decimal("20"): health = "attention"
-    return {"project_id": project.id, "quote_id": quote.id, "sold_total": _money(sold_total), "expected_cost": _money(expected_base_cost), "real_cost": _money(real_cost), "real_profit": _money(real_profit), "real_margin_percent": _percent(real_margin), "cost_variance": _money(cost_variance), "cost_variance_percent": _percent(cost_variance_percent), "health": health}
+    if real_profit < 0:
+        health = "loss"
+    elif real_margin < Decimal("10"):
+        health = "critical"
+    elif real_margin < Decimal("20"):
+        health = "attention"
+    return {
+        "project_id": project.id,
+        "quote_id": quote.id,
+        "sold_total": _money(sold_total),
+        "expected_cost": _money(expected_base_cost),
+        "real_cost": _money(real_cost),
+        "real_profit": _money(real_profit),
+        "real_margin_percent": _percent(real_margin),
+        "cost_variance": _money(cost_variance),
+        "cost_variance_percent": _percent(cost_variance_percent),
+        "health": health,
+    }
