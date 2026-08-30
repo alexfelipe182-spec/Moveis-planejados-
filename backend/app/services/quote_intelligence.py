@@ -9,25 +9,26 @@ def recommend_from_history(
     *,
     base_cost: Decimal,
     requested_margin: Decimal,
-    historical_margins: list[Decimal],
+    historical_markups: list[Decimal],
     historical_cost_variances: list[Decimal],
 ) -> dict[str, Decimal | int | str]:
-    sample_size = len(historical_margins)
+    """Recommend the markup used by the pricing engine from realized historical markup."""
+    sample_size = len(historical_markups)
 
     if sample_size == 0:
         recommended_margin = max(requested_margin, Decimal("25"))
-        average_margin = Decimal("0")
+        average_markup = Decimal("0")
         average_variance = Decimal("0")
         confidence = "low"
     else:
-        average_margin = sum(historical_margins, Decimal("0")) / Decimal(sample_size)
+        average_markup = sum(historical_markups, Decimal("0")) / Decimal(sample_size)
         average_variance = (
             sum(historical_cost_variances, Decimal("0")) / Decimal(len(historical_cost_variances))
             if historical_cost_variances
             else Decimal("0")
         )
         variance_buffer = max(average_variance, Decimal("0"))
-        recommended_margin = max(requested_margin, average_margin + variance_buffer)
+        recommended_margin = max(requested_margin, average_markup + variance_buffer)
         confidence = "high" if sample_size >= 10 else "medium" if sample_size >= 3 else "low"
 
     recommended_margin = min(max(recommended_margin, Decimal("5")), Decimal("80"))
@@ -51,7 +52,7 @@ def recommend_from_history(
 
     return {
         "sample_size": sample_size,
-        "average_real_margin_percent": _q(average_margin),
+        "average_real_markup_percent": _q(average_markup),
         "average_cost_variance_percent": _q(average_variance),
         "requested_margin_percent": _q(requested_margin),
         "recommended_margin_percent": _q(recommended_margin),

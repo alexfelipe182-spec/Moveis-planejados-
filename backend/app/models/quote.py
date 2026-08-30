@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -26,6 +26,13 @@ class Quote(Base):
     profit_margin: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=30)
     suggested_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    recommended_profit_margin: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    recommended_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    risk_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    risk_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    intelligence_confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    intelligence_sample_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    intelligence_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ai_analysis: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
