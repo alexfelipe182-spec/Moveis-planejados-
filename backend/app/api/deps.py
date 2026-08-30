@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.security import decode_token
 from app.database import get_db
 from app.models import User
+from app.tenancy import current_tenant
 
 CSRF_COOKIE = "csrf_token"
 
@@ -35,6 +36,7 @@ def get_current_user(
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário inválido ou inativo")
+    current_tenant(db, user)
     return user
 
 
@@ -55,13 +57,17 @@ def require_cookie_csrf(
     csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
     csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
 ) -> None:
-    # CSRF é necessário quando a autenticação está sendo feita por cookie.
-    # Clientes que usam Authorization: Bearer não precisam enviar o token CSRF.
     if access_token:
         _validate_csrf(csrf_cookie, csrf_header)
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.is_admin:
+    if not (current_user.is_admin or current_user.is_superadmin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito ao administrador")
+    return current_user
+
+
+def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_superadmin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito ao superadministrador")
     return current_user

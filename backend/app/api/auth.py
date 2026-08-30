@@ -13,9 +13,12 @@ from app.api.deps import CSRF_COOKIE, require_csrf
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 from app.database import get_db
-from app.models import Activity, PasswordResetToken, RefreshToken, User
+from app.models import Activity, PasswordResetToken, RefreshToken, Tenant, User
 from app.schemas.password_reset import PasswordResetConfirm, PasswordResetRequest, PasswordResetResponse
+from app.schemas.tenant import BusinessRegistration
 from app.schemas.user import UserCreate, UserRead
+from app.services.plans import get_plan
+from app.tenancy import current_tenant, unique_tenant_slug
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -40,7 +43,7 @@ def _send_reset_email(user: User, token: str) -> bool:
     if not all([settings.smtp_host, settings.smtp_user, settings.smtp_password, settings.smtp_from]):
         return False
     msg = EmailMessage()
-    msg["Subject"] = "Recuperação de acesso — Marcenaria Ideal"
+    msg["Subject"] = "Recuperação de acesso — Multi-Marcenarias"
     msg["From"] = settings.smtp_from
     msg["To"] = user.email
     link = f"{settings.frontend_url}/#reset_token={token}"
@@ -54,22 +57,34 @@ def _send_reset_email(user: User, token: str) -> bool:
     return True
 
 
+def _create_tenant(db: Session, *, name: str, email: str, plan_code: str, status_value: str = "trialing") -> Tenant:
+    get_plan(plan_code)
+    tenant = Tenant(
+        name=name.strip(),
+        slug=unique_tenant_slug(db, name),
+        status=status_value,
+        plan_code=plan_code,
+        billing_email=email,
+        billing_provider="disabled",
+        trial_ends_at=_now() + timedelta(days=14) if status_value == "trialing" else None,
+    )
+    db.add(tenant)
+    db.flush()
+    return tenant
+
+
+def _ensure_email_available(db: Session, email: str) -> None:
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+
+
 @router.get("/csrf")
 def get_csrf_token(response: Response, csrf_token: str | None = Cookie(default=None, alias=CSRF_COOKIE)):
-    """Disponibiliza o token CSRF para clientes que usam autenticação por cookie."""
     secure = settings.environment == "production"
     samesite = "none" if secure else "lax"
     if not csrf_token:
         csrf_token = secrets.token_urlsafe(32)
-        response.set_cookie(
-            CSRF_COOKIE,
-            csrf_token,
-            httponly=False,
-            secure=secure,
-            samesite=samesite,
-            max_age=settings.refresh_token_expire_days * 86400,
-            path="/",
-        )
+        response.set_cookie(CSRF_COOKIE, csrf_token, httponly=False, secure=secure, samesite=samesite, max_age=settings.refresh_token_expire_days * 86400, path="/")
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return {"csrf_token": csrf_token}
@@ -78,25 +93,38 @@ def get_csrf_token(response: Response, csrf_token: str | None = Cookie(default=N
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     email = str(payload.email).strip().lower()
-    if db.scalar(select(User).where(User.email == email)):
-        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
-
-    user = User(
-        name=payload.name.strip(),
-        email=email,
-        password_hash=hash_password(payload.password),
-        is_admin=False,
-    )
-    db.add(user)
+    _ensure_email_available(db, email)
     try:
+        tenant = _create_tenant(db, name=f"Conta de {payload.name.strip()}", email=email, plan_code="starter")
+        user = User(tenant_id=tenant.id, name=payload.name.strip(), email=email, password_hash=hash_password(payload.password), is_admin=False)
+        db.add(user)
         db.flush()
-        db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email}"))
+        db.add(Activity(tenant_id=tenant.id, user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email}"))
         db.commit()
         db.refresh(user)
+        return user
     except Exception:
         db.rollback()
         raise
-    return user
+
+
+@router.post("/register-business", status_code=status.HTTP_201_CREATED)
+def register_business(payload: BusinessRegistration, db: Session = Depends(get_db)):
+    email = str(payload.email).strip().lower()
+    _ensure_email_available(db, email)
+    try:
+        tenant = _create_tenant(db, name=payload.business_name, email=email, plan_code=payload.plan_code)
+        owner = User(tenant_id=tenant.id, name=payload.owner_name.strip(), email=email, password_hash=hash_password(payload.password), is_admin=True)
+        db.add(owner)
+        db.flush()
+        db.add(Activity(tenant_id=tenant.id, user_id=owner.id, action="tenant_onboarded", entity="tenant", entity_id=tenant.id, description="Marcenaria criada pelo onboarding SaaS"))
+        db.commit()
+        db.refresh(tenant)
+        db.refresh(owner)
+        return {"tenant": {"id": tenant.id, "name": tenant.name, "slug": tenant.slug, "status": tenant.status, "plan_code": tenant.plan_code, "trial_ends_at": tenant.trial_ends_at}, "owner": UserRead.model_validate(owner).model_dump(mode="json")}
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/login")
@@ -105,10 +133,11 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
     user = db.scalar(select(User).where(User.email == email))
     if not user or not user.is_active or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos")
+    current_tenant(db, user)
     access = create_access_token(str(user.id))
     refresh, jti, expires = create_refresh_token(str(user.id))
     db.add(RefreshToken(user_id=user.id, token_jti=jti, expires_at=expires.replace(tzinfo=None)))
-    db.add(Activity(user_id=user.id, action="login", entity="user", entity_id=user.id, description=f"Login realizado por {user.email}"))
+    db.add(Activity(tenant_id=user.tenant_id, user_id=user.id, action="login", entity="user", entity_id=user.id, description=f"Login realizado por {user.email}"))
     db.commit()
     csrf = _cookies(response, access, refresh)
     return {"access_token": access, "token_type": "bearer", "expires_in": settings.access_token_expire_minutes * 60, "csrf_token": csrf}
@@ -123,7 +152,7 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
     db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)).update({"used_at": _now()})
     token = secrets.token_urlsafe(48)
     db.add(PasswordResetToken(user_id=user.id, token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=_now() + timedelta(minutes=settings.password_reset_expire_minutes)))
-    db.add(Activity(user_id=user.id, action="password_reset_requested", entity="user", entity_id=user.id, description="Solicitou recuperação de senha"))
+    db.add(Activity(tenant_id=user.tenant_id, user_id=user.id, action="password_reset_requested", entity="user", entity_id=user.id, description="Solicitou recuperação de senha"))
     db.commit()
     try:
         sent = _send_reset_email(user, token)
@@ -136,11 +165,7 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
 @router.post("/password-reset/confirm")
 def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
-    record = db.scalar(
-        select(PasswordResetToken)
-        .where(PasswordResetToken.token_hash == token_hash)
-        .with_for_update()
-    )
+    record = db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash).with_for_update())
     if not record or record.used_at is not None or record.expires_at <= _now():
         raise HTTPException(status_code=400, detail="Token inválido, expirado ou já utilizado")
     user = db.get(User, record.user_id)
@@ -148,11 +173,8 @@ def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(
         raise HTTPException(status_code=400, detail="Usuário inválido ou inativo")
     user.password_hash = hash_password(payload.new_password)
     record.used_at = _now()
-    db.query(RefreshToken).filter(
-        RefreshToken.user_id == user.id,
-        RefreshToken.revoked.is_(False),
-    ).update({"revoked": True}, synchronize_session=False)
-    db.add(Activity(user_id=user.id, action="password_reset", entity="user", entity_id=user.id, description="Senha redefinida com sucesso e sessões renováveis revogadas"))
+    db.query(RefreshToken).filter(RefreshToken.user_id == user.id, RefreshToken.revoked.is_(False)).update({"revoked": True}, synchronize_session=False)
+    db.add(Activity(tenant_id=user.tenant_id, user_id=user.id, action="password_reset", entity="user", entity_id=user.id, description="Senha redefinida com sucesso e sessões renováveis revogadas"))
     db.commit()
     return {"message": "Senha redefinida com sucesso. Faça login novamente."}
 
@@ -167,11 +189,7 @@ def refresh(response: Response, _: None = Depends(require_csrf), refresh_token: 
         raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado") from None
     if payload.get("type") != "refresh" or not payload.get("sub") or not payload.get("jti"):
         raise HTTPException(status_code=401, detail="Refresh token inválido")
-    stored = db.scalar(
-        select(RefreshToken)
-        .where(RefreshToken.token_jti == payload["jti"])
-        .with_for_update()
-    )
+    stored = db.scalar(select(RefreshToken).where(RefreshToken.token_jti == payload["jti"]).with_for_update())
     if not stored or stored.revoked or stored.expires_at <= _now():
         raise HTTPException(status_code=401, detail="Refresh token revogado ou expirado")
     try:
@@ -183,6 +201,7 @@ def refresh(response: Response, _: None = Depends(require_csrf), refresh_token: 
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuário inválido")
+    current_tenant(db, user)
     stored.revoked = True
     access = create_access_token(str(user.id))
     new_refresh, jti, expires = create_refresh_token(str(user.id))

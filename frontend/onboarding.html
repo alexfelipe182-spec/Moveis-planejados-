@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Criar sua marcenaria — Multi-Marcenarias</title>
+  <meta name="description" content="Crie uma empresa isolada na plataforma Multi-Marcenarias.">
+  <style>
+    :root{color-scheme:dark;background:#050816;color:#f8fafc;font-family:Inter,system-ui,-apple-system,sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#172554 0,#070b1c 42%,#02040b 100%)}main{width:min(1080px,calc(100% - 28px));margin:auto;padding:42px 0 72px}.brand{font-weight:900;letter-spacing:.08em}.brand b{color:#22d3ee}h1{font-size:clamp(2rem,7vw,4.3rem);line-height:1;margin:26px 0 14px}.lead{color:#a5b4fc;max-width:720px;font-size:1.08rem}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:28px 0}.plan{border:1px solid #253055;background:#0b1026cc;border-radius:20px;padding:20px;cursor:pointer;text-align:left;color:inherit;min-height:190px}.plan[aria-pressed=true]{border-color:#22d3ee;box-shadow:0 0 28px #22d3ee33}.plan strong{font-size:1.25rem}.price{font-size:2rem;font-weight:900;margin:10px 0}.plan small{color:#94a3b8}form{border:1px solid #253055;background:#080d20e8;border-radius:22px;padding:22px;display:grid;grid-template-columns:1fr 1fr;gap:16px}label{display:grid;gap:7px;font-weight:700}input,select{width:100%;min-height:48px;border-radius:12px;border:1px solid #334155;background:#050816;color:#fff;padding:11px 13px;font-size:16px}.wide{grid-column:1/-1}.submit{min-height:52px;border:0;border-radius:13px;background:linear-gradient(90deg,#22d3ee,#8b5cf6);color:#020617;font-weight:900;font-size:1rem}.message{grid-column:1/-1;min-height:24px;color:#fca5a5}.success{color:#86efac}a{color:#67e8f9}@media(max-width:760px){.plans,form{grid-template-columns:1fr}main{padding-top:26px}.wide{grid-column:auto}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">MM <b>Multi-Marcenarias</b></div>
+  <h1>Sua marcenaria, com dados realmente separados.</h1>
+  <p class="lead">Crie a empresa, escolha o plano inicial e receba uma conta administradora. Cada marcenaria nasce em um tenant próprio, sem compartilhar clientes, orçamentos, projetos ou custos.</p>
+  <section id="plans" class="plans" aria-label="Planos"><p>Carregando planos...</p></section>
+  <form id="form">
+    <label>Nome da marcenaria<input id="business" required minlength="2" maxlength="180" autocomplete="organization"></label>
+    <label>Seu nome<input id="owner" required minlength="2" maxlength="120" autocomplete="name"></label>
+    <label>E-mail<input id="email" type="email" required autocomplete="email" autocapitalize="none"></label>
+    <label>Senha<input id="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label>
+    <input id="plan" type="hidden" value="starter">
+    <button class="submit wide" type="submit">Criar minha Multi-Marcenarias</button>
+    <div id="message" class="message" role="status" aria-live="polite"></div>
+  </form>
+  <p><a href="/">← Voltar para a apresentação</a></p>
+</main>
+<script src="./onboarding.js"></script>
+</body>
+</html>

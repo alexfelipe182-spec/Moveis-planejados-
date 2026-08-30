@@ -1,0 +1,63 @@
+name: PostgreSQL Recovery Drill
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/alembic/**"
+      - ".github/workflows/recovery.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marcenaria_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d marcenaria_db"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_db
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: test-secret-key-for-ci-at-least-32-bytes-long
+      ENVIRONMENT: test
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        run: python -m pip install -r backend/requirements.txt
+      - name: Apply migrations
+        working-directory: backend
+        run: alembic upgrade head
+      - name: Seed tenant-scoped smoke data
+        run: |
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d marcenaria_db <<'SQL'
+          INSERT INTO tenants (name, slug, status, plan_code, billing_provider, created_at, updated_at)
+          VALUES ('Recovery Drill', 'recovery-drill', 'active', 'business', 'disabled', NOW(), NOW());
+          SQL
+      - name: Backup
+        run: PGPASSWORD=postgres pg_dump -h 127.0.0.1 -U postgres -Fc marcenaria_db > /tmp/marcenaria.dump
+      - name: Restore into clean database
+        run: |
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres marcenaria_restore
+          PGPASSWORD=postgres pg_restore -h 127.0.0.1 -U postgres -d marcenaria_restore --no-owner /tmp/marcenaria.dump
+      - name: Validate restored schema and tenant data
+        run: |
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d marcenaria_restore -Atc "SELECT count(*) FROM tenants WHERE slug='recovery-drill'")" = "1"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d marcenaria_restore -Atc "SELECT version_num FROM alembic_version")" = "013_bootstrap_superadmin"

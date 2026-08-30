@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app import crud
 from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Project, User
 from app.schemas.project import ProjectRead, ProjectStatus
 from app.services.automation import engine
+from app.tenancy import tenant_get
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -26,7 +26,6 @@ NEXT_STATUS = {
     "installation": "delivered",
     "delivered": "completed",
 }
-
 TERMINAL_STATUSES = {"completed", "cancelled"}
 
 
@@ -41,40 +40,44 @@ def advance_project_status(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    project = crud.get_item(db, Project, item_id)
+    project = tenant_get(db, Project, item_id, current_user)
     if not project:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
-
     previous_status = project.status
     requested_status = payload.status
-
     if previous_status in TERMINAL_STATUSES:
-        raise HTTPException(status_code=409, detail="Projeto concluído ou cancelado não pode mudar de etapa")
-
-    allowed_status = NEXT_STATUS.get(previous_status)
-    is_cancel = requested_status == "cancelled"
-    if not is_cancel and requested_status != allowed_status:
         raise HTTPException(
             status_code=409,
-            detail=f"Transição inválida: {previous_status} → {requested_status}. Próxima etapa: {allowed_status}",
+            detail="Projeto concluído ou cancelado não pode mudar de etapa",
         )
-
+    allowed_status = NEXT_STATUS.get(previous_status)
+    if requested_status != "cancelled" and requested_status != allowed_status:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Transição inválida: {previous_status} → {requested_status}. "
+                f"Próxima etapa: {allowed_status}"
+            ),
+        )
     project.status = requested_status
     db.add(
         Activity(
+            tenant_id=current_user.tenant_id,
             user_id=current_user.id,
             action="status_changed",
             entity="project",
             entity_id=project.id,
-            description=f"Alterou projeto #{project.id}: {previous_status} → {requested_status}",
+            description=(
+                f"Alterou projeto #{project.id}: {previous_status} → {requested_status}"
+            ),
         )
     )
     db.commit()
     db.refresh(project)
-
     engine.emit(
         "project.status_changed",
         {
+            "tenant_id": current_user.tenant_id,
             "entity": "project",
             "item_id": project.id,
             "user_id": current_user.id,

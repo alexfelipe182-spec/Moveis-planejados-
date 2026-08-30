@@ -18,8 +18,11 @@ class UserUpdate(BaseModel):
 
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
+    tenant_id: int
     name: str
     email: EmailStr
     is_active: bool
     is_admin: bool
+    is_superadmin: bool

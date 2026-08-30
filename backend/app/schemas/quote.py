@@ -63,6 +63,7 @@ class QuoteEstimateResponse(BaseModel):
 
 class QuoteRead(QuoteBase):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     material_cost: Decimal = Decimal("0")
     hardware_cost: Decimal = Decimal("0")
@@ -72,3 +73,10 @@ class QuoteRead(QuoteBase):
     suggested_total: Decimal = Decimal("0")
     ai_analysis: str | None = None
     ai_analyzed_at: datetime | None = None
+    recommended_profit_margin: Decimal | None = None
+    recommended_total: Decimal | None = None
+    risk_score: int | None = None
+    risk_level: str | None = None
+    intelligence_confidence: str | None = None
+    intelligence_sample_size: int | None = None
+    intelligence_analyzed_at: datetime | None = None
