@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Superadmin — Multi-Marcenarias</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,sans-serif;background:#030712;color:#f8fafc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#172554,#030712 50%);min-height:100vh}main{width:min(1180px,calc(100% - 28px));margin:auto;padding:32px 0 70px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-weight:900}.brand b{color:#22d3ee}.panel{border:1px solid #26324d;border-radius:18px;background:#080d1dcc;padding:18px;margin-top:18px}.login{max-width:520px;margin:60px auto}.hidden{display:none!important}input,select,button{min-height:44px;border-radius:10px;border:1px solid #334155;background:#0b1020;color:#fff;padding:10px 12px;font-size:16px}button{cursor:pointer;font-weight:800}.primary{background:linear-gradient(90deg,#22d3ee,#8b5cf6);color:#020617;border:0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{padding:18px;border:1px solid #26324d;border-radius:14px}.metric strong{display:block;font-size:2rem}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:780px}th,td{padding:12px;border-bottom:1px solid #1e293b;text-align:left}.actions{display:flex;gap:8px}.message{color:#fca5a5;min-height:22px}@media(max-width:700px){.grid{grid-template-columns:1fr 1fr}.top{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="top"><div class="brand">MM <b>Multi-Marcenarias</b> · Superadmin</div><a href="/" style="color:#67e8f9">Site público</a></div>
+  <section id="login" class="panel login">
+    <h1>Operação da plataforma</h1>
+    <p>Este acesso é separado do administrador de uma marcenaria.</p>
+    <form id="login-form">
+      <p><input id="email" type="email" required placeholder="E-mail" autocomplete="username" style="width:100%"></p>
+      <p><input id="password" type="password" required placeholder="Senha" autocomplete="current-password" style="width:100%"></p>
+      <button class="primary" type="submit" style="width:100%">Entrar</button>
+      <div id="login-message" class="message" role="status"></div>
+    </form>
+  </section>
+  <section id="app" class="hidden">
+    <div id="metrics" class="grid"></div>
+    <div class="panel"><h2>Marcenarias</h2><div id="message" class="message"></div><div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Status</th><th>Plano</th><th>Trial</th><th>Ações</th></tr></thead><tbody id="tenants"></tbody></table></div></div>
+  </section>
+</main>
+<script src="./superadmin.js"></script>
+</body>
+</html>
