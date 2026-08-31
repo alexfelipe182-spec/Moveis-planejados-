@@ -5,13 +5,14 @@ from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.tenant import TenantScopedMixin
 
 
 def utc_now_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-class Supplier(Base):
+class Supplier(TenantScopedMixin, Base):
     __tablename__ = "suppliers"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,7 +25,7 @@ class Supplier(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)
 
 
-class Material(Base):
+class Material(TenantScopedMixin, Base):
     __tablename__ = "materials"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -43,7 +44,7 @@ class Material(Base):
     )
 
 
-class ProjectCost(Base):
+class ProjectCost(TenantScopedMixin, Base):
     __tablename__ = "project_costs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
