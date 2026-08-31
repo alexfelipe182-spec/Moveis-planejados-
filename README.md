@@ -48,7 +48,10 @@ de backup, remetente de e-mail e número comercial. O ensaio de recuperação do
 
 Os dados internos são restritos a administradores. O cadastro público cria uma nova
 marcenaria isolada, concede a essa primeira conta a propriedade administrativa do
-próprio espaço e inicia o trial do plano Starter quando o catálogo já estiver migrado.
+próprio espaço e inicia 14 dias de teste no plano comercial escolhido. O catálogo
+oferece Essencial (R$ 49/mês), Profissional (R$ 99/mês) e Empresarial
+(R$ 249/mês). A cobrança permanece desativada por padrão e só deve ser ligada
+depois da configuração e homologação do provedor de pagamento.
 Listagens possuem paginação e busca no servidor; decisões e edições de orçamento usam
 bloqueio de linha para preservar valores aprovados.
 

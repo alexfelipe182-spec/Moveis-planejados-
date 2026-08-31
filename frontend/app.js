@@ -103,6 +103,36 @@ let authView = null;
 let authReturnFocus = null;
 let modalReturnFocus = null;
 let recoveryToken = '';
+const registrationPlans = {
+  starter: { name:'Essencial', price:'R$ 49/mês' },
+  pro: { name:'Profissional', price:'R$ 99/mês' },
+  scale: { name:'Empresarial', price:'R$ 249/mês' },
+};
+let selectedRegistrationPlan = 'starter';
+function updateRegistrationPlan(code='starter') {
+  if (!registrationPlans[code]) return;
+  selectedRegistrationPlan=code;
+  const summary=$('#register-plan-summary'), plan=registrationPlans[code];
+  if(summary) summary.textContent=`Plano ${plan.name} selecionado · ${plan.price} após o teste.`;
+}
+function choosePublicPlan(code) {
+  updateRegistrationPlan(code);
+  openAuth('register');
+}
+async function hydratePublicPlanPrices() {
+  try {
+    const plans=await api('/plans');
+    plans.forEach(plan=>{
+      const card=$(`[data-public-plan="${plan.code}"]`);
+      const price=card?.querySelector?.('[data-plan-price]');
+      if(price) price.textContent=money(plan.monthly_price_cents/100);
+      if(registrationPlans[plan.code]) registrationPlans[plan.code].price=`${money(plan.monthly_price_cents/100)}/mês`;
+    });
+    updateRegistrationPlan(selectedRegistrationPlan);
+  } catch (_) {
+    // The static catalog remains usable when a sleeping API is still waking up.
+  }
+}
 function storeRecoveryToken(token) {
   recoveryToken = String(token || '');
   try { sessionStorage.setItem('reset_token', recoveryToken); } catch (_) {}
@@ -180,6 +210,7 @@ function setupPublic() {
   $('#close-auth').addEventListener('click',closeAuth);
   $('#auth-overlay').addEventListener('click',e=>{if(e.target.id==='auth-overlay')closeAuth()});
   $$('[data-quote]').forEach(b=>b.addEventListener('click',()=>showWhatsApp()));
+  $$('[data-plan-choice]').forEach(b=>b.addEventListener('click',()=>choosePublicPlan(b.dataset.planChoice)));
   $('#show-register').addEventListener('click',()=>showAuth('register'));
   $('#show-recovery').addEventListener('click',()=>showAuth('recovery'));
   $$('[data-auth-back]').forEach(b=>b.addEventListener('click',()=>showAuth('login')));
@@ -190,6 +221,7 @@ function setupPublic() {
   $('#toggle-login-password')?.addEventListener('click',toggleLoginPassword);
   window.addEventListener('hashchange', handleAuthLink);
   handleAuthLink();
+  hydratePublicPlanPrices();
 }
 let loginInProgress = false;
 let loginAttemptVersion = 0;
@@ -261,7 +293,7 @@ async function login(e) {
     form.removeAttribute('aria-busy');
   }
 }
-async function register(e){return submitAuthForm(e,'Criando espaço...',async form=>{const msg=$('#register-message');setFormMessage(msg);try{await api('/auth/register',{method:'POST',body:{organization_name:$('#register-organization').value.trim(),name:$('#register-name').value.trim(),email:$('#register-email').value.trim().toLowerCase(),password:$('#register-password').value}});setFormMessage(msg,'Marcenaria criada. Agora entre com seu e-mail e senha para abrir o painel.','success');form.reset()}catch(err){setFormMessage(msg,err.message,'error')}})}
+async function register(e){return submitAuthForm(e,'Criando espaço...',async form=>{const msg=$('#register-message');setFormMessage(msg);try{await api('/auth/register',{method:'POST',body:{organization_name:$('#register-organization').value.trim(),name:$('#register-name').value.trim(),email:$('#register-email').value.trim().toLowerCase(),password:$('#register-password').value,plan_code:selectedRegistrationPlan}});setFormMessage(msg,`Marcenaria criada no plano ${registrationPlans[selectedRegistrationPlan].name}. Agora entre com seu e-mail e senha para abrir o painel.`,'success');form.reset()}catch(err){setFormMessage(msg,err.message,'error')}})}
 async function recovery(e){return submitAuthForm(e,'Enviando...',async()=>{const msg=$('#recovery-message');setFormMessage(msg);try{const data=await api('/auth/password-reset/request',{method:'POST',body:{email:$('#recovery-email').value.trim().toLowerCase()}});setFormMessage(msg,data.message+(data.debug_token?' Token de teste gerado.':''),'success');if(data.debug_token){storeRecoveryToken(data.debug_token);setTimeout(()=>showAuth('reset'),500)}}catch(err){setFormMessage(msg,err.message,'error')}})}
 async function resetPassword(e){return submitAuthForm(e,'Redefinindo...',async form=>{const msg=$('#reset-message');setFormMessage(msg);try{const token=readRecoveryToken();if(!token)throw new Error('Token de recuperação não encontrado. Solicite novamente.');await api('/auth/password-reset/confirm',{method:'POST',body:{token,new_password:$('#reset-password').value}});clearRecoveryToken();setFormMessage(msg,'Senha redefinida com sucesso. Faça login.','success');form.reset();setTimeout(()=>showAuth('login'),900)}catch(err){setFormMessage(msg,err.message,'error')}})}
 function enterAdmin(){closeAuth(false);$('#public-site').classList.add('hidden');$('#admin-app').classList.remove('hidden');$('#user-badge').textContent=state.user?.name||'Administrador';syncRoleNavigation();const skip=$('#skip-link');skip?.setAttribute?.('href','#admin-title');$('#admin-title')?.focus?.();loadDashboard();loadOnboardingCard();loadWorkspaceAccess().catch(()=>{})}
@@ -321,7 +353,7 @@ function showSection(name){
   else loadResource(name,{reset:true});
 }
 const subscriptionStatusLabels={trial:'Teste gratuito',active:'Ativa',past_due:'Pagamento pendente',canceled:'Cancelada'};
-const featureLabels={quotes:'Orçamentos',intelligence:'Inteligência de orçamento',automation:'Automações',production:'Produção',profitability:'Rentabilidade'};
+const featureLabels={customers:'Clientes',quotes:'Orçamentos',projects:'Projetos',costs:'Controle de custos',intelligence:'Inteligência de orçamento',automation:'Automações',production:'Produção',profitability:'Rentabilidade',advanced_reports:'Relatórios avançados',priority_support:'Suporte prioritário',assisted_onboarding:'Implantação assistida'};
 function readableDate(value){if(!value)return 'Não informado';const date=new Date(value);return Number.isNaN(date.getTime())?'Não informado':date.toLocaleDateString('pt-BR')}
 function workspaceHtml(plans=[],subscription=null,onboarding={}) {
   const activePlan=plans.find(plan=>plan.code===subscription?.plan_code);
@@ -335,7 +367,7 @@ function workspaceHtml(plans=[],subscription=null,onboarding={}) {
     const current=plan.code===subscription?.plan_code;
     const features=Object.entries(plan.features||{}).filter(([,enabled])=>Boolean(enabled)).map(([key])=>`<li>${escapeHtml(featureLabels[key]||key.replace(/_/g,' '))}</li>`).join('')||'<li>Recursos essenciais da marcenaria</li>';
     const buttonLabel=current&&allowed?'Plano atual':'Preparar seleção';
-    return `<article class="saas-plan${current?' current':''}"><div><span class="eyebrow">${current?'Plano da marcenaria':'Plano disponível'}</span><h3>${escapeHtml(plan.name)}</h3><p class="plan-price"><strong>${money(plan.monthly_price_cents/100)}</strong><span>/mês</span></p></div><p class="muted">Até ${escapeHtml(plan.max_users)} usuários.</p><ul>${features}</ul><button class="btn ${current&&allowed?'secondary':'primary'}" type="button" data-plan-code="${escapeHtml(plan.code)}" ${current&&allowed?'disabled':''}>${buttonLabel}</button></article>`;
+    return `<article class="saas-plan${current?' current':''}${plan.code==='pro'?' recommended':''}">${plan.code==='pro'?'<span class="public-plan-badge">Mais escolhido</span>':''}<div><span class="eyebrow">${current?'Plano da marcenaria':'Plano disponível'}</span><h3>${escapeHtml(plan.name)}</h3><p class="plan-price"><strong>${money(plan.monthly_price_cents/100)}</strong><span>/mês</span></p></div><p class="muted">Até ${escapeHtml(plan.max_users)} usuários.</p><ul>${features}</ul><button class="btn ${current&&allowed?'secondary':'primary'}" type="button" data-plan-code="${escapeHtml(plan.code)}" ${current&&allowed?'disabled':''}>${buttonLabel}</button></article>`;
   }).join('')||'<div class="empty"><p>Nenhum plano ativo foi disponibilizado.</p></div>';
   return `<div class="saas-heading"><div><span class="eyebrow">Gestão do espaço</span><h2>Plano e equipe</h2><p>Administre o acesso da sua marcenaria sem misturar dados com outras empresas.</p></div><span class="access-chip ${allowed?'allowed':'blocked'}">${allowed?'Acesso liberado':'Acesso pendente'}</span></div><div class="panel subscription-panel"><div><span class="eyebrow">Assinatura atual</span><h3>${escapeHtml(subscription?.plan_name||'Plano ainda não associado')}</h3><p class="muted">${escapeHtml(status)} · ${escapeHtml(providerNotice)}</p></div><dl class="subscription-facts"><div><dt>Equipe</dt><dd>${escapeHtml(onboarding.user_count||0)} de ${escapeHtml(maxUsers)} usuários</dd></div><div><dt>Fim do teste</dt><dd>${escapeHtml(readableDate(subscription?.trial_end))}</dd></div><div><dt>Próximo período</dt><dd>${escapeHtml(readableDate(subscription?.current_period_end))}</dd></div></dl><p id="billing-action-message" class="form-message" role="status" aria-live="polite"></p></div><div class="saas-plan-grid">${planCards}</div><div class="panel team-panel"><div class="panel-title"><div><span class="eyebrow">Equipe isolada por marcenaria</span><h3>Adicionar membro</h3></div><span class="badge">${escapeHtml(onboarding.user_count||0)} de ${escapeHtml(maxUsers)} usuários</span></div><form id="team-member-form" class="team-form"><label>Nome<input name="name" type="text" minlength="2" maxlength="120" autocomplete="name" required></label><label>E-mail<input name="email" type="email" autocomplete="email" required></label><label>Senha provisória<input name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label><label>Permissão<select name="is_admin"><option value="false">Usuário da marcenaria</option><option value="true">Administrador da marcenaria</option></select></label><button class="btn primary" type="submit" ${allowed?'':'disabled'}>Adicionar membro</button><p id="team-member-message" class="form-message" role="status" aria-live="polite"></p></form></div>`;
 }

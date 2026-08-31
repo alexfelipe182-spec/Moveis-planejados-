@@ -70,20 +70,51 @@ def seed_demo() -> None:
             slug="multi-marcenarias-demo",
             status="active",
         )
-        plan = Plan(
-            code="pro",
-            name="Profissional",
-            monthly_price_cents=9900,
-            max_users=10,
-            features={
-                "quotes": True,
-                "production": True,
-                "intelligence": True,
-                "automation": True,
-                "profitability": True,
-            },
-        )
-        db.add_all([organization, plan])
+        plans = [
+            Plan(
+                code="starter",
+                name="Essencial",
+                monthly_price_cents=4900,
+                max_users=3,
+                features={"customers": True, "quotes": True, "projects": True, "production": True, "costs": True},
+            ),
+            Plan(
+                code="pro",
+                name="Profissional",
+                monthly_price_cents=9900,
+                max_users=10,
+                features={
+                    "customers": True,
+                    "quotes": True,
+                    "projects": True,
+                    "production": True,
+                    "costs": True,
+                    "intelligence": True,
+                    "automation": True,
+                    "profitability": True,
+                },
+            ),
+            Plan(
+                code="scale",
+                name="Empresarial",
+                monthly_price_cents=24900,
+                max_users=50,
+                features={
+                    "customers": True,
+                    "quotes": True,
+                    "projects": True,
+                    "production": True,
+                    "costs": True,
+                    "intelligence": True,
+                    "automation": True,
+                    "profitability": True,
+                    "advanced_reports": True,
+                    "priority_support": True,
+                    "assisted_onboarding": True,
+                },
+            ),
+        ]
+        db.add_all([organization, *plans])
         db.flush()
         db.add(
             User(
@@ -98,7 +129,7 @@ def seed_demo() -> None:
         db.add(
             Subscription(
                 organization_id=organization.id,
-                plan_id=plan.id,
+                plan_id=plans[1].id,
                 status="trial",
                 provider="sandbox",
             )

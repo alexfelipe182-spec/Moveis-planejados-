@@ -6,6 +6,7 @@ class UserCreate(BaseModel):
     organization_name: str | None = Field(default=None, min_length=2, max_length=160)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    plan_code: str = Field(default="starter", min_length=2, max_length=40, pattern=r"^[a-z0-9-]+$")
     # Ignorado pelo backend; o primeiro usuário administra somente a própria marcenaria.
     is_admin: bool = False
 

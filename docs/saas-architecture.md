@@ -36,8 +36,9 @@ conflitantes por força:
 | 013 | planos, trial, assinatura e idempotência de webhooks |
 | 014 | bootstrap explícito do superadministrador |
 | 015 | FKs compostas para impedir referências cruzadas |
+| 016 | catálogo comercial Essencial, Profissional e Empresarial |
 
-O estado esperado é uma única cabeça Alembic (`015_tenant_reference_guards`).
+O estado esperado é uma única cabeça Alembic (`016_commercial_plan_catalog`).
 Antes de migrar o banco definitivo, executar `alembic upgrade head` em uma cópia
 isolada e conferir a revisão corrente. A migração 012 preserva os dados legados em
 `Multi-Marcenarias Legado`; a divisão posterior de dados é uma decisão de negócio,
@@ -45,10 +46,17 @@ não uma inferência automática.
 
 ## Planos, trial e pagamento
 
-O catálogo inicial contém Starter, Pro e Scale. O cadastro público cria a
-organização, o primeiro usuário como administrador e um trial de 14 dias quando o
-catálogo estiver disponível. O onboarding mostra o progresso e o endpoint de
-membros aplica `max_users` do plano.
+O catálogo comercial inicial contém:
+
+| Plano | Mensalidade | Usuários | Posicionamento |
+| --- | ---: | ---: | --- |
+| Essencial | R$ 49 | 3 | clientes, orçamentos, projetos, produção e custos |
+| Profissional | R$ 99 | 10 | IA de orçamento, automações e rentabilidade |
+| Empresarial | R$ 249 | 50 | relatórios avançados, suporte prioritário e implantação assistida |
+
+O cadastro público cria a organização, o primeiro usuário como administrador e
+14 dias de teste no plano escolhido. O onboarding mostra o progresso e o endpoint
+de membros aplica `max_users` do plano.
 
 `BILLING_PROVIDER=disabled` é o padrão seguro. `sandbox` permite testar checkout e
 webhooks sem cobrança; o evento é gravado por `(provider, event_id)` e repetição é

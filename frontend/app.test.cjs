@@ -64,6 +64,7 @@ function createAccessFormClient(kind, handler) {
     '#register-organization':{value:' Oficina Teste '},
     '#register-email':{value:' Cliente@Example.com '},
     '#register-password':{value:'senha-segura'},
+    '#register-plan-summary':{textContent:''},
     '#recovery-email':{value:' Cliente@Example.com '},
     '#reset-password':{value:'nova-senha-segura'},
   };
@@ -78,7 +79,7 @@ function createAccessFormClient(kind, handler) {
   vm.runInContext(fs.readFileSync(path.join(__dirname,'app.js'),'utf8').replace(/\nboot\(\);\s*$/,''),context);
   context.api=(url,options)=>{calls.push({url,options});return handler(url,options);};
   const event={preventDefault(){},target:form,currentTarget:form};
-  return {context,button,form,message,attributes,calls,submit:()=>context[kind==='reset'?'resetPassword':kind](event)};
+  return {context,button,form,message,fields,attributes,calls,submit:()=>context[kind==='reset'?'resetPassword':kind](event)};
 }
 function prepareBoot(c, view='login') {
   for (const name of ['login','register','recovery','reset']) {
@@ -290,6 +291,7 @@ for (const scenario of [
     if (scenario.kind === 'register') {
       assert.equal(c.calls[0].options.body.organization_name, 'Oficina Teste');
       assert.equal(c.calls[0].options.body.email, 'cliente@example.com');
+      assert.equal(c.calls[0].options.body.plan_code, 'starter');
     }
     assert.equal(c.button.disabled,true);
     assert.equal(c.button.textContent,scenario.pending);
@@ -302,6 +304,26 @@ for (const scenario of [
     assert.equal(c.form.resetCalls,scenario.resetCalls);
   });
 }
+
+test('public plan selection is carried into registration',async()=>{
+  const c=createAccessFormClient('register',async()=>({})), opened=[];
+  c.context.openAuth=view=>opened.push(view);
+  c.context.choosePublicPlan('pro');
+  await c.submit();
+  assert.deepEqual(opened,['register']);
+  assert.equal(c.calls[0].options.body.plan_code,'pro');
+  assert.match(c.fields['#register-plan-summary'].textContent,/Profissional/);
+});
+
+test('public page presents three commercial plans and a no-charge trial',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+  assert.match(html,/id="planos"/);
+  assert.match(html,/data-public-plan="starter"/);
+  assert.match(html,/data-public-plan="pro"/);
+  assert.match(html,/data-public-plan="scale"/);
+  assert.match(html,/14 dias gratuitos/);
+  assert.match(html,/Mais escolhido/);
+});
 
 test('failed access request restores the original label and disabled state',async()=>{
   const c=createAccessFormClient('register',async()=>{throw new Error('Sem conexão.');});

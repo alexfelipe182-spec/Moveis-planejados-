@@ -75,6 +75,10 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
 
+    selected_plan = db.scalar(select(Plan).where(Plan.code == payload.plan_code, Plan.is_active.is_(True)))
+    if selected_plan is None and db.scalar(select(Plan.id).limit(1)) is not None:
+        raise HTTPException(status_code=400, detail="Plano selecionado não está disponível")
+
     normalized_name = payload.name.strip()
     normalized_organization_name = (payload.organization_name or "").strip()
     organization_label = normalized_organization_name or f"Marcenaria de {normalized_name}"
@@ -100,11 +104,10 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         )
         db.add(user)
         db.flush()
-        starter = db.scalar(select(Plan).where(Plan.code == "starter", Plan.is_active.is_(True)))
-        if starter:
+        if selected_plan:
             db.add(Subscription(
                 organization_id=organization.id,
-                plan_id=starter.id,
+                plan_id=selected_plan.id,
                 status="trial",
                 provider="internal",
                 trial_end=_now() + timedelta(days=14),
