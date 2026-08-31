@@ -30,16 +30,12 @@ services:
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "7"
       - key: CORS_ORIGINS
-        value: '["https://ideal-marcenaria.onrender.com"]'
+        value: '["https://multi-marcenarias.onrender.com"]'
       - key: FRONTEND_URL
-        value: https://ideal-marcenaria.onrender.com
+        value: https://multi-marcenarias.onrender.com
 
-  - type: web
-    name: ideal-marcenaria
-    runtime: static
-    buildCommand: echo "Frontend pronto"
-    staticPublishPath: ./frontend
-    autoDeployTrigger: commit
+  # O frontend oficial multi-marcenarias é um serviço existente gerenciado
+  # separadamente. Não declarar frontends demo/legados evita duplicação.
 
   - type: keyvalue
     name: ideal-marcenaria-redis
