@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.api.activity import router as activity_router
 from app.api.admin import router as admin_router
+from app.api.commercial import router as commercial_router
 from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
@@ -20,7 +21,7 @@ from app.api.quote_intelligence import router as quote_intelligence_router
 from app.api.quote_items import router as quote_items_router
 from app.api.tenant import router as tenant_router
 from app.database import get_db
-from app.models import Activity, Category, Customer, Material, Product, Project, Quote, Supplier, User
+from app.models import Activity, Category, Customer, Material, Product, Project, Quote, Supplier, Tenant, User
 from app.schemas import (
     CategoryCreate, CategoryRead, CategoryUpdate,
     CustomerCreate, CustomerRead, CustomerUpdate,
@@ -31,6 +32,7 @@ from app.schemas import (
     SupplierCreate, SupplierRead, SupplierUpdate,
 )
 from app.services.automation import engine
+from app.services.plans import ensure_capacity, increment_usage
 from app.services.quote_ai import analyze_quote
 from app.services.quote_pricing import calculate_quote_suggestion
 
@@ -46,6 +48,7 @@ class QuoteEstimateRequest(BaseModel):
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(protected_router)
 api_router.include_router(tenant_router)
+api_router.include_router(commercial_router)
 api_router.include_router(admin_router)
 api_router.include_router(activity_router)
 api_router.include_router(customer_history_router)
@@ -90,6 +93,13 @@ def _commit_quote_write(db: Session, item: Quote) -> None:
         raise HTTPException(status_code=409, detail="Não foi possível concluir a alteração do orçamento") from exc
 
 
+def _tenant_for_user(db: Session, user: User) -> Tenant:
+    tenant = db.get(Tenant, user.tenant_id) if user.tenant_id else None
+    if tenant is None or not tenant.is_active:
+        raise HTTPException(status_code=403, detail="Marcenaria indisponível")
+    return tenant
+
+
 @quotes_router.get(
     "",
     response_model=list[QuoteRead],
@@ -105,6 +115,9 @@ def list_quotes(
 
 @quotes_router.post("", response_model=QuoteRead, status_code=201, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
 def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    tenant = _tenant_for_user(db, current_user)
+    ensure_capacity(db, tenant, "quotes_month")
+    ensure_capacity(db, tenant, "ai_month")
     pricing = _quote_calculation(payload)
     analysis = analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"], profit_margin=pricing["profit_margin"])
     data = payload.model_dump()
@@ -112,6 +125,8 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
                  "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
     try:
         item = crud.create_item(db, Quote(**data), commit=False)
+        increment_usage(db, tenant.id, "quotes_month")
+        increment_usage(db, tenant.id, "ai_month")
         db.add(Activity(user_id=current_user.id, action="created", entity="quote", entity_id=item.id,
                         description=f"Criou quote #{item.id} com análise inteligente"))
         _commit_quote_write(db, item)
@@ -129,15 +144,26 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
     response_model=QuoteEstimateResponse,
     dependencies=[Depends(require_admin)],
 )
-def estimate_quote(payload: QuoteEstimateRequest):
+def estimate_quote(
+    payload: QuoteEstimateRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    tenant = _tenant_for_user(db, current_user)
+    ensure_capacity(db, tenant, "ai_month")
     pricing = calculate_quote_suggestion(**payload.model_dump())
-    return analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"],
-                         profit_margin=pricing["profit_margin"]) | pricing
+    result = analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"],
+                           profit_margin=pricing["profit_margin"]) | pricing
+    increment_usage(db, tenant.id, "ai_month")
+    db.commit()
+    return result
 
 
 @quotes_router.put("/{item_id}", response_model=QuoteRead, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
 def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     """Atualiza dados técnicos antes da decisão; transições de status usam endpoints dedicados."""
+    tenant = _tenant_for_user(db, current_user)
+    ensure_capacity(db, tenant, "ai_month")
     item = crud.get_item(db, Quote, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
@@ -159,6 +185,7 @@ def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depend
                  "ai_analysis": analysis["ai_analysis"], "ai_analyzed_at": analysis["ai_analyzed_at"]})
     try:
         item = crud.update_item(db, item, data, commit=False)
+        increment_usage(db, tenant.id, "ai_month")
         db.add(Activity(user_id=current_user.id, action="updated", entity="quote", entity_id=item.id,
                         description=f"Atualizou quote #{item.id} e recalculou análise inteligente"))
         _commit_quote_write(db, item)

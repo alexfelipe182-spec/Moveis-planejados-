@@ -7,9 +7,10 @@ from app.api.deps import require_admin, require_cookie_csrf
 from app.core.config import settings
 from app.core.security import hash_password
 from app.database import get_db
-from app.models import Activity, Category, Customer, Product, Project, Quote, User
+from app.models import Activity, Category, Customer, Product, Project, Quote, Tenant, User
 from app.schemas.activity import ActivityRead
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.services.plans import ensure_capacity
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 
@@ -61,9 +62,15 @@ def create_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Usuário sem marcenaria vinculada")
+    tenant = db.get(Tenant, current_user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Marcenaria não encontrada")
     email = str(payload.email).strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+    ensure_capacity(db, tenant, "users")
 
     user = User(
         tenant_id=current_user.tenant_id,
