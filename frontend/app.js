@@ -1,7 +1,7 @@
 const API = window.API_BASE_URL || (location.hostname === 'localhost' ? 'http://localhost:8000/api/v1' : 'https://ideal-marcenaria-api.onrender.com/api/v1');
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const state = { user:null, resource:null, id:null, rows:[], categories:[], customers:[], search:'', status:'', csrfToken:'' };
+const state = { user:null, resource:null, id:null, rows:[], categories:[], customers:[], search:'', status:'', csrfToken:'', accessToken:'' };
 const labels = {dashboard:'Dashboard',customers:'Clientes',quotes:'Orçamentos',projects:'Projetos',products:'Produtos',categories:'Serviços',users:'Usuários',activities:'Histórico'};
 const statusLabels = {pending:'Pendente',analysis:'Em análise',approved:'Aprovado',rejected:'Recusado',completed:'Concluído',planning:'Planejamento',in_progress:'Em andamento',cancelled:'Cancelado'};
 const csrf = () => state.csrfToken || document.cookie.split('; ').find(x=>x.startsWith('csrf_token='))?.split('=')[1] || '';
@@ -20,6 +20,9 @@ async function refreshSession() {
 async function api(path, options = {}, retryAuth = true) {
   const requestVersion = sessionVersion;
   const opts = { credentials: 'include', ...options, headers: { ...(options.headers || {}) } };
+  if (state.accessToken && !opts.headers.Authorization) {
+    opts.headers.Authorization = `Bearer ${state.accessToken}`;
+  }
   if (opts.body && !(opts.body instanceof URLSearchParams) && typeof opts.body !== 'string') {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
@@ -28,7 +31,10 @@ async function api(path, options = {}, retryAuth = true) {
     opts.headers['X-CSRF-Token'] = csrf();
   }
   const res = await fetch(API + path, opts);
-  if (res.status === 204) return null;
+  if (res.status === 204) {
+    if (path === '/auth/logout') state.accessToken = '';
+    return null;
+  }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && retryAuth && !path.startsWith('/auth/')) {
     // A delayed response may belong to the session another request already renewed.
@@ -39,13 +45,16 @@ async function api(path, options = {}, retryAuth = true) {
     throw new Error(data.detail || (res.status === 401 ? 'Sessão expirada. Faça login novamente.' : `Erro ${res.status}`));
   }
   if (typeof data?.csrf_token === 'string') state.csrfToken = data.csrf_token;
+  if ((path === '/auth/login' || path === '/auth/refresh') && typeof data?.access_token === 'string') {
+    state.accessToken = data.access_token;
+  }
   if (path === '/auth/login' || path === '/auth/refresh') sessionVersion += 1;
   return data;
 }
 function openAuth(view='login'){const o=$('#auth-overlay');o.classList.remove('hidden');o.setAttribute('aria-hidden','false');showAuth(view)}
 function closeAuth(){const o=$('#auth-overlay');o.classList.add('hidden');o.setAttribute('aria-hidden','true')}
 function showAuth(view){['login','register','recovery','reset'].forEach(v=>$(`#${v}-view`)?.classList.toggle('hidden',v!==view))}
-function showWhatsApp(message='Olá! Quero solicitar um orçamento para móveis planejados.'){const number=window.WHATSAPP_NUMBER;if(number)window.open(`https://wa.me/${String(number).replace(/\D/g,'')}?text=${encodeURIComponent(message)}`,'_blank','noopener');else toast('Configure window.WHATSAPP_NUMBER para ativar o WhatsApp.','error')}
+function showWhatsApp(message='Olá! Quero conhecer a plataforma Multi-Marcenarias para minha marcenaria.'){const number=window.WHATSAPP_NUMBER||'5513981236650';window.open(`https://wa.me/${String(number).replace(/\D/g,'')}?text=${encodeURIComponent(message)}`,'_blank','noopener')}
 function setupPublic(){$$('#open-login').forEach(b=>b.addEventListener('click',()=>openAuth('login')));$('#close-auth').addEventListener('click',closeAuth);$('#auth-overlay').addEventListener('click',e=>{if(e.target.id==='auth-overlay')closeAuth()});$$('[data-quote]').forEach(b=>b.addEventListener('click',()=>showWhatsApp()));$('#show-register').addEventListener('click',()=>showAuth('register'));$('#show-recovery').addEventListener('click',()=>showAuth('recovery'));$$('[data-auth-back]').forEach(b=>b.addEventListener('click',()=>showAuth('login')));$('#login-form').addEventListener('submit',login);$('#register-form').addEventListener('submit',register);$('#recovery-form').addEventListener('submit',recovery);$('#reset-form').addEventListener('submit',resetPassword);const hashToken=new URLSearchParams(location.hash.slice(1)).get('reset_token');const queryToken=new URLSearchParams(location.search).get('reset_token');const token=hashToken||queryToken;if(token){sessionStorage.setItem('reset_token',token);history.replaceState({},'',location.pathname);openAuth('reset')}}
 async function login(e){e.preventDefault();$('#login-error').textContent='';try{const body=new URLSearchParams({username:$('#login-email').value.trim().toLowerCase(),password:$('#login-password').value});await api('/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});state.user=await api('/me');if(!state.user.is_admin)throw new Error('Sua conta ainda não possui permissão administrativa.');closeAuth();enterAdmin()}catch(err){$('#login-error').textContent=err.message;if(err.message.includes('permissão'))await api('/auth/logout',{method:'POST'}).catch(()=>{})}}
 async function register(e){e.preventDefault();const msg=$('#register-message');msg.className='form-message';msg.textContent='';try{await api('/auth/register',{method:'POST',body:{name:$('#register-name').value.trim(),email:$('#register-email').value.trim().toLowerCase(),password:$('#register-password').value}});msg.classList.add('success');msg.textContent='Cadastro realizado! Agora faça login.';e.target.reset();setTimeout(()=>showAuth('login'),700)}catch(err){msg.classList.add('error');msg.textContent=err.message}}

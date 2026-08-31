@@ -112,6 +112,20 @@ test('failed login does not try to refresh an unrelated session', async () => {
   assert.equal(calls.length, 1);
 });
 
+test('login bearer keeps the cross-site session working when cookies are blocked', async () => {
+  const { api, calls } = createClient((url) => url.endsWith('/auth/login')
+    ? response(200, { access_token: 'access-for-this-session', csrf_token: 'csrf-new' })
+    : response(200, { id: 7, is_admin: true }));
+
+  await api('/auth/login', {
+    method: 'POST',
+    body: new URLSearchParams({ username: 'admin@example.com', password: 'test-only' }),
+  });
+  await api('/me');
+
+  assert.equal(calls[1].options.headers.Authorization, 'Bearer access-for-this-session');
+});
+
 test('a repeated 401 after renewal does not create a refresh loop', async () => {
   const { api, calls } = createClient((url) => url.endsWith('/auth/refresh')
     ? response(200, { csrf_token: 'csrf-new' })
@@ -171,4 +185,26 @@ test('a network error does not automatically replay a write', async () => {
   const { api, calls } = createClient(() => { throw new Error('Network unavailable'); });
   await assert.rejects(api('/customers', { method: 'POST', body: { name: 'Cliente' } }), /Network unavailable/);
   assert.equal(calls.length, 1);
+});
+
+test('the official landing page exposes the final brand, contact and canonical URL', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(html, /rel="canonical" href="https:\/\/multi-marcenarias\.onrender\.com\/"/);
+  assert.match(html, /rel="icon"[^>]+logo-multi-marcenarias-512\.png/);
+  assert.match(html, /property="og:image"[^>]+logo-multi-marcenarias-social\.png/);
+  assert.match(html, /wa\.me\/5513981236650/);
+  assert.match(html, /\+55 \(13\) 98123-6650/);
+  assert.doesNotMatch(html, /multi-marcenarias-demo|multi-marcenarias-homologacao|ideal-marcenaria\.onrender\.com/i);
+});
+
+test('the official logo assets are present and wired into every logo mark', () => {
+  const assets = path.join(__dirname, 'assets');
+  assert.ok(fs.statSync(path.join(assets, 'logo-multi-marcenarias-512.png')).size > 10_000);
+  assert.ok(fs.statSync(path.join(assets, 'logo-multi-marcenarias-social.png')).size > 10_000);
+  const css = fs.readFileSync(path.join(__dirname, 'commercial.css'), 'utf8');
+  assert.match(css, /\.logo-mark[^{]*\{[^}]*logo-multi-marcenarias-512\.png/s);
+});
+
+test('the public WhatsApp fallback uses the official business contact', () => {
+  assert.match(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), /5513981236650/);
 });

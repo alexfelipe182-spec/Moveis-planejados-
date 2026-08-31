@@ -1,4 +1,15 @@
 /* Landing comercial Multi-Marcenarias — mesma experiência no desktop e mobile */
+
+/* Marca oficial compartilhada pelo site, login e painel administrativo. */
+.logo-mark{
+  font-size:0;
+  color:transparent;
+  background-color:#07111d;
+  background-image:url('./assets/logo-multi-marcenarias-512.png')!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+}
 :root{
   --mm-bg:#050811;--mm-card:#0d1320;--mm-line:rgba(255,255,255,.09);--mm-text:#f6f8ff;
   --mm-muted:#aab5c7;--mm-cyan:#38d7ff;--mm-violet:#9c6cff;--mm-lime:#7df29a;--mm-gold:#f1bd63;

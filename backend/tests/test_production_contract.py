@@ -45,7 +45,7 @@ def test_production_env_example_matches_runtime_contract():
     assert int(values["PASSWORD_RESET_EXPIRE_MINUTES"]) >= 5
 
     origins = json.loads(values["CORS_ORIGINS"])
-    assert origins == ["https://ideal-marcenaria.onrender.com"]
+    assert origins == ["https://multi-marcenarias.onrender.com"]
     assert values["FRONTEND_URL"] == origins[0]
 
 
@@ -74,8 +74,9 @@ def test_frontend_session_behavior_is_required_in_ci():
 def test_render_blueprint_keeps_readiness_probe_and_production_origin():
     blueprint = (ROOT / "render.yaml").read_text(encoding="utf-8")
     assert "healthCheckPath: /ready" in blueprint
-    assert 'value: \'["https://ideal-marcenaria.onrender.com"]\'' in blueprint
-    assert "value: https://ideal-marcenaria.onrender.com" in blueprint
+    assert 'value: \'["https://multi-marcenarias.onrender.com"]\'' in blueprint
+    assert "value: https://multi-marcenarias.onrender.com" in blueprint
+    assert "https://ideal-marcenaria.onrender.com" not in blueprint
 
 
 def test_render_blueprint_matches_linked_production_resources():
@@ -85,7 +86,6 @@ def test_render_blueprint_matches_linked_production_resources():
 
     assert set(services) == {
         "ideal-marcenaria-api",
-        "ideal-marcenaria",
         "ideal-marcenaria-redis",
     }
     assert set(databases) == {"Ideal"}
