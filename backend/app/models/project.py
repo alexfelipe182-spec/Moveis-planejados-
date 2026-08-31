@@ -4,13 +4,14 @@ from sqlalchemy import Date, DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.tenant import TenantScopedMixin
 
 
 def utc_now_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-class Project(Base):
+class Project(TenantScopedMixin, Base):
     __tablename__ = "projects"
 
     id: Mapped[int] = mapped_column(primary_key=True)
