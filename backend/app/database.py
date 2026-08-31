@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, with_loader_criteria
 
@@ -43,11 +45,22 @@ def _tenant_filter(execute_state) -> None:
 
 @event.listens_for(Session, "before_flush")
 def _assign_tenant_id(session: Session, _flush_context, _instances) -> None:
+    from app.models.tenant import Tenant, TenantScopedMixin
+    from app.models.user import User
+
     tenant_id = session.info.get("tenant_id")
+
+    for obj in list(session.new):
+        if isinstance(obj, User) and obj.tenant_id is None and obj.tenant is None:
+            tenant = Tenant(
+                name=f"Marcenaria de {obj.name}",
+                slug=f"tenant-{uuid4().hex}",
+            )
+            obj.tenant = tenant
+            session.add(tenant)
+
     if not tenant_id:
         return
-
-    from app.models.tenant import TenantScopedMixin
 
     for obj in session.new:
         if isinstance(obj, TenantScopedMixin):
@@ -56,6 +69,19 @@ def _assign_tenant_id(session: Session, _flush_context, _instances) -> None:
                 obj.tenant_id = tenant_id
             elif current != tenant_id:
                 raise ValueError("Tentativa de gravar dados em outra marcenaria")
+
+
+@event.listens_for(Session, "after_flush_postexec")
+def _remember_new_user_tenant(session: Session, _flush_context) -> None:
+    if session.info.get("tenant_id"):
+        return
+
+    from app.models.user import User
+
+    for obj in session.identity_map.values():
+        if isinstance(obj, User) and obj.tenant_id:
+            session.info["tenant_id"] = obj.tenant_id
+            return
 
 
 def get_db():
