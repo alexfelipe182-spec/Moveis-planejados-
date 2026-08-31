@@ -29,18 +29,13 @@ def _tenant_filter(execute_state) -> None:
 
     from app.models.tenant import TenantScopedMixin
 
-    statement = execute_state.statement
-    for mapper in Base.registry.mappers:
-        model = mapper.class_
-        if issubclass(model, TenantScopedMixin):
-            statement = statement.options(
-                with_loader_criteria(
-                    model,
-                    lambda cls, tenant_id=tenant_id: cls.tenant_id == tenant_id,
-                    include_aliases=True,
-                )
-            )
-    execute_state.statement = statement
+    execute_state.statement = execute_state.statement.options(
+        with_loader_criteria(
+            TenantScopedMixin,
+            lambda cls: cls.tenant_id == tenant_id,
+            include_aliases=True,
+        )
+    )
 
 
 @event.listens_for(Session, "before_flush")
