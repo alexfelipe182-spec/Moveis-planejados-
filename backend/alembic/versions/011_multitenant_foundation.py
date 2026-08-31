@@ -78,12 +78,11 @@ def upgrade() -> None:
         )
         op.alter_column(table, "tenant_id", nullable=False)
 
-    inspector = sa.inspect(connection)
-    for constraint in inspector.get_unique_constraints("categories"):
-        columns = constraint.get("column_names") or []
-        name = constraint.get("name")
-        if columns == ["name"] and name:
-            op.drop_constraint(name, "categories", type_="unique")
+    # Revision 007 created a globally-unique index on category name. In a
+    # multi-tenant system the same category name must be allowed in different
+    # marcenarias, while remaining unique within each tenant.
+    op.drop_index("ix_categories_name", table_name="categories")
+    op.create_index("ix_categories_name", "categories", ["name"], unique=False)
     op.create_unique_constraint(
         "uq_categories_tenant_name",
         "categories",
@@ -93,6 +92,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_constraint("uq_categories_tenant_name", "categories", type_="unique")
+    op.drop_index("ix_categories_name", table_name="categories")
+    op.create_index("ix_categories_name", "categories", ["name"], unique=True)
 
     for table in reversed(BUSINESS_TABLES):
         op.drop_constraint(f"fk_{table}_tenant_id_tenants", table, type_="foreignkey")
