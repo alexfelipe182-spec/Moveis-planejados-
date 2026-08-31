@@ -48,8 +48,6 @@ def _assign_tenant_id(session: Session, _flush_context, _instances) -> None:
     from app.models.tenant import Tenant, TenantScopedMixin
     from app.models.user import User
 
-    tenant_id = session.info.get("tenant_id")
-
     for obj in list(session.new):
         if isinstance(obj, User) and obj.tenant_id is None and obj.tenant is None:
             tenant = Tenant(
@@ -58,6 +56,14 @@ def _assign_tenant_id(session: Session, _flush_context, _instances) -> None:
             )
             obj.tenant = tenant
             session.add(tenant)
+
+    tenant_id = session.info.get("tenant_id")
+    if not tenant_id:
+        for obj in session.identity_map.values():
+            if isinstance(obj, User) and obj.tenant_id:
+                tenant_id = obj.tenant_id
+                session.info["tenant_id"] = tenant_id
+                break
 
     if not tenant_id:
         return
