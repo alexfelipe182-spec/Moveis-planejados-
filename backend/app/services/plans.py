@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Customer, Project, Quote, Subscription, Tenant, UsageCounter, User
+from app.models import Customer, Project, Subscription, Tenant, UsageCounter, User
 
 
 @dataclass(frozen=True)
