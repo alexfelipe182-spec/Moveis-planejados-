@@ -19,7 +19,7 @@ definitivo. O roteiro também explica como reabrir e preparar o exemplo sem dupl
   compostas no banco e painel de plataforma separado
 - Monetização: catálogo de planos, trial inicial, checkout em sandbox e webhooks
   idempotentes; Stripe só é habilitado depois da configuração de produção
-- Frontend: HTML, CSS e JavaScript
+- Frontend: HTML, CSS e JavaScript, com central de automação/IA e identidade visual própria
 - Contêineres: Docker e Docker Compose
 - Deploy: Render e publicação de imagem no GHCR
 

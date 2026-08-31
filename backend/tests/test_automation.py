@@ -1,8 +1,13 @@
 from uuid import UUID
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
+from app.api.automation import router as automation_router
+from app.api.deps import require_admin
 from app.services.automation import AutomationAction, AutomationEngine
+from app.services.automation import engine as default_engine
 
 
 def test_automation_engine_emits_registered_action() -> None:
@@ -198,3 +203,59 @@ def test_event_and_action_names_must_be_clean_and_non_empty() -> None:
         engine.register("quote.created", AutomationAction(name=" ", handler=lambda _event: {}))
     with pytest.raises(ValueError):
         engine.emit(" ")
+
+
+def test_default_automations_make_project_events_auditable() -> None:
+    organization_id = 987654
+    default_engine.emit(
+        "project.status_changed",
+        {
+            "organization_id": organization_id,
+            "entity": "project",
+            "item_id": 42,
+            "previous_status": "planning",
+            "status": "measurement",
+        },
+    )
+
+    result = default_engine.results_for_organization(organization_id)[-1]
+    assert result["status"] == "completed"
+    assert result["action"] == "audit_operational_event"
+    assert result["result"] == {
+        "message": "Etapa de produção atualizada",
+        "entity": "project",
+        "item_id": 42,
+        "requires_human_review": True,
+        "status": "measurement",
+        "previous_status": "planning",
+    }
+
+
+def test_automation_overview_reports_safe_mode_and_tenant_results(monkeypatch) -> None:
+    organization_id = 987655
+    default_engine.emit(
+        "project.cost_added",
+        {"organization_id": organization_id, "entity": "project", "item_id": 7},
+    )
+    default_engine.emit(
+        "project.cost_added",
+        {"organization_id": organization_id + 1, "entity": "project", "item_id": 8},
+    )
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    current_user = type("UserContext", (), {"organization_id": organization_id, "is_admin": True})()
+    app = FastAPI()
+    app.include_router(automation_router, prefix="/api/v1")
+    app.dependency_overrides[require_admin] = lambda: current_user
+
+    with TestClient(app) as client:
+        overview = client.get("/api/v1/automations/overview")
+
+    assert overview.status_code == 200
+    body = overview.json()
+    assert body["engine_status"] == "operational"
+    assert body["safe_local_analysis"] is True
+    assert body["external_ai_status"] == "local_only"
+    assert body["total_executions"] == 1
+    assert body["completed"] == 1
+    assert body["failed"] == 0
+    assert body["recent"][0]["organization_id"] == organization_id

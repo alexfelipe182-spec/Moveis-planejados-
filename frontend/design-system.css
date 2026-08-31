@@ -436,6 +436,32 @@ select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in sr
 .public-plan-badge { align-self: flex-start; display: inline-flex; margin: -16px 0 16px; padding: 7px 12px; border-radius: 999px; background: var(--brand); color: #fff; font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .pricing-footnote { position: relative; margin: 24px 0 0; color: var(--muted); text-align: center; font-size: .9rem; }
 .register-plan-summary { margin: 14px 0 18px; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 82%, var(--accent)); color: var(--ink); font-weight: 700; }
+.logo-mark { padding: 2px; background-color: color-mix(in srgb, var(--surface) 94%, var(--accent)); background-image: url('./assets/logo-whatsapp-multi-marcenarias-512.png'); background-position: center; background-repeat: no-repeat; background-size: contain; color: transparent; overflow: hidden; font-size: 0; }
+.side-brand .logo-mark { background-color: #f8f4ea; background-image: url('./assets/logo-whatsapp-multi-marcenarias-512.png'); box-shadow: 0 0 22px rgba(216, 178, 92, .22); }
+.intelligence-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: center; margin-bottom: 20px; padding: clamp(24px, 5vw, 44px); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 24px; background: radial-gradient(circle at 85% 20%, var(--glow), transparent 30%), linear-gradient(135deg, var(--surface), var(--surface-2)); overflow: hidden; }
+.intelligence-hero h2 { margin: 8px 0 12px; }
+.intelligence-hero p { max-width: 720px; margin: 0; color: var(--muted); }
+.intelligence-orbit { position: relative; width: 112px; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); box-shadow: inset 0 0 30px var(--glow), 0 0 30px var(--glow); font-weight: 900; letter-spacing: .12em; }
+.intelligence-orbit::before, .intelligence-orbit::after { content: ''; position: absolute; inset: 13px; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 50%; animation: intelligence-spin 12s linear infinite; }
+.intelligence-orbit::after { inset: 27px; animation-direction: reverse; animation-duration: 8s; }
+@keyframes intelligence-spin { to { transform: rotate(360deg); } }
+.intelligence-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-bottom: 16px; }
+.intelligence-status { position: relative; min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); overflow: hidden; }
+.intelligence-status::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--success); box-shadow: 0 0 14px var(--success); }
+.intelligence-status.local::before { background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+.intelligence-status span, .intelligence-status small { display: block; color: var(--muted); }
+.intelligence-status strong { display: block; margin: 8px 0 5px; font-size: 1.35rem; overflow-wrap: anywhere; }
+.intelligence-actions, .welcome-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.intelligence-actions { margin: 16px 0 20px; }
+.automation-panel { overflow: hidden; }
+.automation-list { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.automation-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 13px; align-items: start; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.automation-item p { margin: 4px 0; color: var(--muted); }
+.automation-item small { color: var(--muted); }
+.automation-led { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 12px var(--success); }
+.automation-item.failed .automation-led { background: var(--danger); box-shadow: 0 0 12px var(--danger); }
+.automation-empty { display: grid; gap: 5px; padding: 32px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); text-align: center; }
+.automation-disclaimer { margin: 18px 0 0; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 82%, var(--accent)); color: var(--muted); font-size: .88rem; }
 .team-panel { margin-top: 20px; }
 .team-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
 .team-form .btn { align-self: end; min-height: 44px; }
@@ -455,6 +481,7 @@ select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in sr
   .hero-card { min-height: 390px; }
   .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .saas-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .intelligence-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .public-plan-grid { grid-template-columns: 1fr; max-width: 720px; margin-inline: auto; }
   .public-plan { min-height: 0; }
   .public-plan.recommended { transform: none; }
@@ -531,6 +558,12 @@ select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in sr
   .filter { min-width: 0; width: 100%; }
   .table-wrap { margin-inline: -2px; padding-bottom: 6px; }
   .saas-heading { display: grid; }
+  .intelligence-hero { grid-template-columns: 1fr; }
+  .intelligence-orbit { width: 88px; }
+  .intelligence-status-grid { grid-template-columns: 1fr; }
+  .intelligence-actions .btn, .welcome-actions .btn { width: 100%; }
+  .automation-item { grid-template-columns: auto minmax(0, 1fr); }
+  .automation-item > .badge { grid-column: 2; justify-self: start; }
   .saas-plan-grid { grid-template-columns: 1fr; }
   .subscription-facts { grid-template-columns: 1fr; }
   .team-form { grid-template-columns: 1fr; }

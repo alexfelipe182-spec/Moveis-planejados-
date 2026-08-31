@@ -18,7 +18,7 @@ function context() {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(`${source}\nglobalThis.workspaceHtmlForTest=workspaceHtml;globalThis.platformHtmlForTest=platformHtml;globalThis.workspaceCanWriteForTest=workspaceCanWrite;globalThis.stateForTest=state;`, sandbox);
+  vm.runInContext(`${source}\nglobalThis.workspaceHtmlForTest=workspaceHtml;globalThis.platformHtmlForTest=platformHtml;globalThis.intelligenceHtmlForTest=intelligenceHtml;globalThis.workspaceCanWriteForTest=workspaceCanWrite;globalThis.stateForTest=state;`, sandbox);
   return sandbox;
 }
 
@@ -49,12 +49,31 @@ test('platform view contains aggregates and tenant metadata, not operational rec
 });
 
 test('admin bootstrap declares role-scoped SaaS navigation and sections', () => {
+  assert.match(source, /data-section="intelligence"/);
   assert.match(source, /data-section="workspace"/);
   assert.match(source, /data-section="platform"/);
   assert.match(source, /is_platform_admin/);
   assert.match(source, /\/billing\/subscription/);
   assert.match(source, /\/onboarding\/members/);
   assert.match(source, /\/platform\/organizations/);
+  assert.match(source, /\/automations\/overview/);
+});
+
+test('intelligence center is honest about local AI and automation failures', () => {
+  const c = context();
+  const html = c.intelligenceHtmlForTest({
+    external_ai_status:'local_only', safe_local_analysis:true,
+    total_executions:2, completed:1, failed:1,
+    recent:[
+      { event:'project.status_changed', status:'completed', created_at:'2026-08-31T12:00:00Z', result:{message:'Etapa atualizada',status:'production'} },
+      { event:'quote.created', status:'failed', created_at:'2026-08-31T12:01:00Z', result:{} },
+    ],
+  });
+  assert.match(html,/Central inteligente/);
+  assert.match(html,/Modo local/);
+  assert.match(html,/Etapa atualizada/);
+  assert.match(html,/Falhou/);
+  assert.match(html,/não altera valores financeiros/i);
 });
 
 test('read-only subscription sends mutation attempts to the billing area', () => {

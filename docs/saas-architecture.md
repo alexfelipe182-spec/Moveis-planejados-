@@ -71,6 +71,12 @@ sandbox e nunca apresenta isso como pagamento concluído. A área **Plataforma**
 só é exibida para `is_platform_admin` e lista agregados/metadados; alterações de
 status pedem confirmação e são registradas em atividade.
 
+A área **Central inteligente** informa separadamente a análise local segura e a
+IA externa opcional. Ela mostra execuções de automação filtradas pela marcenaria,
+falhas e atalhos operacionais, sem permitir que a IA altere valores ou aprove
+orçamentos. O histórico da central ainda tem retenção apenas na instância atual;
+as atividades comerciais permanentes continuam no histórico transacional do banco.
+
 Quando a assinatura está `past_due`, `canceled` ou com trial expirado, consultas
 continuam disponíveis para o cliente não perder acesso aos próprios dados, mas
 criações, edições, exclusões, decisões, produção, custos e recomendações ficam

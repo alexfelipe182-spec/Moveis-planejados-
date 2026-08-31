@@ -130,6 +130,30 @@ def _prepare_quote_analysis(event: AutomationEvent) -> dict:
     return analysis
 
 
+def _audit_domain_event(event: AutomationEvent) -> dict:
+    labels = {
+        "quote.updated": "Orçamento atualizado e preparado para nova revisão",
+        "quote.approved": "Orçamento aprovado internamente",
+        "quote.rejected": "Orçamento recusado internamente",
+        "quote.shared": "Compartilhamento do orçamento registrado",
+        "quote.accepted": "Aceite comercial registrado e projeto preparado",
+        "quote.declined": "Recusa comercial registrada",
+        "project.created": "Projeto criado a partir do orçamento aceito",
+        "project.status_changed": "Etapa de produção atualizada",
+        "project.cost_added": "Novo custo registrado no projeto",
+    }
+    result = {
+        "message": labels.get(event.name, "Evento operacional registrado"),
+        "entity": event.payload.get("entity"),
+        "item_id": event.payload.get("item_id"),
+        "requires_human_review": True,
+    }
+    for key in ("status", "previous_status", "risk_level", "project_id", "quote_id"):
+        if event.payload.get(key) is not None:
+            result[key] = event.payload[key]
+    return result
+
+
 def register_default_automations() -> None:
     """Register safe foundation automations exactly once."""
     engine.register(
@@ -140,6 +164,21 @@ def register_default_automations() -> None:
         "quote.created",
         AutomationAction(name="analyze_quote", handler=_prepare_quote_analysis),
     )
+    for event_name in (
+        "quote.updated",
+        "quote.approved",
+        "quote.rejected",
+        "quote.shared",
+        "quote.accepted",
+        "quote.declined",
+        "project.created",
+        "project.status_changed",
+        "project.cost_added",
+    ):
+        engine.register(
+            event_name,
+            AutomationAction(name="audit_operational_event", handler=_audit_domain_event),
+        )
 
 
 register_default_automations()
