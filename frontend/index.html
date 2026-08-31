@@ -2,43 +2,44 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#03050d">
-  <meta name="description" content="Multi-Marcenarias — plataforma de gestão para marcenarias com orçamentos inteligentes, produção, clientes, projetos e análise de lucro.">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050811">
+  <meta name="description" content="Multi-Marcenarias — SaaS de gestão para marcenarias com clientes, orçamentos inteligentes, produção, projetos, lucro e planos por assinatura.">
   <title>Multi-Marcenarias | Gestão inteligente para marcenarias</title>
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./professional.css">
+  <link rel="stylesheet" href="./commercial.css">
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
   <div id="public-site">
     <header class="site-header">
       <a class="logo" href="#inicio" aria-label="Multi-Marcenarias"><span class="logo-mark" aria-hidden="true">MM</span><span><strong>Multi</strong><small>Marcenarias</small></span></a>
-      <nav class="site-nav" aria-label="Navegação principal"><a href="#inicio">Início</a><a href="#recursos">Recursos</a><a href="#plataforma">Plataforma</a><a href="#demonstracao">Demonstração</a></nav>
-      <div class="header-actions"><button class="btn ghost" id="open-login" type="button">Entrar na plataforma</button></div>
+      <nav class="site-nav" aria-label="Navegação principal"><a href="#inicio">Início</a><a href="#recursos">Recursos</a><a href="#plataforma">Plataforma</a><a href="#planos">Planos</a></nav>
+      <div class="header-actions"><button class="btn ghost" id="open-login" type="button">Entrar</button></div>
     </header>
 
     <main id="conteudo">
       <section class="hero" id="inicio">
         <div class="hero-copy">
-          <span class="eyebrow">Gestão inteligente para marcenarias</span>
-          <h1>Da proposta ao lucro, <em>tudo em um só lugar.</em></h1>
-          <p>A Multi-Marcenarias organiza clientes, cria orçamentos com inteligência, acompanha a produção e mostra o resultado real de cada projeto.</p>
+          <span class="eyebrow">SaaS para marcenarias • multiempresa</span>
+          <h1>Sua marcenaria mais organizada, <em>lucrativa e inteligente.</em></h1>
+          <p>Clientes, orçamentos com IA, propostas, produção, projetos, custos e rentabilidade em uma única plataforma. Cada marcenaria trabalha em um ambiente privado e isolado.</p>
           <div class="hero-actions">
-            <button class="btn primary large" type="button" onclick="document.getElementById('open-login').click()">Acessar demonstração</button>
-            <a class="btn secondary large" href="#recursos">Conhecer recursos</a>
+            <button class="btn primary large" type="button" data-plan="starter">Criar minha marcenaria</button>
+            <a class="btn secondary large" href="#planos">Ver planos</a>
           </div>
-          <div class="trust"><span>✓ Orçamentos com IA</span><span>✓ Produção organizada</span><span>✓ Lucro real por projeto</span></div>
+          <div class="trust"><span>✓ Dados isolados por empresa</span><span>✓ Orçamento inteligente</span><span>✓ Acesso pelo celular e computador</span></div>
         </div>
-        <div class="hero-card platform-preview" aria-label="Prévia demonstrativa do painel Multi-Marcenarias">
+        <div class="hero-card platform-preview" aria-label="Prévia do painel Multi-Marcenarias">
           <div class="wood-swatch" aria-hidden="true"></div>
           <div class="preview-shell">
             <div class="preview-topbar">
-              <div class="preview-brand"><span class="preview-led" aria-hidden="true"></span><strong>Multi-Marcenarias</strong><small>Demonstração ao vivo</small></div>
+              <div class="preview-brand"><span class="preview-led" aria-hidden="true"></span><strong>Multi-Marcenarias</strong><small>Sua operação em tempo real</small></div>
               <span class="preview-online"><i aria-hidden="true"></i> Sistema online</span>
             </div>
             <div class="preview-command">
-              <div><span class="eyebrow">Orçamento inteligente</span><h2>Cozinha premium</h2><p>IA analisando custos, margem e risco comercial.</p></div>
+              <div><span class="eyebrow">Orçamento inteligente</span><h2>Cozinha premium</h2><p>Custos, margem, risco e recomendação comercial.</p></div>
               <div class="preview-score"><span>IA Score</span><strong>94</strong><small>/ 100</small></div>
             </div>
             <div class="preview-metrics">
@@ -56,45 +57,66 @@
       </section>
 
       <section class="section public-section" id="recursos">
-        <div class="section-heading"><div><span class="eyebrow">Recursos principais</span><h2>Uma plataforma feita para a rotina da marcenaria</h2></div><p>Transforme processos espalhados em um fluxo comercial e produtivo organizado.</p></div>
+        <div class="section-heading"><div><span class="eyebrow">Tudo conectado</span><h2>Uma plataforma para administrar a marcenaria inteira</h2></div><p>Do primeiro contato com o cliente até a entrega e análise de lucro do projeto.</p></div>
         <div class="service-grid">
-          <article class="service-card"><span class="service-icon" aria-hidden="true">✦</span><h3>Orçamentos com IA</h3><p>Calcule custos, markup, preço sugerido, alertas e recomendações antes de enviar a proposta.</p></article>
-          <article class="service-card"><span class="service-icon" aria-hidden="true">▦</span><h3>Gestão de produção</h3><p>Acompanhe medição, projeto técnico, compras, produção, instalação, entrega e conclusão.</p></article>
-          <article class="service-card"><span class="service-icon" aria-hidden="true">♙</span><h3>Clientes e propostas</h3><p>Centralize clientes, histórico, orçamentos, aprovações e envio de propostas comerciais.</p></article>
-          <article class="service-card"><span class="service-icon" aria-hidden="true">↗</span><h3>Lucro real</h3><p>Compare valor vendido, custo previsto e custo realizado para enxergar lucro e margem de verdade.</p></article>
+          <article class="service-card"><span class="service-icon" aria-hidden="true">✦</span><h3>Orçamentos com inteligência</h3><p>Calcule custos, markup, margem, preço sugerido, risco e recomendações antes de enviar a proposta.</p></article>
+          <article class="service-card"><span class="service-icon" aria-hidden="true">▦</span><h3>Produção e projetos</h3><p>Acompanhe medição, projeto técnico, compras, fabricação, instalação, entrega e conclusão.</p></article>
+          <article class="service-card"><span class="service-icon" aria-hidden="true">♙</span><h3>Clientes e equipe</h3><p>Centralize histórico, propostas e usuários da sua própria marcenaria em um ambiente privado.</p></article>
+          <article class="service-card"><span class="service-icon" aria-hidden="true">↗</span><h3>Rentabilidade real</h3><p>Compare venda, custo previsto e custo realizado para enxergar lucro e margem de verdade.</p></article>
         </div>
       </section>
 
       <section class="section projects-section" id="plataforma">
-        <div class="section-heading"><div><span class="eyebrow">Fluxo completo</span><h2>Do primeiro contato à entrega do móvel</h2></div><button class="btn secondary" type="button" onclick="document.getElementById('open-login').click()">Ver por dentro</button></div>
+        <div class="section-heading"><div><span class="eyebrow">Fluxo completo</span><h2>Venda melhor, produza com controle e saiba quanto lucrou</h2></div><button class="btn secondary" type="button" data-plan="starter">Começar agora</button></div>
         <div class="project-grid">
           <article class="project-card project-one"><div><span>Comercial</span><h3>Cliente → orçamento inteligente → proposta → aprovação</h3></div></article>
-          <article class="project-card project-two"><div><span>Produção</span><h3>Projeto → compras → fabricação → instalação → entrega</h3></div></article>
-          <article class="project-card project-three"><div><span>Financeiro</span><h3>Custos reais → lucro → margem → inteligência para o próximo orçamento</h3></div></article>
+          <article class="project-card project-two"><div><span>Operação</span><h3>Projeto → compras → produção → instalação → entrega</h3></div></article>
+          <article class="project-card project-three"><div><span>Gestão</span><h3>Custos → lucro → margem → decisões melhores para o próximo projeto</h3></div></article>
         </div>
       </section>
 
-      <section class="cta-section" id="demonstracao">
-        <div><span class="eyebrow">Apresentação comercial</span><h2>Veja como a Multi-Marcenarias pode organizar sua operação.</h2></div>
-        <button class="btn light large" type="button" onclick="document.getElementById('open-login').click()">Entrar na plataforma</button>
+      <section class="pricing-section" id="planos">
+        <div class="section-heading"><div><span class="eyebrow">Planos</span><h2>Escolha o tamanho certo para sua marcenaria</h2></div><p>Você pode começar menor e evoluir conforme sua operação cresce.</p></div>
+        <div class="pricing-grid">
+          <article class="price-card">
+            <span class="eyebrow">Essencial</span><h3>Para começar organizado</h3><div class="price">R$ 149 <small>/ mês</small></div><p>Base completa para uma marcenaria pequena iniciar no sistema.</p>
+            <ul><li>Até 3 usuários</li><li>Clientes e orçamentos</li><li>Projetos e produção</li><li>Orçamento inteligente</li></ul>
+            <button class="btn secondary" type="button" data-plan="starter">Escolher Essencial</button>
+          </article>
+          <article class="price-card featured">
+            <span class="price-badge">Mais escolhido</span><span class="eyebrow">Profissional</span><h3>Para marcenarias em crescimento</h3><div class="price">R$ 299 <small>/ mês</small></div><p>Mais capacidade para equipe, clientes, projetos e inteligência.</p>
+            <ul><li>Mais usuários e volume</li><li>Gestão comercial completa</li><li>Produção e rentabilidade</li><li>Mais análises de IA</li></ul>
+            <button class="btn primary" type="button" data-plan="professional">Escolher Profissional</button>
+          </article>
+          <article class="price-card">
+            <span class="eyebrow">Empresa</span><h3>Para operações maiores</h3><div class="price">R$ 599 <small>/ mês</small></div><p>Limites ampliados para equipes e operações com maior volume.</p>
+            <ul><li>Maior capacidade mensal</li><li>Equipe ampliada</li><li>Mais projetos e orçamentos</li><li>Inteligência avançada</li></ul>
+            <button class="btn secondary" type="button" data-plan="business">Escolher Empresa</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="commercial-band">
+        <div><span class="eyebrow">Multi-Marcenarias</span><h2>Crie o ambiente da sua empresa em poucos minutos.</h2><p>Cadastre a marcenaria e o primeiro administrador. Depois você entra com seu próprio e-mail e começa a configurar clientes, equipe e orçamentos.</p></div>
+        <button class="btn primary large" type="button" data-plan="starter">Criar minha conta</button>
       </section>
 
       <section class="section contact-section">
         <div class="contact-card">
-          <div><span class="eyebrow">O que você encontra</span><h2>Gestão comercial, produção e rentabilidade conectadas.</h2><p>A plataforma foi desenhada para concentrar o trabalho diário da marcenaria e transformar dados reais em decisões melhores.</p></div>
-          <div class="contact-list"><div><strong>Comercial</strong><span>Clientes, orçamentos, propostas e aprovações.</span></div><div><strong>Operação</strong><span>Projetos, produção, materiais e custos reais.</span></div><div><strong>Inteligência</strong><span>Preço recomendado, risco, margem e rentabilidade.</span></div></div>
+          <div><span class="eyebrow">Segurança multiempresa</span><h2>Cada marcenaria vê somente os próprios dados.</h2><p>Clientes, orçamentos, projetos, materiais, custos e usuários são vinculados à empresa autenticada.</p></div>
+          <div class="contact-list"><div><strong>Comercial</strong><span>Clientes, propostas e aprovações.</span></div><div><strong>Operação</strong><span>Projetos, produção, materiais e custos.</span></div><div><strong>Inteligência</strong><span>Preço recomendado, risco, margem e rentabilidade.</span></div></div>
         </div>
       </section>
     </main>
 
-    <footer><div class="logo"><span class="logo-mark" aria-hidden="true">MM</span><span><strong>Multi</strong><small>Marcenarias</small></span></div><span>© 2026 Multi-Marcenarias. Plataforma de gestão para marcenarias.</span></footer>
+    <footer><div class="logo"><span class="logo-mark" aria-hidden="true">MM</span><span><strong>Multi</strong><small>Marcenarias</small></span></div><span>© 2026 Multi-Marcenarias. Gestão inteligente para marcenarias.</span></footer>
   </div>
 
-  <div id="auth-overlay" class="overlay hidden" aria-hidden="true"><div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title"><button class="close" id="close-auth" aria-label="Fechar" type="button">×</button><div class="auth-brand"><span class="logo-mark" aria-hidden="true">MM</span><div><strong>Multi-Marcenarias</strong><small>Acesso à plataforma</small></div></div><div id="login-view"><span class="eyebrow">Área de gestão</span><h2 id="login-title">Bem-vindo de volta</h2><p class="muted">Entre para gerenciar sua marcenaria.</p><form id="login-form"><label for="login-email">E-mail<input id="login-email" type="email" autocomplete="username" required></label><label for="login-password">Senha<input id="login-password" type="password" autocomplete="current-password" required></label><button class="btn primary wide" type="submit">Entrar</button><div id="login-error" class="form-message error" role="alert" aria-live="polite"></div></form><div class="auth-links"><button id="show-register" type="button">Criar minha conta</button><button id="show-recovery" type="button">Recuperar acesso</button></div></div><div id="register-view" class="hidden"><span class="eyebrow">Novo acesso</span><h2>Crie sua conta</h2><form id="register-form"><label for="register-name">Nome<input id="register-name" type="text" minlength="2" required></label><label for="register-email">E-mail<input id="register-email" type="email" required></label><label for="register-password">Senha<input id="register-password" type="password" minlength="8" required></label><button class="btn primary wide" type="submit">Cadastrar</button><div id="register-message" class="form-message" role="status" aria-live="polite"></div></form><button class="back-link" data-auth-back type="button">← Voltar para login</button></div><div id="recovery-view" class="hidden"><span class="eyebrow">Recuperação</span><h2>Redefina sua senha</h2><form id="recovery-form"><label for="recovery-email">E-mail<input id="recovery-email" type="email" required autocomplete="email"></label><button class="btn primary wide" type="submit">Enviar instruções</button><div id="recovery-message" class="form-message" role="status" aria-live="polite"></div></form><button class="back-link" data-auth-back type="button">← Voltar para login</button></div><div id="reset-view" class="hidden"><span class="eyebrow">Nova senha</span><h2>Crie uma nova senha</h2><form id="reset-form"><label for="reset-password">Nova senha<input id="reset-password" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary wide" type="submit">Redefinir senha</button><div id="reset-message" class="form-message" role="status" aria-live="polite"></div></form></div></div></div>
+  <div id="auth-overlay" class="overlay hidden" aria-hidden="true"><div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title"><button class="close" id="close-auth" aria-label="Fechar" type="button">×</button><div class="auth-brand"><span class="logo-mark" aria-hidden="true">MM</span><div><strong>Multi-Marcenarias</strong><small>Acesso à plataforma</small></div></div><div id="login-view"><span class="eyebrow">Área de gestão</span><h2 id="login-title">Bem-vindo de volta</h2><p class="muted">Entre para gerenciar sua marcenaria.</p><form id="login-form"><label for="login-email">E-mail<input id="login-email" type="email" autocomplete="username" required></label><label for="login-password">Senha<input id="login-password" type="password" autocomplete="current-password" required></label><button class="btn primary wide" type="submit">Entrar</button><div id="login-error" class="form-message error" role="alert" aria-live="polite"></div></form><div class="auth-links"><button id="show-register" type="button">Criar minha marcenaria</button><button id="show-recovery" type="button">Recuperar acesso</button></div></div><div id="register-view" class="hidden"><span class="eyebrow">Nova marcenaria</span><h2>Crie sua empresa</h2><p class="muted">Você será o primeiro administrador da marcenaria.</p><form id="register-form"><label for="register-business-name">Nome da marcenaria<input id="register-business-name" type="text" minlength="2" autocomplete="organization" required></label><label for="register-name">Seu nome<input id="register-name" type="text" minlength="2" autocomplete="name" required></label><label for="register-email">E-mail<input id="register-email" type="email" autocomplete="email" required></label><label for="register-password">Senha<input id="register-password" type="password" minlength="8" autocomplete="new-password" required></label><label for="register-plan">Plano<select id="register-plan" required><option value="starter">Essencial</option><option value="professional">Profissional</option><option value="business">Empresa</option></select></label><button class="btn primary wide" type="submit">Criar minha marcenaria</button><div id="register-message" class="form-message" role="status" aria-live="polite"></div></form><button class="back-link" data-auth-back type="button">← Voltar para login</button></div><div id="recovery-view" class="hidden"><span class="eyebrow">Recuperação</span><h2>Redefina sua senha</h2><form id="recovery-form"><label for="recovery-email">E-mail<input id="recovery-email" type="email" required autocomplete="email"></label><button class="btn primary wide" type="submit">Enviar instruções</button><div id="recovery-message" class="form-message" role="status" aria-live="polite"></div></form><button class="back-link" data-auth-back type="button">← Voltar para login</button></div><div id="reset-view" class="hidden"><span class="eyebrow">Nova senha</span><h2>Crie uma nova senha</h2><form id="reset-form"><label for="reset-password">Nova senha<input id="reset-password" type="password" minlength="8" required autocomplete="new-password"></label><button class="btn primary wide" type="submit">Redefinir senha</button><div id="reset-message" class="form-message" role="status" aria-live="polite"></div></form></div></div></div>
 
-  <div id="admin-app" class="hidden"><aside class="sidebar"><div class="side-brand"><span class="logo-mark" aria-hidden="true">MM</span><div><strong>Multi-Marcenarias</strong><small>Painel de gestão</small></div></div><nav id="admin-nav" aria-label="Menu administrativo"><button class="nav active" data-section="dashboard" type="button">⌂ <span>Dashboard</span></button><button class="nav" data-section="customers" type="button">♙ <span>Clientes</span></button><button class="nav" data-section="quotes" type="button">▤ <span>Orçamentos</span></button><button class="nav" data-section="projects" type="button">▦ <span>Projetos</span></button><button class="nav" data-section="products" type="button">▧ <span>Produtos</span></button><button class="nav" data-section="categories" type="button">◈ <span>Serviços</span></button><button class="nav admin-only" data-section="users" type="button">♙ <span>Usuários</span></button><button class="nav admin-only" data-section="activities" type="button">◷ <span>Histórico</span></button></nav><div class="side-bottom"><a href="#demonstracao">Plataforma</a><button id="logout" class="logout" type="button">↪ <span>Sair</span></button></div></aside><main class="admin-main"><header class="topbar"><div><span class="eyebrow">Multi-Marcenarias</span><h1 id="admin-title">Dashboard</h1></div><div class="top-actions"><button id="theme-toggle" class="icon-button" title="Alternar tema" aria-label="Alternar tema" type="button">☾</button><span class="user-pill"><span class="status-dot" aria-hidden="true"></span><span id="user-badge">Usuário</span></span></div></header><div id="toast" class="toast" role="status" aria-live="polite"></div><section id="dashboard" class="admin-section"></section><section id="customers" class="admin-section hidden"></section><section id="quotes" class="admin-section hidden"></section><section id="projects" class="admin-section hidden"></section><section id="products" class="admin-section hidden"></section><section id="categories" class="admin-section hidden"></section><section id="users" class="admin-section hidden"></section><section id="activities" class="admin-section hidden"></section></main></div>
+  <div id="admin-app" class="hidden"><aside class="sidebar"><div class="side-brand"><span class="logo-mark" aria-hidden="true">MM</span><div><strong>Multi-Marcenarias</strong><small>Painel de gestão</small></div></div><nav id="admin-nav" aria-label="Menu administrativo"><button class="nav active" data-section="dashboard" type="button">⌂ <span>Dashboard</span></button><button class="nav" data-section="customers" type="button">♙ <span>Clientes</span></button><button class="nav" data-section="quotes" type="button">▤ <span>Orçamentos</span></button><button class="nav" data-section="projects" type="button">▦ <span>Projetos</span></button><button class="nav" data-section="products" type="button">▧ <span>Produtos</span></button><button class="nav" data-section="categories" type="button">◈ <span>Serviços</span></button><button class="nav admin-only" data-section="users" type="button">♙ <span>Usuários</span></button><button class="nav admin-only" data-section="activities" type="button">◷ <span>Histórico</span></button></nav><div class="side-bottom"><a href="#planos">Planos</a><button id="logout" class="logout" type="button">↪ <span>Sair</span></button></div></aside><main class="admin-main"><header class="topbar"><div><span class="eyebrow">Multi-Marcenarias</span><h1 id="admin-title">Dashboard</h1></div><div class="top-actions"><button id="theme-toggle" class="icon-button" title="Alternar tema" aria-label="Alternar tema" type="button">☾</button><span class="user-pill"><span class="status-dot" aria-hidden="true"></span><span id="user-badge">Usuário</span></span></div></header><div id="toast" class="toast" role="status" aria-live="polite"></div><section id="dashboard" class="admin-section"></section><section id="customers" class="admin-section hidden"></section><section id="quotes" class="admin-section hidden"></section><section id="projects" class="admin-section hidden"></section><section id="products" class="admin-section hidden"></section><section id="categories" class="admin-section hidden"></section><section id="users" class="admin-section hidden"></section><section id="activities" class="admin-section hidden"></section></main></div>
 
   <div id="modal" class="modal hidden" aria-hidden="true"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-head"><div><span class="eyebrow">Gerenciamento</span><h2 id="modal-title">Novo registro</h2></div><button id="modal-close" class="close" type="button" aria-label="Fechar">×</button></div><form id="item-form"></form></div></div>
-  <script src="./app.js"></script><script src="./smart-quotes.js"></script><script src="./quote-decisions.js"></script><script src="./quote-proposal.js"></script>
+  <script src="./app.js"></script><script src="./smart-quotes.js"></script><script src="./quote-decisions.js"></script><script src="./quote-proposal.js"></script><script src="./saas-public.js"></script>
 </body>
 </html>
