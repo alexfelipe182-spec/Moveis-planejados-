@@ -65,7 +65,7 @@ def test_plan_catalog_subscription_usage_and_guided_onboarding():
         assert updated.status_code == 200, updated.text
         assert updated.json()["completed"] is True
         assert updated.json()["business"]["city"] == "Praia Grande"
-        assert updated.json()["business"]["default_profit_margin"] == "35.00"
+        assert updated.json()["business"]["default_profit_margin"] == 35.0
 
 
 def test_checkout_requires_billing_configuration():
