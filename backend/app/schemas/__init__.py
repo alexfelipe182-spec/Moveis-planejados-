@@ -17,10 +17,12 @@ from app.schemas.production_cost import (
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.schemas.quote import QuoteCreate, QuoteEstimateResponse, QuoteRead, QuoteUpdate
 from app.schemas.quote_item import QuoteItemCreate, QuoteItemRead, QuoteItemUpdate
+from app.schemas.tenant import BusinessRegister, BusinessRegisterResponse, TenantRead, TenantUpdate
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 __all__ = [
-    "ActivityRead", "CategoryCreate", "CategoryRead", "CategoryUpdate",
+    "ActivityRead", "BusinessRegister", "BusinessRegisterResponse",
+    "CategoryCreate", "CategoryRead", "CategoryUpdate",
     "CustomerCreate", "CustomerRead", "CustomerUpdate",
     "MaterialCreate", "MaterialRead", "MaterialUpdate",
     "PasswordResetConfirm", "PasswordResetRequest", "PasswordResetResponse",
@@ -30,5 +32,6 @@ __all__ = [
     "QuoteCreate", "QuoteEstimateResponse", "QuoteRead", "QuoteUpdate",
     "QuoteItemCreate", "QuoteItemRead", "QuoteItemUpdate",
     "SupplierCreate", "SupplierRead", "SupplierUpdate",
+    "TenantRead", "TenantUpdate",
     "UserCreate", "UserRead", "UserUpdate",
 ]
