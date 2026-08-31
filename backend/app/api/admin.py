@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin, require_cookie_csrf
 from app.core.config import settings
+from app.core.security import hash_password
 from app.database import get_db
 from app.models import Activity, Category, Customer, Product, Project, Quote, User
 from app.schemas.activity import ActivityRead
-from app.schemas.user import UserRead, UserUpdate
+from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 
@@ -46,6 +48,48 @@ def list_users(
         .offset(offset)
         .limit(limit)
     ).all()
+
+
+@router.post(
+    "/users",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+)
+def create_user(
+    payload: UserCreate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    email = str(payload.email).strip().lower()
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+
+    user = User(
+        tenant_id=current_user.tenant_id,
+        name=payload.name.strip(),
+        email=email,
+        password_hash=hash_password(payload.password),
+        is_admin=payload.is_admin,
+    )
+    db.add(user)
+    try:
+        db.flush()
+        db.add(
+            Activity(
+                user_id=current_user.id,
+                action="created",
+                entity="user",
+                entity_id=user.id,
+                description=f"Criou usuário da equipe {user.email}",
+            )
+        )
+        db.commit()
+        db.refresh(user)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Não foi possível criar o usuário") from exc
+    return user
 
 
 @router.patch(
