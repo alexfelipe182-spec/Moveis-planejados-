@@ -6,10 +6,11 @@ import json
 import os
 import time
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -17,13 +18,24 @@ from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.core.config import settings
 from app.database import get_db
 from app.models import Subscription, Tenant, User
-from app.services.plans import PLANS, plan_for_tenant, usage_snapshot
+from app.services.plans import PLANS, usage_snapshot
 
 router = APIRouter(tags=["SaaS Commercial"])
 
 
 class CheckoutRequest(BaseModel):
     plan_code: str
+
+
+class OnboardingUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    phone: str | None = Field(default=None, max_length=40)
+    city: str | None = Field(default=None, max_length=100)
+    state: str | None = Field(default=None, max_length=40)
+    document: str | None = Field(default=None, max_length=30)
+    default_profit_margin: Decimal | None = Field(default=None, ge=0, le=100, max_digits=5, decimal_places=2)
+    step: int | None = Field(default=None, ge=1, le=4)
+    complete: bool = False
 
 
 def _tenant(db: Session, user: User) -> Tenant:
@@ -74,6 +86,28 @@ def _subscription_payload(subscription: Subscription | None, tenant: Tenant) -> 
     }
 
 
+def _onboarding_payload(tenant: Tenant) -> dict:
+    return {
+        "step": tenant.onboarding_step,
+        "completed": tenant.onboarding_completed,
+        "completed_at": tenant.onboarding_completed_at,
+        "business": {
+            "name": tenant.name,
+            "phone": tenant.phone,
+            "city": tenant.city,
+            "state": tenant.state,
+            "document": tenant.document,
+            "default_profit_margin": tenant.default_profit_margin,
+        },
+        "checklist": {
+            "business_profile": bool(tenant.name and tenant.phone and tenant.city and tenant.state),
+            "pricing": tenant.default_profit_margin is not None,
+            "team": True,
+            "first_quote": False,
+        },
+    }
+
+
 @router.get("/plans")
 def plans():
     return [
@@ -86,6 +120,37 @@ def plans():
         }
         for plan in PLANS.values()
     ]
+
+
+@router.get("/onboarding")
+def onboarding_status(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return _onboarding_payload(_tenant(db, current_user))
+
+
+@router.patch("/onboarding", dependencies=[Depends(require_cookie_csrf)])
+def update_onboarding(
+    payload: OnboardingUpdate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    tenant = _tenant(db, current_user)
+    changes = payload.model_dump(exclude_unset=True, exclude={"step", "complete"})
+    for key, value in changes.items():
+        if isinstance(value, str):
+            value = value.strip() or None
+        setattr(tenant, key, value)
+    if payload.step is not None:
+        tenant.onboarding_step = max(tenant.onboarding_step, payload.step)
+    if payload.complete:
+        required = [tenant.name, tenant.phone, tenant.city, tenant.state]
+        if not all(required):
+            raise HTTPException(status_code=409, detail="Complete os dados da marcenaria antes de finalizar o onboarding")
+        tenant.onboarding_step = 4
+        tenant.onboarding_completed = True
+        tenant.onboarding_completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    db.refresh(tenant)
+    return _onboarding_payload(tenant)
 
 
 @router.get("/billing/subscription")
