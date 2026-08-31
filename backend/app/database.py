@@ -1,5 +1,5 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, with_loader_criteria
 
 from app.core.config import settings
 
@@ -19,9 +19,49 @@ class Base(DeclarativeBase):
     pass
 
 
+@event.listens_for(Session, "do_orm_execute")
+def _tenant_filter(execute_state) -> None:
+    tenant_id = execute_state.session.info.get("tenant_id")
+    if not tenant_id or not execute_state.is_select or execute_state.execution_options.get("skip_tenant_scope"):
+        return
+
+    from app.models.tenant import TenantScopedMixin
+
+    statement = execute_state.statement
+    for mapper in Base.registry.mappers:
+        model = mapper.class_
+        if issubclass(model, TenantScopedMixin):
+            statement = statement.options(
+                with_loader_criteria(
+                    model,
+                    lambda cls, tenant_id=tenant_id: cls.tenant_id == tenant_id,
+                    include_aliases=True,
+                )
+            )
+    execute_state.statement = statement
+
+
+@event.listens_for(Session, "before_flush")
+def _assign_tenant_id(session: Session, _flush_context, _instances) -> None:
+    tenant_id = session.info.get("tenant_id")
+    if not tenant_id:
+        return
+
+    from app.models.tenant import TenantScopedMixin
+
+    for obj in session.new:
+        if isinstance(obj, TenantScopedMixin):
+            current = getattr(obj, "tenant_id", None)
+            if current is None:
+                obj.tenant_id = tenant_id
+            elif current != tenant_id:
+                raise ValueError("Tentativa de gravar dados em outra marcenaria")
+
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
+        db.info.pop("tenant_id", None)
         db.close()
