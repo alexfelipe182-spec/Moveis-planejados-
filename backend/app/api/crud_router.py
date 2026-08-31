@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.database import get_db
-from app.models import Activity, User
+from app.models import Activity, Tenant, User
 from app.services.automation import engine
+from app.services.plans import ensure_capacity
 
 
 def _database_conflict(exc: ValueError | IntegrityError) -> HTTPException:
@@ -54,6 +55,15 @@ def _commit_or_conflict(db: Session) -> None:
     except IntegrityError as exc:
         db.rollback()
         raise _database_conflict(exc) from exc
+
+
+def _enforce_create_limit(db: Session, user: User, model) -> None:
+    metric = {"customers": "customers", "projects": "projects"}.get(model.__tablename__)
+    if not metric or not user.tenant_id:
+        return
+    tenant = db.get(Tenant, user.tenant_id)
+    if tenant is not None:
+        ensure_capacity(db, tenant, metric)
 
 
 def make_router(
@@ -111,6 +121,7 @@ def make_router(
             current_user: User = Depends(require_admin),
             db: Session = Depends(get_db),
         ):
+            _enforce_create_limit(db, current_user, model)
             try:
                 item = crud.create_item(db, model(**_payload_data(payload)), commit=False)
                 _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
