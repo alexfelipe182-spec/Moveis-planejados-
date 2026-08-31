@@ -112,6 +112,20 @@ test('failed login does not try to refresh an unrelated session', async () => {
   assert.equal(calls.length, 1);
 });
 
+test('login bearer keeps the cross-site session working when cookies are blocked', async () => {
+  const { api, calls } = createClient((url) => url.endsWith('/auth/login')
+    ? response(200, { access_token: 'access-for-this-session', csrf_token: 'csrf-new' })
+    : response(200, { id: 7, is_admin: true }));
+
+  await api('/auth/login', {
+    method: 'POST',
+    body: new URLSearchParams({ username: 'admin@example.com', password: 'test-only' }),
+  });
+  await api('/me');
+
+  assert.equal(calls[1].options.headers.Authorization, 'Bearer access-for-this-session');
+});
+
 test('a repeated 401 after renewal does not create a refresh loop', async () => {
   const { api, calls } = createClient((url) => url.endsWith('/auth/refresh')
     ? response(200, { csrf_token: 'csrf-new' })

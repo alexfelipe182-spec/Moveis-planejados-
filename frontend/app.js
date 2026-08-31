@@ -1,7 +1,7 @@
 const API = window.API_BASE_URL || (location.hostname === 'localhost' ? 'http://localhost:8000/api/v1' : 'https://ideal-marcenaria-api.onrender.com/api/v1');
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const state = { user:null, resource:null, id:null, rows:[], categories:[], customers:[], search:'', status:'', csrfToken:'' };
+const state = { user:null, resource:null, id:null, rows:[], categories:[], customers:[], search:'', status:'', csrfToken:'', accessToken:'' };
 const labels = {dashboard:'Dashboard',customers:'Clientes',quotes:'Orçamentos',projects:'Projetos',products:'Produtos',categories:'Serviços',users:'Usuários',activities:'Histórico'};
 const statusLabels = {pending:'Pendente',analysis:'Em análise',approved:'Aprovado',rejected:'Recusado',completed:'Concluído',planning:'Planejamento',in_progress:'Em andamento',cancelled:'Cancelado'};
 const csrf = () => state.csrfToken || document.cookie.split('; ').find(x=>x.startsWith('csrf_token='))?.split('=')[1] || '';
@@ -20,6 +20,9 @@ async function refreshSession() {
 async function api(path, options = {}, retryAuth = true) {
   const requestVersion = sessionVersion;
   const opts = { credentials: 'include', ...options, headers: { ...(options.headers || {}) } };
+  if (state.accessToken && !opts.headers.Authorization) {
+    opts.headers.Authorization = `Bearer ${state.accessToken}`;
+  }
   if (opts.body && !(opts.body instanceof URLSearchParams) && typeof opts.body !== 'string') {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
@@ -28,7 +31,10 @@ async function api(path, options = {}, retryAuth = true) {
     opts.headers['X-CSRF-Token'] = csrf();
   }
   const res = await fetch(API + path, opts);
-  if (res.status === 204) return null;
+  if (res.status === 204) {
+    if (path === '/auth/logout') state.accessToken = '';
+    return null;
+  }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && retryAuth && !path.startsWith('/auth/')) {
     // A delayed response may belong to the session another request already renewed.
@@ -39,6 +45,9 @@ async function api(path, options = {}, retryAuth = true) {
     throw new Error(data.detail || (res.status === 401 ? 'Sessão expirada. Faça login novamente.' : `Erro ${res.status}`));
   }
   if (typeof data?.csrf_token === 'string') state.csrfToken = data.csrf_token;
+  if ((path === '/auth/login' || path === '/auth/refresh') && typeof data?.access_token === 'string') {
+    state.accessToken = data.access_token;
+  }
   if (path === '/auth/login' || path === '/auth/refresh') sessionVersion += 1;
   return data;
 }
