@@ -3,13 +3,16 @@ title = "Ideal Marcenaria Gitleaks policy"
 [extend]
 useDefault = true
 
-# False positive histórico conhecido: chave determinística usada apenas pelo CI
-# no commit que aumentou o comprimento do SECRET_KEY de teste. A exceção vale
-# somente para a regra generic-api-key e somente para esse commit; as demais
-# regras e todos os outros commits continuam sendo examinados normalmente.
+# False positives históricos conhecidos: chaves determinísticas usadas somente
+# em workflows/testes de CI. As exceções são limitadas à regra generic-api-key
+# e aos commits exatos que introduziram esses valores; o restante do histórico
+# continua sendo examinado normalmente.
 [[rules]]
 id = "generic-api-key"
 
 [rules.allowlist]
-description = "CI-only deterministic test SECRET_KEY introduced in 590df38"
-commits = ["590df38bafeae9a2445cb6446c6014d3a899ac63"]
+description = "CI-only deterministic test SECRET_KEY values"
+commits = [
+  "590df38bafeae9a2445cb6446c6014d3a899ac63",
+  "edcb26497ab1a4936aa5071bcc20197e2a74d384",
+]

@@ -35,6 +35,9 @@ def get_current_user(
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário inválido ou inativo")
+    if not user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário sem marcenaria vinculada")
+    db.info["tenant_id"] = user.tenant_id
     return user
 
 
@@ -55,8 +58,6 @@ def require_cookie_csrf(
     csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
     csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
 ) -> None:
-    # CSRF é necessário quando a autenticação está sendo feita por cookie.
-    # Clientes que usam Authorization: Bearer não precisam enviar o token CSRF.
     if access_token:
         _validate_csrf(csrf_cookie, csrf_header)
 

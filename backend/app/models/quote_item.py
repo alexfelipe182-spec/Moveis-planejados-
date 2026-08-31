@@ -4,9 +4,10 @@ from sqlalchemy import ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.tenant import TenantScopedMixin
 
 
-class QuoteItem(Base):
+class QuoteItem(TenantScopedMixin, Base):
     __tablename__ = "quote_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)

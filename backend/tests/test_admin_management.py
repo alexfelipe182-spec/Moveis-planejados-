@@ -44,6 +44,16 @@ def login(client, *, email: str, password: str):
     assert response.status_code == 200
 
 
+def create_team_user(client, *, name: str, email: str, password: str):
+    response = client.post(
+        "/api/v1/admin/users",
+        json={"name": name, "email": email, "password": password},
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 def test_admin_user_management_guards_and_update(client):
     password = "Senha-Forte-123!"
     admin_email = "admin.management@example.com"
@@ -52,13 +62,25 @@ def test_admin_user_management_guards_and_update(client):
 
     register(client, name="Admin Management", email=admin_email, password=password)
     admin_id = promote_to_admin(admin_email)
-    register(client, name="Target User", email=target_email, password=password)
-    register(client, name="Duplicate User", email=duplicate_email, password=password)
     login(client, email=admin_email, password=password)
+
+    target = create_team_user(
+        client,
+        name="Target User",
+        email=target_email,
+        password=password,
+    )
+    create_team_user(
+        client,
+        name="Duplicate User",
+        email=duplicate_email,
+        password=password,
+    )
 
     users = client.get("/api/v1/admin/users")
     assert users.status_code == 200
-    target_id = next(user["id"] for user in users.json() if user["email"] == target_email)
+    target_id = target["id"]
+    assert next(user for user in users.json() if user["id"] == target_id)["email"] == target_email
 
     missing = client.patch(
         "/api/v1/admin/users/999999999",
@@ -75,6 +97,13 @@ def test_admin_user_management_guards_and_update(client):
     )
     assert duplicate.status_code == 409
     assert duplicate.json()["detail"] == "E-mail já cadastrado"
+
+    duplicate_create = client.post(
+        "/api/v1/admin/users",
+        json={"name": "Duplicate Again", "email": duplicate_email, "password": password},
+        headers=csrf_headers(client),
+    )
+    assert duplicate_create.status_code == 409
 
     self_demote = client.patch(
         f"/api/v1/admin/users/{admin_id}",
