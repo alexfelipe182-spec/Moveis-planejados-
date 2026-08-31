@@ -32,15 +32,17 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: int = 10
     password_reset_expire_minutes: int = 30
     frontend_url: str = "http://localhost:3000"
+    billing_provider: Literal["disabled", "sandbox", "stripe"] = "disabled"
+    billing_webhook_secret: SecretStr | None = Field(default=None, repr=False)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
-    @field_validator("email_provider", mode="before")
+    @field_validator("email_provider", "billing_provider", mode="before")
     @classmethod
     def normalize_email_provider(cls, value):
         return value.strip().lower() if isinstance(value, str) else value
 
-    @field_validator("email_from", "resend_api_key", mode="before")
+    @field_validator("email_from", "resend_api_key", "billing_webhook_secret", mode="before")
     @classmethod
     def normalize_optional_email_values(cls, value):
         if isinstance(value, str):
@@ -69,6 +71,8 @@ class Settings(BaseSettings):
                 raise ValueError("RESEND_API_KEY deve conter uma chave válida sem espaços")
         if self.email_provider == "resend" and not (self.resend_api_key and self.email_from):
             raise ValueError("EMAIL_PROVIDER=resend exige RESEND_API_KEY e EMAIL_FROM")
+        if self.billing_provider == "stripe" and not self.billing_webhook_secret:
+            raise ValueError("BILLING_PROVIDER=stripe exige BILLING_WEBHOOK_SECRET")
         if not 1 <= self.smtp_port <= 65535:
             raise ValueError("SMTP_PORT deve estar entre 1 e 65535")
         if self.smtp_timeout_seconds < 1:

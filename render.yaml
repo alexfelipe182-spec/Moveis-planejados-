@@ -33,6 +33,13 @@ services:
         value: '["https://ideal-marcenaria.onrender.com"]'
       - key: FRONTEND_URL
         value: https://ideal-marcenaria.onrender.com
+      - key: BILLING_PROVIDER
+        value: disabled
+      - key: BILLING_WEBHOOK_SECRET
+        sync: false
+      # Configure only during a controlled migration; leave blank by default.
+      - key: BOOTSTRAP_PLATFORM_ADMIN_EMAIL
+        sync: false
 
   - type: web
     name: ideal-marcenaria

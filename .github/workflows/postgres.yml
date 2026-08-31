@@ -186,8 +186,10 @@ jobs:
           test -s frontend/index.html
           test -s frontend/styles.css
           test -s frontend/professional.css
+          test -s frontend/design-system.css
           test -s frontend/app.js
           test -s frontend/app.test.cjs
+          test -s frontend/robustness.test.cjs
           test -s frontend/site-config.js
           test -s frontend/public-contact.js
           test -s frontend/public-contact.test.cjs
@@ -195,20 +197,31 @@ jobs:
           test -s frontend/production.js
           test -s frontend/production.test.cjs
           test -s frontend/smart-quotes.js
+          test -s frontend/smart-quotes.test.cjs
           test -s frontend/quote-decisions.js
           test -s frontend/quote-proposal.js
+          test -s frontend/quote-proposal.test.cjs
       - name: JavaScript syntax
         run: |
           node --check frontend/app.js
           node --check frontend/production.js
           node --check frontend/app.test.cjs
+          node --check frontend/robustness.test.cjs
           node --check frontend/site-config.js
           node --check frontend/public-contact.js
           node --check frontend/smart-quotes.js
+          node --check frontend/smart-quotes.test.cjs
           node --check frontend/quote-decisions.js
           node --check frontend/quote-proposal.js
+          node --check frontend/quote-proposal.test.cjs
       - name: Frontend behavior
         run: node frontend/app.test.cjs
+      - name: Frontend robustness regressions
+        run: node frontend/robustness.test.cjs
+      - name: Printable proposal regressions
+        run: node frontend/quote-proposal.test.cjs
+      - name: Smart quote regressions
+        run: node frontend/smart-quotes.test.cjs
       - name: Public contact behavior
         run: node frontend/public-contact.test.cjs
       - name: Pagination and form behavior
@@ -226,9 +239,10 @@ jobs:
           grep -q '<script src="./quote-proposal.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
           grep -q '<link rel="stylesheet" href="./professional.css">' frontend/index.html
+          grep -q '<link rel="stylesheet" href="./design-system.css?v=20260830-studio">' frontend/index.html
       - name: Accidental placeholders
         run: |
-          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js
+          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/design-system.css frontend/app.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js
       - name: Frontend smoke test
         run: |
           python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &

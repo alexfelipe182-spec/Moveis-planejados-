@@ -28,7 +28,7 @@
   window.formHtml = (resource, row = {}) => resource === 'suppliers' ? supplierForm(row) : resource === 'materials' ? materialForm(row) : originalForm(resource, row);
   const originalOpen = window.openForm;
   window.openForm = async function(resource, id = null) {
-    await originalOpen(resource, id);
+    if (await originalOpen(resource, id) === false) return false;
     if (['suppliers','materials'].includes(resource)) $('#modal-title').textContent = (id ? 'Editar ' : 'Novo ') + (resource === 'suppliers' ? 'fornecedor' : 'insumo');
   };
   const originalFormat = window.formatCell;
@@ -57,10 +57,7 @@
     });
   };
   function modal(title) {
-    $('#modal-title').textContent = title;
-    $('#item-form').innerHTML = '<div class="production-modal" aria-live="polite">Carregando...</div>';
-    $('#modal').classList.remove('hidden'); $('#modal').setAttribute('aria-hidden','false');
-    return $('.production-modal', $('#item-form'));
+    return openManagedModal(title, '<div class="production-modal" aria-live="polite">Carregando...</div>', '#modal-close').content;
   }
   function costPayload(form, projectId) {
     const fd = new FormData(form);

@@ -10,8 +10,10 @@ um arquivo de backup ou um teste sintético aprovado, sozinhos, não encerram o 
 - Confirmar na homologação que uma conta comum recebe `403` nas rotas internas e
   não consegue consultar esses dados fornecendo um ID conhecido.
 - Confirmar que a conta administrativa consegue executar o fluxo comercial completo.
-- Não promover todas as contas a administrador e não compartilhar senhas. A primeira
-  conta administrativa deve ser atribuída pelo responsável, por um canal controlado.
+- Não promover todas as contas a administrador e não compartilhar senhas. O cadastro
+  público cria o primeiro owner somente dentro da marcenaria recém-criada; o papel de
+  superadministrador da plataforma continua sendo atribuído pelo responsável, por um
+  canal controlado.
 - Testar sessão expirada, renovação, logout e tentativa de reutilizar sessão encerrada.
 
 ## 2. Banco definitivo e recuperação

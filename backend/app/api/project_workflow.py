@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app import crud
-from app.api.deps import require_admin, require_cookie_csrf
+from app.api.deps import require_cookie_csrf, require_workspace_admin
 from app.database import get_db
 from app.models import Activity, Project, User
 from app.schemas.project import ProjectRead, ProjectStatus
@@ -33,15 +33,16 @@ TERMINAL_STATUSES = {"completed", "cancelled"}
 @router.patch(
     "/{item_id}/status",
     response_model=ProjectRead,
-    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+    dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)],
 )
 def advance_project_status(
     item_id: int,
     payload: ProjectStatusRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_workspace_admin),
     db: Session = Depends(get_db),
 ):
-    project = crud.get_item(db, Project, item_id)
+    organization_id = current_user.organization_id
+    project = crud.get_item(db, Project, item_id, organization_id=organization_id)
     if not project:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
 
@@ -62,6 +63,7 @@ def advance_project_status(
     project.status = requested_status
     db.add(
         Activity(
+            organization_id=organization_id,
             user_id=current_user.id,
             action="status_changed",
             entity="project",
@@ -81,6 +83,7 @@ def advance_project_status(
             "previous_status": previous_status,
             "status": requested_status,
             "quote_id": project.quote_id,
+            "organization_id": organization_id,
         },
     )
     return project

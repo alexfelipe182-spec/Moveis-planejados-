@@ -33,6 +33,7 @@ test('configured WhatsApp uses a validated number and encoded message', () => {
   assert.equal(opened[0][0], `https://wa.me/5513999990000?text=${encodeURIComponent('Olá & medidas?')}`);
   assert.equal(opened[0][2], 'noopener,noreferrer');
   assert.equal(selectors['#company-contact'].children[0].rel, 'noopener noreferrer');
+  assert.equal(selectors['#company-contact'].children[0].textContent, 'WhatsApp: +55 (13) 99999-0000');
 });
 
 test('a Brazilian number supplied with DDD receives country code', () => {

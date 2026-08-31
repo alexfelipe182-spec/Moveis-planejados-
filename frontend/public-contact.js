@@ -20,6 +20,11 @@
     return '';
   }
 
+  function phoneLabel(digits) {
+    const brazilian = String(digits || '').match(/^55(\d{2})(\d{5})(\d{4})$/);
+    return brazilian ? `+55 (${brazilian[1]}) ${brazilian[2]}-${brazilian[3]}` : `+${digits}`;
+  }
+
   const defaultMessage = 'Olá! Quero solicitar um orçamento para móveis planejados.';
   const url = contactUrl(defaultMessage);
   const phone = normalizePhone(config.whatsappNumber || window.WHATSAPP_NUMBER);
@@ -36,7 +41,7 @@
     if (url) {
       const link = document.createElement('a');
       link.href = url;
-      link.textContent = phone ? `WhatsApp: +${phone}` : config.contactEmail;
+      link.textContent = phone ? `WhatsApp: ${phoneLabel(phone)}` : config.contactEmail;
       if (phone) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
       channel.append(link);
     } else {

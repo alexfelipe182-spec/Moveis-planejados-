@@ -19,7 +19,7 @@ from sqlalchemy.exc import OperationalError
 from app.api import quote_decisions, quote_items, routes
 from app.core.config import settings
 from app.database import SessionLocal
-from app.models import Activity, Customer, Quote, User
+from app.models import Activity, Customer, Organization, Quote, User
 from app.schemas import QuoteUpdate
 
 
@@ -40,6 +40,7 @@ pytestmark = pytest.mark.skipif(
 def quote_rows():
     identifier = uuid4().hex
     with SessionLocal() as db:
+        organization = Organization(name=f"Lock test {identifier}", slug=f"lock-test-{identifier}")
         customer = Customer(name=f"Concurrency test {identifier}")
         user = User(
             name="Concurrency test",
@@ -47,12 +48,16 @@ def quote_rows():
             password_hash="test-only-no-login",
             is_admin=True,
         )
+        db.add(organization)
+        db.flush()
+        customer.organization_id = organization.id
+        user.organization_id = organization.id
         db.add_all([customer, user])
         db.flush()
-        quote = Quote(customer_id=customer.id, description="Disposable lock test", status="analysis")
+        quote = Quote(organization_id=organization.id, customer_id=customer.id, description="Disposable lock test", status="analysis")
         db.add(quote)
         db.commit()
-        ids = SimpleNamespace(customer=customer.id, user=user.id, quote=quote.id)
+        ids = SimpleNamespace(organization=organization.id, customer=customer.id, user=user.id, quote=quote.id)
     try:
         yield ids
     finally:
@@ -63,6 +68,7 @@ def quote_rows():
             db.execute(delete(Quote).where(Quote.id == ids.quote))
             db.execute(delete(Customer).where(Customer.id == ids.customer))
             db.execute(delete(User).where(User.id == ids.user))
+            db.execute(delete(Organization).where(Organization.id == ids.organization))
             db.commit()
 
 
@@ -76,11 +82,11 @@ OPERATIONS = [
 
 
 def invoke(operation, db, ids):
-    user = SimpleNamespace(id=ids.user)
+    user = SimpleNamespace(id=ids.user, organization_id=ids.organization)
     if operation == "edit":
         return routes.update_quote(ids.quote, QuoteUpdate(description="Revised test quote"), user, db)
     if operation == "items":
-        return quote_items._get_editable_quote(db, ids.quote)
+        return quote_items._get_editable_quote(db, ids.quote, ids.organization)
     if operation == "decision":
         return quote_decisions.decide_quote(
             ids.quote, quote_decisions.QuoteDecisionRequest(status="approved"), user, db

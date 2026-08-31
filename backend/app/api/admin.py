@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import crud
-from app.api.deps import require_admin, require_cookie_csrf
+from app.api.deps import require_admin, require_cookie_csrf, require_workspace_admin
 from app.core.config import settings
 from app.database import get_db
 from app.models import Activity, Category, Customer, Product, Project, Quote, User
@@ -16,17 +16,18 @@ router = APIRouter(prefix="/admin", tags=["Administration"])
 
 
 @router.get("/dashboard")
-def dashboard(_: User = Depends(require_admin), db: Session = Depends(get_db)):
-    recent = db.scalars(select(Activity).order_by(Activity.created_at.desc()).limit(10)).all()
+def dashboard(current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    organization_id = current_user.organization_id
+    recent = db.scalars(select(Activity).where(Activity.organization_id == organization_id).order_by(Activity.created_at.desc()).limit(10)).all()
     return {
         "app_name": settings.app_name,
         "counts": {
-            "users": db.scalar(select(func.count()).select_from(User)) or 0,
-            "categories": db.scalar(select(func.count()).select_from(Category)) or 0,
-            "products": db.scalar(select(func.count()).select_from(Product)) or 0,
-            "customers": db.scalar(select(func.count()).select_from(Customer)) or 0,
-            "quotes": db.scalar(select(func.count()).select_from(Quote)) or 0,
-            "projects": db.scalar(select(func.count()).select_from(Project)) or 0,
+            "users": db.scalar(select(func.count()).select_from(User).where(User.organization_id == organization_id)) or 0,
+            "categories": db.scalar(select(func.count()).select_from(Category).where(Category.organization_id == organization_id)) or 0,
+            "products": db.scalar(select(func.count()).select_from(Product).where(Product.organization_id == organization_id)) or 0,
+            "customers": db.scalar(select(func.count()).select_from(Customer).where(Customer.organization_id == organization_id)) or 0,
+            "quotes": db.scalar(select(func.count()).select_from(Quote).where(Quote.organization_id == organization_id)) or 0,
+            "projects": db.scalar(select(func.count()).select_from(Project).where(Project.organization_id == organization_id)) or 0,
         },
         "recent_activities": [ActivityRead.model_validate(item).model_dump(mode="json") for item in recent],
     }
@@ -38,17 +39,17 @@ def list_users(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     q: Annotated[str | None, Query(max_length=200)] = None,
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    total = crud.count_items(db, User, q=q)
+    total = crud.count_items(db, User, q=q, organization_id=current_user.organization_id)
     crud.pagination_headers(response, total=total, offset=offset, limit=limit)
-    return crud.list_items(db, User, offset=offset, limit=limit, q=q)
+    return crud.list_items(db, User, offset=offset, limit=limit, q=q, organization_id=current_user.organization_id)
 
 
-@router.patch("/users/{user_id}", response_model=UserRead, dependencies=[Depends(require_admin), Depends(require_cookie_csrf)])
-def update_user(user_id: int, payload: UserUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
-    user = db.get(User, user_id)
+@router.patch("/users/{user_id}", response_model=UserRead, dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)])
+def update_user(user_id: int, payload: UserUpdate, current_user: User = Depends(require_workspace_admin), db: Session = Depends(get_db)):
+    user = crud.get_item(db, User, user_id, organization_id=current_user.organization_id)
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     changes = payload.model_dump(exclude_unset=True)
@@ -63,7 +64,7 @@ def update_user(user_id: int, payload: UserUpdate, current_user: User = Depends(
         raise HTTPException(status_code=400, detail="O administrador atual não pode desativar a própria conta")
     for key, value in changes.items():
         setattr(user, key, value)
-    db.add(Activity(user_id=current_user.id, action="updated", entity="user", entity_id=user.id, description=f"Alterou usuário #{user.id}"))
+    db.add(Activity(organization_id=current_user.organization_id, user_id=current_user.id, action="updated", entity="user", entity_id=user.id, description=f"Alterou usuário #{user.id}"))
     db.commit()
     db.refresh(user)
     return user

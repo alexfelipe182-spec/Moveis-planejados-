@@ -56,6 +56,8 @@ class QuoteEstimateResponse(BaseModel):
     suggested_total: Decimal
     warnings: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
+    analysis_source: Literal["local-analysis", "local-fallback", "openai-assisted"] = "local-analysis"
+    summary: str = ""
     ai_analysis: str | None = None
     ai_analyzed_at: datetime | None = None
     requires_approval: bool = True
@@ -70,5 +72,12 @@ class QuoteRead(QuoteBase):
     finishing_cost: Decimal = Decimal("0")
     profit_margin: Decimal = Decimal("30")
     suggested_total: Decimal = Decimal("0")
+    recommended_profit_margin: Decimal | None = None
+    recommended_total: Decimal | None = None
+    risk_score: int | None = None
+    risk_level: str | None = None
+    intelligence_confidence: str | None = None
+    intelligence_sample_size: int | None = None
+    intelligence_analyzed_at: datetime | None = None
     ai_analysis: str | None = None
     ai_analyzed_at: datetime | None = None

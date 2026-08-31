@@ -287,7 +287,7 @@ def test_production_reset_response_remains_generic_without_debug_token(monkeypat
     monkeypatch.setattr(auth.secrets, "token_urlsafe", lambda length: TEST_TOKEN)
     db = MagicMock()
     db.scalar.return_value = None if outcome == "unknown_user" else SimpleNamespace(
-        id=7, name="Pessoa Teste", email=RECIPIENT
+        id=7, organization_id=1, name="Pessoa Teste", email=RECIPIENT
     )
     test_app = FastAPI()
     test_app.include_router(auth.router, prefix="/api/v1")
@@ -320,7 +320,7 @@ def test_development_keeps_existing_debug_fallback_without_logging_token(monkeyp
     monkeypatch.setattr(auth, "settings", email_settings())
     monkeypatch.setattr(auth.secrets, "token_urlsafe", lambda length: TEST_TOKEN)
     db = MagicMock()
-    db.scalar.return_value = SimpleNamespace(id=7, name="Pessoa Teste", email=RECIPIENT)
+    db.scalar.return_value = SimpleNamespace(id=7, organization_id=1, name="Pessoa Teste", email=RECIPIENT)
     response = auth.request_password_reset(auth.PasswordResetRequest(email=RECIPIENT), db)
     assert response.debug_token == TEST_TOKEN
     assert response.message == GENERIC_MESSAGE

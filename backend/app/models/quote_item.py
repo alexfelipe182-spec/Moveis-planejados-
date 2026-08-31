@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, Text
+from sqlalchemy import ForeignKey, ForeignKeyConstraint, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -8,8 +8,21 @@ from app.database import Base
 
 class QuoteItem(Base):
     __tablename__ = "quote_items"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "id", name="uq_quote_items_org_id"),
+        ForeignKeyConstraint(
+            ["organization_id", "quote_id"],
+            ["quotes.organization_id", "quotes.id"],
+            name="fk_quote_items_quote_tenant",
+            ondelete="CASCADE",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        index=True,
+    )
     quote_id: Mapped[int] = mapped_column(ForeignKey("quotes.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -19,6 +19,7 @@ os.environ["REDIS_URL"] = "redis://127.0.0.1:6399/15"
 os.environ["SECRET_KEY"] = secrets.token_urlsafe(48)
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["EMAIL_PROVIDER"] = "disabled"
+os.environ["BILLING_PROVIDER"] = "sandbox"
 for setting in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "EMAIL_FROM", "RESEND_API_KEY"):
     # An explicit empty value prevents Pydantic from loading a real .env secret.
     os.environ[setting] = ""
@@ -32,7 +33,7 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 import app.main as main_module  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
-from app.models import Category, Customer, Material, Project, Supplier, User  # noqa: E402
+from app.models import Category, Customer, Material, Organization, Plan, Project, Subscription, Supplier, User  # noqa: E402
 
 
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
@@ -40,18 +41,24 @@ database = create_engine("sqlite://", connect_args={"check_same_thread": False},
 Base.metadata.create_all(database)
 sessions = sessionmaker(database, expire_on_commit=False)
 with sessions() as db:
-    db.add(User(name="Equipe de teste", email="preview@example.com", password_hash=hash_password("Preview-local-123!"), is_admin=True))
-    db.add(Category(name="Cozinhas de teste", description="Categoria sintética"))
+    db.add(Organization(id=1, name="Multi-Marcenarias — Prévia", slug="previa", status="active"))
+    db.add(Plan(id=1, code="starter", name="Essencial", monthly_price_cents=4900, max_users=3, features={"quotes": True, "production": True}))
+    db.add(Plan(id=2, code="pro", name="Profissional", monthly_price_cents=9900, max_users=10, features={"quotes": True, "production": True, "intelligence": True, "automation": True, "profitability": True}))
+    db.flush()
+    db.add(User(organization_id=1, name="Equipe de teste", email="preview@example.com", password_hash=hash_password("Preview-local-123!"), is_admin=True, is_platform_admin=True))
+    db.add(User(organization_id=1, name="Cliente de apresentação", email="cliente.demo@example.com", password_hash=hash_password("MultiCliente-2026!"), is_admin=True, is_platform_admin=False))
+    db.add(Subscription(organization_id=1, plan_id=2, status="trial", provider="sandbox"))
+    db.add(Category(organization_id=1, name="Cozinhas de teste", description="Categoria sintética"))
     db.add_all([
-        Customer(name=f"Cliente de teste {number:03}", email=f"preview-{number}@example.com")
+        Customer(organization_id=1, name=f"Cliente de teste {number:03}", email=f"preview-{number}@example.com")
         for number in range(1, 126)
     ])
     db.commit()
-    supplier = Supplier(name="Fornecedor de demonstração")
+    supplier = Supplier(organization_id=1, name="Fornecedor de demonstração")
     db.add(supplier)
     db.flush()
-    db.add(Material(name="MDF de demonstração", kind="mdf", supplier_id=supplier.id, unit_cost=100, waste_percent=10))
-    db.add(Project(name="Cozinha de demonstração", customer_id=125, status="planning"))
+    db.add(Material(organization_id=1, name="MDF de demonstração", kind="mdf", supplier_id=supplier.id, unit_cost=100, waste_percent=10))
+    db.add(Project(organization_id=1, name="Cozinha de demonstração", customer_id=125, status="planning"))
     db.commit()
 
 
@@ -91,7 +98,11 @@ def preview_home():
     for asset in FRONTEND.glob("*.js"):
         html = html.replace(f'src="./{asset.name}"', f'src="./{asset.name}?v={asset.stat().st_mtime_ns}"')
     banner = '<div style="background:#fff3cc;color:#362b08;padding:8px;text-align:center" role="status">AMBIENTE DE TESTE — dados sintéticos, sem envio de mensagens</div>'
-    return HTMLResponse(html.replace("<body>", "<body>" + banner), headers={"Cache-Control": "no-store"})
+    if '<body class="dark">' in html:
+        html = html.replace('<body class="dark">', '<body class="dark">' + banner, 1)
+    else:
+        html = html.replace('<body>', '<body>' + banner, 1)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/site-config.js", include_in_schema=False)

@@ -20,7 +20,7 @@ def list_activities(
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     q: Annotated[str | None, Query(max_length=200)] = None,
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     filters = []
@@ -28,6 +28,6 @@ def list_activities(
         filters.append(Activity.entity == entity)
     if entity_id:
         filters.append(Activity.entity_id == entity_id)
-    total = crud.count_items(db, Activity, q=q, filters=filters)
+    total = crud.count_items(db, Activity, q=q, filters=filters, organization_id=current_user.organization_id)
     crud.pagination_headers(response, total=total, offset=offset, limit=limit)
-    return crud.list_items(db, Activity, offset=offset, limit=limit, q=q, filters=filters)
+    return crud.list_items(db, Activity, offset=offset, limit=limit, q=q, filters=filters, organization_id=current_user.organization_id)

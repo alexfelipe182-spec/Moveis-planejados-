@@ -5,9 +5,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import crud
-from app.api.deps import require_admin, require_cookie_csrf
+from app.api.deps import require_admin, require_cookie_csrf, require_workspace_admin
 from app.database import get_db
-from app.models import Activity, User
+from app.models import Activity, Category, Customer, Material, Product, Project, Quote, Supplier, User
 from app.services.automation import engine
 
 
@@ -20,6 +20,34 @@ def _entity_name(model) -> str:
     return model.__tablename__.rstrip("s")
 
 
+def _organization_id(user: User) -> int:
+    organization_id = getattr(user, "organization_id", None)
+    if not organization_id:
+        raise HTTPException(status_code=403, detail="Usuário sem marcenaria ativa")
+    return int(organization_id)
+
+
+TENANT_REFERENCES = {
+    Product: {"category_id": Category},
+    Project: {"customer_id": Customer, "quote_id": Quote},
+    Material: {"supplier_id": Supplier},
+}
+
+
+def _validate_tenant_references(
+    db: Session,
+    model,
+    data: dict,
+    organization_id: int,
+) -> None:
+    for field, referenced_model in TENANT_REFERENCES.get(model, {}).items():
+        referenced_id = data.get(field)
+        if referenced_id is None:
+            continue
+        if crud.get_item(db, referenced_model, referenced_id, organization_id=organization_id) is None:
+            raise HTTPException(status_code=404, detail=f"Referência {field} não encontrada")
+
+
 def _event_name(action: str, model) -> str:
     return f"{_entity_name(model)}.{action}"
 
@@ -27,6 +55,7 @@ def _event_name(action: str, model) -> str:
 def _log(db: Session, user: User, action: str, model, item_id: int | None, description: str) -> None:
     db.add(
         Activity(
+            organization_id=_organization_id(user),
             user_id=user.id,
             action=action,
             entity=_entity_name(model),
@@ -36,10 +65,15 @@ def _log(db: Session, user: User, action: str, model, item_id: int | None, descr
     )
 
 
-def _emit(action: str, model, item_id: int, user_id: int) -> None:
+def _emit(action: str, model, item_id: int, user_id: int, organization_id: int) -> None:
     engine.emit(
         _event_name(action, model),
-        {"entity": _entity_name(model), "item_id": item_id, "user_id": user_id},
+        {
+            "entity": _entity_name(model),
+            "item_id": item_id,
+            "user_id": user_id,
+            "organization_id": organization_id,
+        },
     )
 
 
@@ -93,16 +127,29 @@ def make_router(
             q: Annotated[str | None, Query(max_length=200)] = None,
             status: Annotated[str | None, Query(max_length=30)] = None,
             ids: Annotated[list[int] | None, Query(max_length=100)] = None,
+            current_user: User = Depends(require_admin),
             db: Session = Depends(get_db),
         ):
             criteria = {"q": q, "status": status, "ids": ids}
-            total = crud.count_items(db, model, **criteria)
+            organization_id = _organization_id(current_user)
+            total = crud.count_items(db, model, organization_id=organization_id, **criteria)
             crud.pagination_headers(response, total=total, offset=offset, limit=limit)
-            return crud.list_items(db, model, offset=offset, limit=limit, **criteria)
+            return crud.list_items(
+                db,
+                model,
+                offset=offset,
+                limit=limit,
+                organization_id=organization_id,
+                **criteria,
+            )
 
     @router.get("/{item_id}", response_model=read_schema)
-    def get_one(item_id: int, db: Session = Depends(get_db)):
-        item = crud.get_item(db, model, item_id)
+    def get_one(
+        item_id: int,
+        current_user: User = Depends(require_admin),
+        db: Session = Depends(get_db),
+    ):
+        item = crud.get_item(db, model, item_id, organization_id=_organization_id(current_user))
         if not item:
             raise HTTPException(status_code=404, detail="Registro não encontrado")
         return item
@@ -113,19 +160,23 @@ def make_router(
             collection_path,
             response_model=read_schema,
             status_code=201,
-            dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+            dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)],
         )
         def create(
             payload: create_schema,
-            current_user: User = Depends(require_admin),
+            current_user: User = Depends(require_workspace_admin),
             db: Session = Depends(get_db),
         ):
             try:
-                item = crud.create_item(db, model(**_payload_data(payload)), commit=False)
+                data = _payload_data(payload)
+                organization_id = _organization_id(current_user)
+                _validate_tenant_references(db, model, data, organization_id)
+                data["organization_id"] = organization_id
+                item = crud.create_item(db, model(**data), commit=False)
                 _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
                 _commit_or_conflict(db)
                 db.refresh(item)
-                _emit("created", model, item.id, current_user.id)
+                _emit("created", model, item.id, current_user.id, _organization_id(current_user))
                 return item
             except ValueError as exc:
                 db.rollback()
@@ -136,23 +187,25 @@ def make_router(
         @router.put(
             "/{item_id}",
             response_model=read_schema,
-            dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+            dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)],
         )
         def update(
             item_id: int,
             payload: update_schema,
-            current_user: User = Depends(require_admin),
+            current_user: User = Depends(require_workspace_admin),
             db: Session = Depends(get_db),
         ):
-            item = crud.get_item(db, model, item_id)
+            item = crud.get_item(db, model, item_id, organization_id=_organization_id(current_user))
             if not item:
                 raise HTTPException(status_code=404, detail="Registro não encontrado")
             try:
-                item = crud.update_item(db, item, _payload_data(payload, exclude_unset=True), commit=False)
+                data = _payload_data(payload, exclude_unset=True)
+                _validate_tenant_references(db, model, data, _organization_id(current_user))
+                item = crud.update_item(db, item, data, commit=False)
                 _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
                 _commit_or_conflict(db)
                 db.refresh(item)
-                _emit("updated", model, item.id, current_user.id)
+                _emit("updated", model, item.id, current_user.id, _organization_id(current_user))
                 return item
             except ValueError as exc:
                 db.rollback()
@@ -163,21 +216,21 @@ def make_router(
         @router.delete(
             "/{item_id}",
             status_code=204,
-            dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+            dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)],
         )
         def delete(
             item_id: int,
-            current_user: User = Depends(require_admin),
+            current_user: User = Depends(require_workspace_admin),
             db: Session = Depends(get_db),
         ):
-            item = crud.get_item(db, model, item_id)
+            item = crud.get_item(db, model, item_id, organization_id=_organization_id(current_user))
             if not item:
                 raise HTTPException(status_code=404, detail="Registro não encontrado")
             try:
                 crud.delete_item(db, item, commit=False)
                 _log(db, current_user, "deleted", model, item_id, f"Excluiu {_entity_name(model)} #{item_id}")
                 _commit_or_conflict(db)
-                _emit("deleted", model, item_id, current_user.id)
+                _emit("deleted", model, item_id, current_user.id, _organization_id(current_user))
             except ValueError as exc:
                 db.rollback()
                 raise _database_conflict(exc) from exc

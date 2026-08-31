@@ -1,0 +1,35 @@
+name: Main review gate
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  require-approved-review:
+    name: At least one approved review
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check current review state
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const latestByReviewer = new Map();
+            for (const review of reviews) {
+              if (!review.user?.login) continue;
+              latestByReviewer.set(review.user.login, review.state);
+            }
+            const approved = [...latestByReviewer.values()].filter(state => state === 'APPROVED');
+            if (approved.length < 1) {
+              core.setFailed('A main exige pelo menos uma review aprovada antes do merge.');
+            }

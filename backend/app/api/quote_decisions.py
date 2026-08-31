@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin, require_cookie_csrf
+from app.api.deps import require_cookie_csrf, require_workspace_admin
 from app.database import get_db
 from app.models import Activity, Project, Quote, User
 from app.schemas import QuoteRead
@@ -24,15 +24,16 @@ class QuoteCommercialStatusRequest(BaseModel):
 @router.patch(
     "/{item_id}/decision",
     response_model=QuoteRead,
-    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+    dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)],
 )
 def decide_quote(
     item_id: int,
     payload: QuoteDecisionRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_workspace_admin),
     db: Session = Depends(get_db),
 ):
-    item = db.get(Quote, item_id, with_for_update=True, populate_existing=True)
+    organization_id = current_user.organization_id
+    item = db.query(Quote).filter(Quote.id == item_id, Quote.organization_id == organization_id).with_for_update().populate_existing().one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "analysis":
@@ -45,6 +46,7 @@ def decide_quote(
     item.status = payload.status
     db.add(
         Activity(
+            organization_id=organization_id,
             user_id=current_user.id,
             action=payload.status,
             entity="quote",
@@ -67,6 +69,7 @@ def decide_quote(
             "previous_status": previous_status,
             "status": payload.status,
             "suggested_total": item.suggested_total,
+            "organization_id": organization_id,
         },
     )
     return item
@@ -75,14 +78,15 @@ def decide_quote(
 @router.post(
     "/{item_id}/shared",
     response_model=QuoteRead,
-    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+    dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)],
 )
 def record_quote_share(
     item_id: int,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_workspace_admin),
     db: Session = Depends(get_db),
 ):
-    item = db.get(Quote, item_id, with_for_update=True, populate_existing=True)
+    organization_id = current_user.organization_id
+    item = db.query(Quote).filter(Quote.id == item_id, Quote.organization_id == organization_id).with_for_update().populate_existing().one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "approved":
@@ -95,6 +99,7 @@ def record_quote_share(
     item.status = "sent"
     db.add(
         Activity(
+            organization_id=organization_id,
             user_id=current_user.id,
             action="shared",
             entity="quote",
@@ -113,6 +118,7 @@ def record_quote_share(
             "previous_status": previous_status,
             "status": item.status,
             "suggested_total": item.suggested_total,
+            "organization_id": organization_id,
         },
     )
     return item
@@ -121,15 +127,16 @@ def record_quote_share(
 @router.patch(
     "/{item_id}/commercial-status",
     response_model=QuoteRead,
-    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+    dependencies=[Depends(require_workspace_admin), Depends(require_cookie_csrf)],
 )
 def update_quote_commercial_status(
     item_id: int,
     payload: QuoteCommercialStatusRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_workspace_admin),
     db: Session = Depends(get_db),
 ):
-    item = db.get(Quote, item_id, with_for_update=True, populate_existing=True)
+    organization_id = current_user.organization_id
+    item = db.query(Quote).filter(Quote.id == item_id, Quote.organization_id == organization_id).with_for_update().populate_existing().one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "sent":
@@ -145,6 +152,7 @@ def update_quote_commercial_status(
 
     db.add(
         Activity(
+            organization_id=organization_id,
             user_id=current_user.id,
             action=payload.status,
             entity="quote",
@@ -154,7 +162,10 @@ def update_quote_commercial_status(
     )
 
     if payload.status == "accepted":
-        existing_project = db.query(Project).filter(Project.quote_id == item.id).one_or_none()
+        existing_project = db.query(Project).filter(
+            Project.quote_id == item.id,
+            Project.organization_id == organization_id,
+        ).one_or_none()
         if existing_project:
             raise HTTPException(
                 status_code=409,
@@ -162,6 +173,7 @@ def update_quote_commercial_status(
             )
 
         created_project = Project(
+            organization_id=organization_id,
             customer_id=item.customer_id,
             quote_id=item.id,
             name=f"Projeto do orçamento #{item.id}",
@@ -174,6 +186,7 @@ def update_quote_commercial_status(
         db.flush()
         db.add(
             Activity(
+                organization_id=organization_id,
                 user_id=current_user.id,
                 action="created_from_quote",
                 entity="project",
@@ -198,6 +211,7 @@ def update_quote_commercial_status(
             "status": item.status,
             "suggested_total": item.suggested_total,
             "project_id": created_project.id if created_project else None,
+            "organization_id": organization_id,
         },
     )
     if created_project:
@@ -210,6 +224,7 @@ def update_quote_commercial_status(
                 "quote_id": item.id,
                 "customer_id": item.customer_id,
                 "status": created_project.status,
+                "organization_id": organization_id,
             },
         )
     return item

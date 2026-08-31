@@ -28,6 +28,16 @@ def promote_to_admin(email: str):
         db.close()
 
 
+def demote_to_member(email: str):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).one()
+        user.is_admin = False
+        db.commit()
+    finally:
+        db.close()
+
+
 def test_swagger_page_and_cookie_diagnostic(client):
     docs = client.get("/docs")
     assert docs.status_code == 200
@@ -124,6 +134,7 @@ def test_non_admin_cannot_access_admin_endpoint(client):
     email = "teste.user@example.com"
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Usuário", "email": email, "password": password}).status_code == 201
+    demote_to_member(email)
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
     assert client.get("/api/v1/admin/check").status_code == 403
     assert client.get("/api/v1/admin/dashboard").status_code == 403
@@ -141,6 +152,7 @@ def test_non_admin_cannot_mutate_crud(client):
     email = "teste.crud.csrf@example.com"
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Teste CRUD", "email": email, "password": password}).status_code == 201
+    demote_to_member(email)
 
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
 

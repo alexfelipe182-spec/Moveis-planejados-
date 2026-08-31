@@ -11,7 +11,7 @@ import app.main as main_module
 from app.core.resilience import RateLimitDecision
 from app.core.security import create_access_token
 from app.database import Base, get_db
-from app.models import User
+from app.models import Organization, User
 
 
 INTERNAL_READS = [
@@ -36,10 +36,11 @@ def access_client(monkeypatch):
     Base.metadata.create_all(database)
     sessions = sessionmaker(database, expire_on_commit=False)
     with sessions() as db:
+        db.add(Organization(id=1, name="Marcenaria de teste", slug="marcenaria-teste"))
         db.add_all([
-            User(id=1, name="Equipe teste", email="staff@example.com", password_hash="unused", is_admin=True),
-            User(id=2, name="Visitante teste", email="visitor@example.com", password_hash="unused", is_admin=False),
-            User(id=3, name="Inativo teste", email="inactive@example.com", password_hash="unused", is_active=False),
+            User(id=1, organization_id=1, name="Equipe teste", email="staff@example.com", password_hash="unused", is_admin=True),
+            User(id=2, organization_id=1, name="Visitante teste", email="visitor@example.com", password_hash="unused", is_admin=False),
+            User(id=3, organization_id=1, name="Inativo teste", email="inactive@example.com", password_hash="unused", is_active=False),
         ])
         db.commit()
 
@@ -86,16 +87,17 @@ def test_authorized_staff_keep_read_access(access_client, path):
     assert response.json() == []
 
 
-def test_public_registration_never_grants_internal_access(access_client):
-    payload = {"name": "Novo visitante", "email": "public@example.com", "password": "Only-for-test-123!", "is_admin": True}
+def test_public_registration_creates_scoped_owner_access(access_client):
+    payload = {"name": "Nova marcenaria", "email": "public@example.com", "password": "Only-for-test-123!", "is_admin": False}
     registered = access_client.post("/api/v1/auth/register", json=payload)
     assert registered.status_code == 201
-    assert registered.json()["is_admin"] is False
+    assert registered.json()["is_admin"] is True
+    assert registered.json()["organization_id"] > 1
     login = access_client.post("/api/v1/auth/login", data={"username": payload["email"], "password": payload["password"]})
     assert login.status_code == 200
     assert access_client.get("/api/v1/me").status_code == 200
-    for path in INTERNAL_READS:
-        assert access_client.get(path).status_code == 403
+    assert access_client.get("/api/v1/admin/check").status_code == 200
+    assert access_client.get("/api/v1/admin/users").json()[0]["email"] == payload["email"]
 
 
 def test_release_workflow_and_approved_quote_integrity(access_client, monkeypatch):

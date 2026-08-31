@@ -88,21 +88,67 @@ def test_list_and_get_success(monkeypatch):
 
     monkeypatch.setattr(crud_router.crud, "list_items", lambda db, model, **kwargs: items)
     monkeypatch.setattr(crud_router.crud, "count_items", lambda db, model, **kwargs: len(items))
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: items[0])
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: items[0])
 
     response = Response()
-    assert list_endpoint(response=response, offset=0, limit=100, db=object()) == items
+    current_user = SimpleNamespace(id=1, organization_id=7)
+    assert list_endpoint(response=response, offset=0, limit=100, current_user=current_user, db=object()) == items
     assert response.headers["X-Total-Count"] == "2"
-    assert get_endpoint(item_id=1, db=object()) is items[0]
+    assert get_endpoint(item_id=1, current_user=current_user, db=object()) is items[0]
+
+
+def test_crud_router_scopes_reads_and_assigns_writes_to_current_organization(monkeypatch):
+    """Catches a route that forgets tenant scope or trusts organization input from the client."""
+    router = build_router()
+    list_endpoint = endpoint_for(router, "GET")
+    get_endpoint = endpoint_for(router, "GET", item=True)
+    create_endpoint = endpoint_for(router, "POST")
+    current_user = SimpleNamespace(id=42, organization_id=7)
+    observed = {"list": [], "count": [], "get": [], "create": []}
+    created = SimpleNamespace(id=9, name="Novo", organization_id=7)
+    db = MagicMock()
+
+    monkeypatch.setattr(
+        crud_router.crud,
+        "list_items",
+        lambda _db, _model, **kwargs: observed["list"].append(kwargs) or [],
+    )
+    monkeypatch.setattr(
+        crud_router.crud,
+        "count_items",
+        lambda _db, _model, **kwargs: observed["count"].append(kwargs) or 0,
+    )
+    monkeypatch.setattr(
+        crud_router.crud,
+        "get_item",
+        lambda _db, _model, item_id, **kwargs: observed["get"].append(kwargs) or created,
+    )
+
+    def create_item(_db, obj, *, commit=True):
+        observed["create"].append(obj)
+        return created
+
+    monkeypatch.setattr(crud_router.crud, "create_item", create_item)
+    monkeypatch.setattr(crud_router, "_log", lambda *args: None)
+    monkeypatch.setattr(crud_router, "_emit", lambda *args: None)
+
+    list_endpoint(response=Response(), offset=0, limit=100, current_user=current_user, db=db)
+    get_endpoint(item_id=9, current_user=current_user, db=db)
+    create_endpoint(payload=CreateSchema(name="Novo"), current_user=current_user, db=db)
+
+    assert observed["list"][0]["organization_id"] == 7
+    assert observed["count"][0]["organization_id"] == 7
+    assert observed["get"][0]["organization_id"] == 7
+    assert observed["create"][0].organization_id == 7
 
 
 def test_get_one_returns_404_when_missing(monkeypatch):
     router = build_router()
     endpoint = endpoint_for(router, "GET", item=True)
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: None)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: None)
 
     with pytest.raises(HTTPException) as exc_info:
-        endpoint(item_id=123, db=object())
+        endpoint(item_id=123, current_user=SimpleNamespace(id=1, organization_id=7), db=object())
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Registro não encontrado"
@@ -127,7 +173,7 @@ def test_create_success_logs_and_emits(monkeypatch):
 
     result = endpoint(
         payload=CreateSchema(name="Criado"),
-        current_user=SimpleNamespace(id=42),
+        current_user=SimpleNamespace(id=42, organization_id=7),
         db=db,
     )
 
@@ -136,7 +182,7 @@ def test_create_success_logs_and_emits(monkeypatch):
     assert logged
     db.commit.assert_called_once_with()
     db.refresh.assert_called_once_with(created)
-    assert emitted == [("created", FakeModel, 7, 42)]
+    assert emitted == [("created", FakeModel, 7, 42, 7)]
 
 
 def test_create_maps_value_error_to_409(monkeypatch):
@@ -152,7 +198,7 @@ def test_create_maps_value_error_to_409(monkeypatch):
     with pytest.raises(HTTPException) as exc_info:
         endpoint(
             payload=CreateSchema(name="Duplicado"),
-            current_user=SimpleNamespace(id=1),
+            current_user=SimpleNamespace(id=1, organization_id=7),
             db=db,
         )
 
@@ -171,7 +217,7 @@ def test_update_success_logs_and_emits(monkeypatch):
     commits = []
     db = MagicMock()
 
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: existing)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: existing)
 
     def update_item(_db, _item, _data, *, commit=True):
         commits.append(commit)
@@ -184,7 +230,7 @@ def test_update_success_logs_and_emits(monkeypatch):
     result = endpoint(
         item_id=10,
         payload=UpdateSchema(name="Novo"),
-        current_user=SimpleNamespace(id=42),
+        current_user=SimpleNamespace(id=42, organization_id=7),
         db=db,
     )
 
@@ -193,26 +239,26 @@ def test_update_success_logs_and_emits(monkeypatch):
     assert logged
     db.commit.assert_called_once_with()
     db.refresh.assert_called_once_with(updated)
-    assert emitted == [("updated", FakeModel, 10, 42)]
+    assert emitted == [("updated", FakeModel, 10, 42, 7)]
 
 
 def test_update_handles_missing_and_conflict(monkeypatch):
     router = build_router()
     endpoint = endpoint_for(router, "PUT", item=True)
 
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: None)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: None)
     with pytest.raises(HTTPException) as missing:
         endpoint(
             item_id=10,
             payload=UpdateSchema(name="Novo"),
-            current_user=SimpleNamespace(id=1),
+            current_user=SimpleNamespace(id=1, organization_id=7),
             db=MagicMock(),
         )
     assert missing.value.status_code == 404
 
     existing = SimpleNamespace(id=10, name="Antigo")
     db = MagicMock()
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: existing)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: existing)
 
     def fail_update(_db, _item, _data, *, commit=True):
         raise ValueError("atualização inválida")
@@ -222,7 +268,7 @@ def test_update_handles_missing_and_conflict(monkeypatch):
         endpoint(
             item_id=10,
             payload=UpdateSchema(name="Novo"),
-            current_user=SimpleNamespace(id=1),
+            current_user=SimpleNamespace(id=1, organization_id=7),
             db=db,
         )
     assert conflict.value.status_code == 409
@@ -240,7 +286,7 @@ def test_delete_success_logs_and_emits(monkeypatch):
     commits = []
     db = MagicMock()
 
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: existing)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: existing)
 
     def delete_item(_db, item, *, commit=True):
         commits.append(commit)
@@ -250,35 +296,35 @@ def test_delete_success_logs_and_emits(monkeypatch):
     monkeypatch.setattr(crud_router, "_log", lambda *args: logged.append(args))
     monkeypatch.setattr(crud_router, "_emit", lambda *args: emitted.append(args))
 
-    result = endpoint(item_id=20, current_user=SimpleNamespace(id=42), db=db)
+    result = endpoint(item_id=20, current_user=SimpleNamespace(id=42, organization_id=7), db=db)
 
     assert result is None
     assert commits == [False]
     assert deleted == [existing]
     assert logged
     db.commit.assert_called_once_with()
-    assert emitted == [("deleted", FakeModel, 20, 42)]
+    assert emitted == [("deleted", FakeModel, 20, 42, 7)]
 
 
 def test_delete_handles_missing_and_conflict(monkeypatch):
     router = build_router()
     endpoint = endpoint_for(router, "DELETE", item=True)
 
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: None)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: None)
     with pytest.raises(HTTPException) as missing:
-        endpoint(item_id=20, current_user=SimpleNamespace(id=1), db=MagicMock())
+        endpoint(item_id=20, current_user=SimpleNamespace(id=1, organization_id=7), db=MagicMock())
     assert missing.value.status_code == 404
 
     existing = SimpleNamespace(id=20, name="Em uso")
     db = MagicMock()
-    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id: existing)
+    monkeypatch.setattr(crud_router.crud, "get_item", lambda db, model, item_id, **kwargs: existing)
 
     def fail_delete(_db, _item, *, commit=True):
         raise ValueError("registro em uso")
 
     monkeypatch.setattr(crud_router.crud, "delete_item", fail_delete)
     with pytest.raises(HTTPException) as conflict:
-        endpoint(item_id=20, current_user=SimpleNamespace(id=1), db=db)
+        endpoint(item_id=20, current_user=SimpleNamespace(id=1, organization_id=7), db=db)
     assert conflict.value.status_code == 409
     assert conflict.value.detail == "registro em uso"
     db.rollback.assert_called_once_with()

@@ -28,7 +28,7 @@ function client(handler) {
   const calls = [], timers = new Map();
   let timerId = 0;
   const context = {
-    URLSearchParams,
+    URLSearchParams, AbortController,
     location: { hostname: 'site.example' },
     API_BASE_URL: 'https://api.example/api/v1',
     document: { cookie: '', activeElement: null, querySelector: selector => sections[selector.slice(1)] || null, querySelectorAll: () => [], createElement: () => new Element() },

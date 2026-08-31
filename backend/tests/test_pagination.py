@@ -13,7 +13,7 @@ from app import crud
 from app.api.deps import get_current_user, require_admin
 from app.api.routes import api_router
 from app.database import Base, get_db
-from app.models import Activity, Category, Customer, Product, Project, Quote, User
+from app.models import Activity, Category, Customer, Organization, Product, Project, Quote, User
 
 
 @pytest.fixture
@@ -21,8 +21,9 @@ def database():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        db.add_all(Customer(id=index, name=f"Cliente {index:03}") for index in range(1, 136))
-        db.add_all(Category(id=index, name=f"Serviço {index:03}") for index in range(1, 136))
+        db.add(Organization(id=1, name="Teste", slug="teste"))
+        db.add_all(Customer(id=index, organization_id=1, name=f"Cliente {index:03}") for index in range(1, 136))
+        db.add_all(Category(id=index, organization_id=1, name=f"Serviço {index:03}") for index in range(1, 136))
         db.commit()
         yield db
     engine.dispose()
@@ -32,7 +33,7 @@ def database():
 def client(database):
     app = FastAPI()
     app.include_router(api_router)
-    admin = User(id=1, name="Equipe", email="admin@example.com", is_admin=True, is_active=True)
+    admin = User(id=1, organization_id=1, name="Equipe", email="admin@example.com", is_admin=True, is_active=True)
     app.dependency_overrides[get_current_user] = lambda: admin
     app.dependency_overrides[require_admin] = lambda: admin
     app.dependency_overrides[get_db] = lambda: database
@@ -71,9 +72,9 @@ def test_search_includes_related_customer_and_status(database, client, model, pa
     database.get(Customer, 135).name = "Cliente fora da primeira página"
     extra = {"description": "Armário"} if model is Quote else {"name": "Armário"}
     database.add_all([
-        model(id=1, customer_id=135, status="sent" if model is Quote else "planning", **extra),
-        model(id=2, customer_id=135, status="accepted" if model is Quote else "completed", **extra),
-        model(id=3, customer_id=1, status="sent" if model is Quote else "planning", **extra),
+        model(id=1, organization_id=1, customer_id=135, status="sent" if model is Quote else "planning", **extra),
+        model(id=2, organization_id=1, customer_id=135, status="accepted" if model is Quote else "completed", **extra),
+        model(id=3, organization_id=1, customer_id=1, status="sent" if model is Quote else "planning", **extra),
     ])
     database.commit()
     response = client.get(f"/api/v1/{path}", params={"q": "fora da primeira", "status": "sent" if model is Quote else "planning"})
@@ -84,7 +85,7 @@ def test_search_includes_related_customer_and_status(database, client, model, pa
 
 def test_product_search_includes_category(database, client):
     database.get(Category, 135).name = "Sob medida especial"
-    database.add_all([Product(id=1, category_id=135, name="Mesa"), Product(id=2, category_id=1, name="Mesa")])
+    database.add_all([Product(id=1, organization_id=1, category_id=135, name="Mesa"), Product(id=2, organization_id=1, category_id=1, name="Mesa")])
     database.commit()
     response = client.get("/api/v1/products?q=sob%20medida")
     assert response.status_code == 200
@@ -92,7 +93,7 @@ def test_product_search_includes_category(database, client):
 
 
 def test_search_wildcards_are_literal_and_sql_is_parameterized(database, client):
-    database.add(Customer(name="Percentual 50%_oferta"))
+    database.add(Customer(organization_id=1, name="Percentual 50%_oferta"))
     database.commit()
     response = client.get("/api/v1/customers", params={"q": "%_"})
     assert len(response.json()) == 1
@@ -108,7 +109,7 @@ def test_numeric_id_search_is_exact(client):
 
 
 def test_user_search_never_queries_password_hash(database, client):
-    database.add_all(User(id=index, name=f"Usuário {index}", email=f"person{index}@example.com", password_hash="internal-secret-hash") for index in range(1, 126))
+    database.add_all(User(id=index, organization_id=1, name=f"Usuário {index}", email=f"person{index}@example.com", password_hash="internal-secret-hash") for index in range(1, 126))
     database.commit()
     page = client.get("/api/v1/admin/users?offset=100&limit=25")
     assert page.status_code == 200
@@ -122,8 +123,8 @@ def test_user_search_never_queries_password_hash(database, client):
 @pytest.mark.parametrize("endpoint", ["/activities?entity=customer&entity_id=135&", "/customers/135/history?"])
 def test_activity_history_paginates_deterministically_and_combines_filters(database, client, endpoint):
     timestamp = datetime(2026, 8, 27, 12, 0)
-    database.add_all(Activity(id=index, action="updated", entity="customer", entity_id=135, description=f"Edição {index}", created_at=timestamp) for index in range(1, 126))
-    database.add(Activity(id=126, action="created", entity="customer", entity_id=1, description="Edição fora do cliente", created_at=timestamp))
+    database.add_all(Activity(id=index, organization_id=1, action="updated", entity="customer", entity_id=135, description=f"Edição {index}", created_at=timestamp) for index in range(1, 126))
+    database.add(Activity(id=126, organization_id=1, action="created", entity="customer", entity_id=1, description="Edição fora do cliente", created_at=timestamp))
     database.commit()
     response = client.get(f"/api/v1{endpoint}offset=100&limit=25")
     assert response.status_code == 200

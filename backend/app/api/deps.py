@@ -1,11 +1,13 @@
 import secrets
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
 from app.database import get_db
-from app.models import User
+from app.models import Organization, Subscription, User
+from app.services.billing import subscription_allows_access
 
 CSRF_COOKIE = "csrf_token"
 
@@ -35,6 +37,9 @@ def get_current_user(
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário inválido ou inativo")
+    organization = db.get(Organization, user.organization_id)
+    if not organization or organization.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Marcenaria suspensa ou indisponível")
     return user
 
 
@@ -64,4 +69,26 @@ def require_cookie_csrf(
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito ao administrador")
+    return current_user
+
+
+def require_workspace_admin(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> User:
+    """Allow operational writes only while the tenant subscription grants access."""
+    subscription = db.scalar(
+        select(Subscription).where(Subscription.organization_id == current_user.organization_id)
+    )
+    if not subscription_allows_access(subscription):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="A assinatura da marcenaria não permite novas alterações",
+        )
+    return current_user
+
+
+def require_platform_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito à plataforma")
     return current_user

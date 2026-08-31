@@ -28,6 +28,16 @@ def promote_to_admin(email: str):
         db.close()
 
 
+def move_to_organization(*, email: str, organization_id: int):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).one()
+        user.organization_id = organization_id
+        db.commit()
+    finally:
+        db.close()
+
+
 def register(client, *, name: str, email: str, password: str):
     response = client.post(
         "/api/v1/auth/register",
@@ -54,6 +64,10 @@ def test_admin_user_management_guards_and_update(client):
     admin_id = promote_to_admin(admin_email)
     register(client, name="Target User", email=target_email, password=password)
     register(client, name="Duplicate User", email=duplicate_email, password=password)
+    with SessionLocal() as db:
+        admin_org_id = db.query(User.organization_id).filter(User.email == admin_email).scalar()
+    move_to_organization(email=target_email, organization_id=admin_org_id)
+    move_to_organization(email=duplicate_email, organization_id=admin_org_id)
     login(client, email=admin_email, password=password)
 
     users = client.get("/api/v1/admin/users")

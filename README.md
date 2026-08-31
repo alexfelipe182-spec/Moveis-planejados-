@@ -1,6 +1,13 @@
-# Ideal Marcenaria
+# Multi-Marcenarias
 
 Plataforma para gestão de marcenaria com API em FastAPI, PostgreSQL, autenticação segura, painel web e automações de CI/CD.
+
+## Apresentação para cliente
+
+O [roteiro de demonstração local](docs/apresentacao-cliente.md) reúne acesso de
+teste, seis passos de apresentação, um orçamento detalhado e custos ilustrativos.
+A prévia usa dados descartáveis, não envia mensagens e não substitui o ambiente
+definitivo. O roteiro também explica como reabrir e preparar o exemplo sem duplicações.
 
 ## Arquitetura
 
@@ -8,6 +15,10 @@ Plataforma para gestão de marcenaria com API em FastAPI, PostgreSQL, autentica�
 - Banco: PostgreSQL com Alembic
 - Cache/limites: Redis
 - Autenticação: JWT, refresh token, rotação/revogação e CSRF para fluxos por cookie
+- Multi-tenancy: uma organização por marcenaria, ownership obrigatório, referências
+  compostas no banco e painel de plataforma separado
+- Monetização: catálogo de planos, trial inicial, checkout em sandbox e webhooks
+  idempotentes; Stripe só é habilitado depois da configuração de produção
 - Frontend: HTML, CSS e JavaScript
 - Contêineres: Docker e Docker Compose
 - Deploy: Render e publicação de imagem no GHCR
@@ -33,10 +44,13 @@ de backup, remetente de e-mail e número comercial. O ensaio de recuperação do
 
 - [Configuração de e-mail](docs/email-setup.md)
 - [Configuração do atendimento público](docs/public-contact.md)
+- [Arquitetura SaaS e plano de lançamento](docs/saas-architecture.md)
 
-Os dados internos são restritos a administradores. O cadastro público não concede
-acesso administrativo. Listagens possuem paginação e busca no servidor; decisões e
-edições de orçamento usam bloqueio de linha para preservar valores aprovados.
+Os dados internos são restritos a administradores. O cadastro público cria uma nova
+marcenaria isolada, concede a essa primeira conta a propriedade administrativa do
+próprio espaço e inicia o trial do plano Starter quando o catálogo já estiver migrado.
+Listagens possuem paginação e busca no servidor; decisões e edições de orçamento usam
+bloqueio de linha para preservar valores aprovados.
 
 **Atenção ao Docker existente:** a stack usa PostgreSQL 18 e um volume novo.
 Instalações com PostgreSQL 16 precisam seguir o plano de migração do manual antes
