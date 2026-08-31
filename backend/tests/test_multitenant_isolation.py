@@ -82,8 +82,39 @@ def test_customers_are_isolated_between_tenants(client: TestClient):
     assert list_b_before.status_code == 200
     assert list_b_before.json() == []
 
-    hidden_a = client.get(f"/api/v1/customers/{customer_a_id}")
-    assert hidden_a.status_code == 404
+    assert client.get(f"/api/v1/customers/{customer_a_id}").status_code == 404
+    assert (
+        client.put(
+            f"/api/v1/customers/{customer_a_id}",
+            json={"name": "Tentativa B"},
+            headers=csrf_headers(client),
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/customers/{customer_a_id}",
+            headers=csrf_headers(client),
+        ).status_code
+        == 404
+    )
+
+    # IDs de outro tenant também não podem ser usados como referências em
+    # novos registros. Isso bloqueia ataques que tentem adivinhar customer_id.
+    cross_tenant_quote = client.post(
+        "/api/v1/quotes",
+        json={
+            "customer_id": customer_a_id,
+            "description": "Tentativa de referenciar cliente da Marcenaria A",
+            "material_cost": "100.00",
+            "hardware_cost": "0.00",
+            "labor_cost": "100.00",
+            "finishing_cost": "0.00",
+            "profit_margin": "30.00",
+        },
+        headers=csrf_headers(client),
+    )
+    assert cross_tenant_quote.status_code == 409
 
     created_b = client.post(
         "/api/v1/customers",
@@ -91,6 +122,23 @@ def test_customers_are_isolated_between_tenants(client: TestClient):
         headers=csrf_headers(client),
     )
     assert created_b.status_code == 201
+    customer_b_id = created_b.json()["id"]
+
+    quote_b = client.post(
+        "/api/v1/quotes",
+        json={
+            "customer_id": customer_b_id,
+            "description": "Orçamento exclusivo B",
+            "material_cost": "500.00",
+            "hardware_cost": "100.00",
+            "labor_cost": "300.00",
+            "finishing_cost": "100.00",
+            "profit_margin": "30.00",
+        },
+        headers=csrf_headers(client),
+    )
+    assert quote_b.status_code == 201
+    quote_b_id = quote_b.json()["id"]
 
     list_b_after = client.get("/api/v1/customers")
     assert list_b_after.status_code == 200
@@ -100,3 +148,4 @@ def test_customers_are_isolated_between_tenants(client: TestClient):
     list_a_after = client.get("/api/v1/customers")
     assert list_a_after.status_code == 200
     assert [item["name"] for item in list_a_after.json()] == ["Cliente exclusivo A"]
+    assert client.get(f"/api/v1/quotes/{quote_b_id}").status_code == 404
