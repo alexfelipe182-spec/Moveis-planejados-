@@ -17,7 +17,7 @@ def csrf_headers(client: TestClient) -> dict[str, str]:
     return {"X-CSRF-Token": token} if token else {}
 
 
-def register_and_promote(client: TestClient, *, name: str, email: str, password: str) -> int:
+def register_and_promote(client: TestClient, *, name: str, email: str, password: str) -> tuple[int, int]:
     response = client.post(
         "/api/v1/auth/register",
         json={"name": name, "email": email, "password": password},
@@ -29,9 +29,10 @@ def register_and_promote(client: TestClient, *, name: str, email: str, password:
         user = db.query(User).filter(User.email == email).one()
         assert user.tenant_id is not None
         tenant_id = user.tenant_id
+        user_id = user.id
         user.is_admin = True
         db.commit()
-        return tenant_id
+        return tenant_id, user_id
     finally:
         db.close()
 
@@ -45,26 +46,31 @@ def login(client: TestClient, email: str, password: str) -> None:
     assert response.status_code == 200
 
 
-def test_customers_are_isolated_between_tenants(client: TestClient):
+def test_customers_users_and_references_are_isolated_between_tenants(client: TestClient):
     password = "Senha-Forte-123!"
     email_a = "tenant.a@example.com"
     email_b = "tenant.b@example.com"
 
-    tenant_a = register_and_promote(
+    tenant_a, user_a_id = register_and_promote(
         client,
         name="Marcenaria A",
         email=email_a,
         password=password,
     )
-    tenant_b = register_and_promote(
+    tenant_b, user_b_id = register_and_promote(
         client,
         name="Marcenaria B",
         email=email_b,
         password=password,
     )
     assert tenant_a != tenant_b
+    assert user_a_id != user_b_id
 
     login(client, email_a, password)
+    users_a = client.get("/api/v1/admin/users")
+    assert users_a.status_code == 200
+    assert [item["email"] for item in users_a.json()] == [email_a]
+
     created_a = client.post(
         "/api/v1/customers",
         json={"name": "Cliente exclusivo A", "email": "cliente.a@example.com"},
@@ -78,6 +84,18 @@ def test_customers_are_isolated_between_tenants(client: TestClient):
     assert [item["name"] for item in list_a.json()] == ["Cliente exclusivo A"]
 
     login(client, email_b, password)
+    users_b = client.get("/api/v1/admin/users")
+    assert users_b.status_code == 200
+    assert [item["email"] for item in users_b.json()] == [email_b]
+    assert (
+        client.patch(
+            f"/api/v1/admin/users/{user_a_id}",
+            json={"is_active": False},
+            headers=csrf_headers(client),
+        ).status_code
+        == 404
+    )
+
     list_b_before = client.get("/api/v1/customers")
     assert list_b_before.status_code == 200
     assert list_b_before.json() == []
@@ -99,8 +117,6 @@ def test_customers_are_isolated_between_tenants(client: TestClient):
         == 404
     )
 
-    # IDs de outro tenant também não podem ser usados como referências em
-    # novos registros. Isso bloqueia ataques que tentem adivinhar customer_id.
     cross_tenant_quote = client.post(
         "/api/v1/quotes",
         json={
@@ -149,3 +165,11 @@ def test_customers_are_isolated_between_tenants(client: TestClient):
     assert list_a_after.status_code == 200
     assert [item["name"] for item in list_a_after.json()] == ["Cliente exclusivo A"]
     assert client.get(f"/api/v1/quotes/{quote_b_id}").status_code == 404
+    assert (
+        client.patch(
+            f"/api/v1/admin/users/{user_b_id}",
+            json={"is_admin": False},
+            headers=csrf_headers(client),
+        ).status_code
+        == 404
+    )
