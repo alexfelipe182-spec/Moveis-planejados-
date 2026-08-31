@@ -9,12 +9,17 @@ from app.models.tenant import utc_now_naive
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_subscriptions_tenant_id"),
+        UniqueConstraint("provider_customer_id", name="uq_subscriptions_provider_customer_id"),
+        UniqueConstraint("provider_subscription_id", name="uq_subscriptions_provider_subscription_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), unique=True, index=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
     provider: Mapped[str] = mapped_column(String(40), default="manual", nullable=False)
-    provider_customer_id: Mapped[str | None] = mapped_column(String(180), unique=True, nullable=True)
-    provider_subscription_id: Mapped[str | None] = mapped_column(String(180), unique=True, nullable=True)
+    provider_customer_id: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    provider_subscription_id: Mapped[str | None] = mapped_column(String(180), nullable=True)
     plan_code: Mapped[str] = mapped_column(String(40), default="starter", nullable=False)
     status: Mapped[str] = mapped_column(String(40), default="trialing", nullable=False, index=True)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
