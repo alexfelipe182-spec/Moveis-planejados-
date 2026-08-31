@@ -18,6 +18,7 @@ from app.api.protected import router as protected_router
 from app.api.quote_decisions import router as quote_decisions_router
 from app.api.quote_intelligence import router as quote_intelligence_router
 from app.api.quote_items import router as quote_items_router
+from app.api.tenant import router as tenant_router
 from app.database import get_db
 from app.models import Activity, Category, Customer, Material, Product, Project, Quote, Supplier, User
 from app.schemas import (
@@ -44,6 +45,7 @@ class QuoteEstimateRequest(BaseModel):
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(protected_router)
+api_router.include_router(tenant_router)
 api_router.include_router(admin_router)
 api_router.include_router(activity_router)
 api_router.include_router(customer_history_router)

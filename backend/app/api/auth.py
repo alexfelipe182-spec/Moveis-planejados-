@@ -1,6 +1,8 @@
 import hashlib
+import re
 import secrets
 import smtplib
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
@@ -13,8 +15,9 @@ from app.api.deps import CSRF_COOKIE, require_csrf
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 from app.database import get_db
-from app.models import Activity, PasswordResetToken, RefreshToken, User
+from app.models import Activity, PasswordResetToken, RefreshToken, Tenant, User
 from app.schemas.password_reset import PasswordResetConfirm, PasswordResetRequest, PasswordResetResponse
+from app.schemas.tenant import BusinessRegister, BusinessRegisterResponse
 from app.schemas.user import UserCreate, UserRead
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -22,6 +25,22 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _slug_base(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-")
+    return (slug or "marcenaria")[:150]
+
+
+def _available_tenant_slug(db: Session, business_name: str) -> str:
+    base = _slug_base(business_name)
+    candidate = base
+    suffix = 2
+    while db.scalar(select(Tenant.id).where(Tenant.slug == candidate)):
+        candidate = f"{base[:140]}-{suffix}"
+        suffix += 1
+    return candidate
 
 
 def _cookies(response: Response, access: str, refresh: str) -> str:
@@ -40,7 +59,7 @@ def _send_reset_email(user: User, token: str) -> bool:
     if not all([settings.smtp_host, settings.smtp_user, settings.smtp_password, settings.smtp_from]):
         return False
     msg = EmailMessage()
-    msg["Subject"] = "Recuperação de acesso — Marcenaria Ideal"
+    msg["Subject"] = "Recuperação de acesso — Multi-Marcenarias"
     msg["From"] = settings.smtp_from
     msg["To"] = user.email
     link = f"{settings.frontend_url}/#reset_token={token}"
@@ -75,8 +94,53 @@ def get_csrf_token(response: Response, csrf_token: str | None = Cookie(default=N
     return {"csrf_token": csrf_token}
 
 
+@router.post(
+    "/register-business",
+    response_model=BusinessRegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_business(payload: BusinessRegister, db: Session = Depends(get_db)):
+    """Cria uma nova marcenaria e o primeiro administrador em uma transação."""
+    email = str(payload.email).strip().lower()
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+
+    tenant = Tenant(
+        name=payload.business_name.strip(),
+        slug=_available_tenant_slug(db, payload.business_name),
+        plan_code=payload.plan_code,
+    )
+    owner = User(
+        tenant=tenant,
+        name=payload.owner_name.strip(),
+        email=email,
+        password_hash=hash_password(payload.password),
+        is_admin=True,
+    )
+    db.add_all([tenant, owner])
+    try:
+        db.flush()
+        db.add(
+            Activity(
+                user_id=owner.id,
+                action="business_registered",
+                entity="tenant",
+                entity_id=tenant.id,
+                description=f"Criou a marcenaria {tenant.name}",
+            )
+        )
+        db.commit()
+        db.refresh(tenant)
+        db.refresh(owner)
+    except Exception:
+        db.rollback()
+        raise
+    return BusinessRegisterResponse(tenant=tenant, owner=owner)
+
+
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
+    """Cadastro legado; novos clientes devem preferir /register-business."""
     email = str(payload.email).strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
@@ -105,6 +169,11 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
     user = db.scalar(select(User).where(User.email == email))
     if not user or not user.is_active or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos")
+    if not user.tenant_id:
+        raise HTTPException(status_code=403, detail="Usuário sem marcenaria vinculada")
+    tenant = db.get(Tenant, user.tenant_id)
+    if not tenant or not tenant.is_active:
+        raise HTTPException(status_code=403, detail="Marcenaria indisponível")
     access = create_access_token(str(user.id))
     refresh, jti, expires = create_refresh_token(str(user.id))
     db.add(RefreshToken(user_id=user.id, token_jti=jti, expires_at=expires.replace(tzinfo=None)))
@@ -181,8 +250,11 @@ def refresh(response: Response, _: None = Depends(require_csrf), refresh_token: 
     if stored.user_id != user_id:
         raise HTTPException(status_code=401, detail="Refresh token inválido")
     user = db.get(User, user_id)
-    if not user or not user.is_active:
+    if not user or not user.is_active or not user.tenant_id:
         raise HTTPException(status_code=401, detail="Usuário inválido")
+    tenant = db.get(Tenant, user.tenant_id)
+    if not tenant or not tenant.is_active:
+        raise HTTPException(status_code=403, detail="Marcenaria indisponível")
     stored.revoked = True
     access = create_access_token(str(user.id))
     new_refresh, jti, expires = create_refresh_token(str(user.id))

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
 from app.database import get_db
-from app.models import User
+from app.models import Tenant, User
 
 CSRF_COOKIE = "csrf_token"
 
@@ -37,6 +37,9 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário inválido ou inativo")
     if not user.tenant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário sem marcenaria vinculada")
+    tenant = db.get(Tenant, user.tenant_id)
+    if not tenant or not tenant.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Marcenaria indisponível")
     db.info["tenant_id"] = user.tenant_id
     return user
 
