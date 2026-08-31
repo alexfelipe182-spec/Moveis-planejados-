@@ -67,10 +67,10 @@ def create_user(
     tenant = db.get(Tenant, current_user.tenant_id)
     if tenant is None:
         raise HTTPException(status_code=404, detail="Marcenaria não encontrada")
-    ensure_capacity(db, tenant, "users")
     email = str(payload.email).strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+    ensure_capacity(db, tenant, "users")
 
     user = User(
         tenant_id=current_user.tenant_id,
