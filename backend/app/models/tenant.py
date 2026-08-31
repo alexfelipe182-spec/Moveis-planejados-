@@ -16,8 +16,15 @@ class Tenant(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160), index=True)
     slug: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    plan_code: Mapped[str] = mapped_column(String(40), default="starter", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
+        nullable=False,
+    )
 
 
 class TenantScopedMixin:
