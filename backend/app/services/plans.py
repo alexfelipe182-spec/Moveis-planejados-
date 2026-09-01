@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -8,6 +9,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Customer, Project, Subscription, Tenant, UsageCounter, User
+
+TRIAL_DAYS = 30
 
 
 @dataclass(frozen=True)
@@ -44,8 +47,31 @@ PLANS: dict[str, PlanDefinition] = {
 }
 
 
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def plan_for_tenant(tenant: Tenant) -> PlanDefinition:
     return PLANS.get(tenant.plan_code, PLANS["starter"])
+
+
+def effective_subscription_status(subscription: Subscription | None, *, now: datetime | None = None) -> str:
+    if subscription is None:
+        return "subscription_required"
+    if subscription.status == "trialing":
+        current = now or _now()
+        if subscription.trial_end is None or subscription.trial_end <= current:
+            return "trial_expired"
+    return subscription.status
+
+
+def trial_days_remaining(subscription: Subscription | None, *, now: datetime | None = None) -> int:
+    if subscription is None or subscription.status != "trialing" or subscription.trial_end is None:
+        return 0
+    remaining_seconds = (subscription.trial_end - (now or _now())).total_seconds()
+    if remaining_seconds <= 0:
+        return 0
+    return math.ceil(remaining_seconds / 86400)
 
 
 def _period() -> str:
@@ -89,7 +115,45 @@ def _current_resource_count(db: Session, tenant_id: int, metric: str) -> int:
     return int(db.scalar(query) or 0)
 
 
+def ensure_commercial_access(db: Session, tenant: Tenant) -> Subscription:
+    subscription = db.scalar(select(Subscription).where(Subscription.tenant_id == tenant.id))
+    effective_status = effective_subscription_status(subscription)
+    if effective_status in {"active", "trialing"} and subscription is not None:
+        return subscription
+
+    if effective_status == "trial_expired":
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "trial_expired",
+                "status": effective_status,
+                "trial_end": subscription.trial_end.isoformat() if subscription and subscription.trial_end else None,
+                "message": "Seu teste grátis de 30 dias terminou. Escolha um plano para continuar usando a plataforma.",
+            },
+        )
+
+    if subscription is None:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "subscription_required",
+                "status": effective_status,
+                "message": "Escolha um plano para continuar usando a plataforma.",
+            },
+        )
+
+    raise HTTPException(
+        status_code=402,
+        detail={
+            "code": "subscription_inactive",
+            "status": effective_status,
+            "message": "Assinatura inativa. Regularize seu plano para continuar.",
+        },
+    )
+
+
 def ensure_capacity(db: Session, tenant: Tenant, metric: str, *, increment: int = 1) -> None:
+    ensure_commercial_access(db, tenant)
     plan = plan_for_tenant(tenant)
     limit = plan.limits.get(metric)
     if limit is None:
@@ -106,18 +170,6 @@ def ensure_capacity(db: Session, tenant: Tenant, metric: str, *, increment: int 
                 "message": "Limite do plano atingido. Faça upgrade para continuar.",
             },
         )
-
-
-def ensure_commercial_access(db: Session, tenant: Tenant) -> Subscription | None:
-    subscription = db.scalar(select(Subscription).where(Subscription.tenant_id == tenant.id))
-    if subscription is None:
-        return None
-    if subscription.status in {"active", "trialing"}:
-        return subscription
-    raise HTTPException(
-        status_code=402,
-        detail={"code": "subscription_inactive", "status": subscription.status, "message": "Assinatura inativa."},
-    )
 
 
 def usage_snapshot(db: Session, tenant: Tenant) -> dict:

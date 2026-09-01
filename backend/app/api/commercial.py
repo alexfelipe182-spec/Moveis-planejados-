@@ -18,7 +18,7 @@ from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.core.config import settings
 from app.database import get_db
 from app.models import Subscription, Tenant, User
-from app.services.plans import PLANS, usage_snapshot
+from app.services.plans import PLANS, effective_subscription_status, trial_days_remaining, usage_snapshot
 
 router = APIRouter(tags=["SaaS Commercial"])
 
@@ -70,18 +70,23 @@ def _stripe_secret() -> str:
 
 
 def _subscription_payload(subscription: Subscription | None, tenant: Tenant) -> dict:
+    effective_status = effective_subscription_status(subscription)
     return {
         "tenant_id": tenant.id,
         "plan_code": tenant.plan_code,
+        "access_allowed": effective_status in {"active", "trialing"},
+        "trial_days_remaining": trial_days_remaining(subscription),
         "can_manage_billing": bool(subscription and subscription.provider_customer_id),
         "subscription": None
         if subscription is None
         else {
             "provider": subscription.provider,
-            "status": subscription.status,
+            "status": effective_status,
+            "provider_status": subscription.status,
             "plan_code": subscription.plan_code,
             "current_period_end": subscription.current_period_end,
             "trial_end": subscription.trial_end,
+            "trial_days_remaining": trial_days_remaining(subscription),
             "cancel_at_period_end": subscription.cancel_at_period_end,
         },
     }
@@ -174,10 +179,16 @@ def create_checkout(
         raise HTTPException(status_code=503, detail="Preço recorrente não configurado para este plano")
     tenant = _tenant(db, current_user)
     existing = db.scalar(select(Subscription).where(Subscription.tenant_id == tenant.id))
-    if existing and existing.status in {"active", "trialing"}:
+    existing_status = effective_subscription_status(existing)
+    if existing and existing_status == "active":
         raise HTTPException(
             status_code=409,
             detail="Já existe uma assinatura ativa. Use o portal de cobrança para alterar o plano.",
+        )
+    if existing and existing_status == "trialing" and existing.provider == "stripe":
+        raise HTTPException(
+            status_code=409,
+            detail="Seu teste já está vinculado ao Stripe. Use o portal de cobrança para alterar o plano.",
         )
     secret = _stripe_secret()
     form = {
@@ -193,6 +204,13 @@ def create_checkout(
         "subscription_data[metadata][tenant_id]": str(tenant.id),
         "subscription_data[metadata][plan_code]": payload.plan_code,
     }
+    if existing and existing_status == "trialing" and existing.trial_end:
+        remaining_seconds = (existing.trial_end - datetime.now(timezone.utc).replace(tzinfo=None)).total_seconds()
+        if remaining_seconds >= 48 * 3600:
+            trial_end_utc = existing.trial_end.replace(tzinfo=timezone.utc)
+            form["subscription_data[trial_end]"] = str(int(trial_end_utc.timestamp()))
+        elif remaining_seconds > 0:
+            form["subscription_data[trial_period_days]"] = str(max(1, trial_days_remaining(existing)))
     try:
         response = httpx.post(
             "https://api.stripe.com/v1/checkout/sessions",
@@ -288,9 +306,9 @@ def _upsert_subscription(db: Session, obj: dict) -> None:
     subscription.plan_code = plan_code
     subscription.status = obj.get("status") or subscription.status
     subscription.current_period_end = _unix_datetime(obj.get("current_period_end"))
+    subscription.trial_end = _unix_datetime(obj.get("trial_end")) or subscription.trial_end
     subscription.cancel_at_period_end = bool(obj.get("cancel_at_period_end", False))
     tenant.plan_code = plan_code
-    tenant.is_active = subscription.status not in {"canceled", "unpaid", "incomplete_expired"}
 
 
 @router.post("/billing/webhook")
@@ -322,7 +340,8 @@ def platform_dashboard(
     subscriptions = db.scalars(select(Subscription).execution_options(skip_tenant_scope=True)).all()
     status_counts: dict[str, int] = {}
     for subscription in subscriptions:
-        status_counts[subscription.status] = status_counts.get(subscription.status, 0) + 1
+        status = effective_subscription_status(subscription)
+        status_counts[status] = status_counts.get(status, 0) + 1
     active_tenants = sum(1 for tenant in tenants if tenant.is_active)
     estimated_mrr = sum(PLANS.get(tenant.plan_code, PLANS["starter"]).monthly_price_brl for tenant in tenants if tenant.is_active)
     return {

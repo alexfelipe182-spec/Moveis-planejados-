@@ -15,10 +15,11 @@ from app.api.deps import CSRF_COOKIE, require_csrf
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 from app.database import get_db
-from app.models import Activity, PasswordResetToken, RefreshToken, Tenant, User
+from app.models import Activity, PasswordResetToken, RefreshToken, Subscription, Tenant, User
 from app.schemas.password_reset import PasswordResetConfirm, PasswordResetRequest, PasswordResetResponse
 from app.schemas.tenant import BusinessRegister, BusinessRegisterResponse
 from app.schemas.user import UserCreate, UserRead
+from app.services.plans import TRIAL_DAYS
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -100,7 +101,7 @@ def get_csrf_token(response: Response, csrf_token: str | None = Cookie(default=N
     status_code=status.HTTP_201_CREATED,
 )
 def register_business(payload: BusinessRegister, db: Session = Depends(get_db)):
-    """Cria uma nova marcenaria e o primeiro administrador em uma transação."""
+    """Cria uma nova marcenaria, o primeiro administrador e seu teste grátis de 30 dias."""
     email = str(payload.email).strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
@@ -121,12 +122,21 @@ def register_business(payload: BusinessRegister, db: Session = Depends(get_db)):
     try:
         db.flush()
         db.add(
+            Subscription(
+                tenant_id=tenant.id,
+                provider="manual",
+                plan_code=payload.plan_code,
+                status="trialing",
+                trial_end=_now() + timedelta(days=TRIAL_DAYS),
+            )
+        )
+        db.add(
             Activity(
                 user_id=owner.id,
                 action="business_registered",
                 entity="tenant",
                 entity_id=tenant.id,
-                description=f"Criou a marcenaria {tenant.name}",
+                description=f"Criou a marcenaria {tenant.name} com {TRIAL_DAYS} dias grátis",
             )
         )
         db.commit()
@@ -153,8 +163,22 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     )
     db.add(user)
     try:
+        # The tenant-scoping hook creates and links a tenant for legacy users.
+        # Once flushed, grant that tenant the same commercial trial as the
+        # current business registration flow so no new account is born locked.
         db.flush()
-        db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email}"))
+        if not user.tenant_id:
+            raise RuntimeError("Cadastro criado sem marcenaria vinculada")
+        db.add(
+            Subscription(
+                tenant_id=user.tenant_id,
+                provider="manual",
+                plan_code="starter",
+                status="trialing",
+                trial_end=_now() + timedelta(days=TRIAL_DAYS),
+            )
+        )
+        db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email} com {TRIAL_DAYS} dias grátis"))
         db.commit()
         db.refresh(user)
     except Exception:
