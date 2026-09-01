@@ -13,6 +13,7 @@ COMMERCIAL_ACCESS_EXEMPT_PATHS = {
     "/api/v1/billing/subscription",
     "/api/v1/billing/checkout",
     "/api/v1/billing/portal",
+    "/api/v1/me",
     "/api/v1/protected/me",
 }
 
