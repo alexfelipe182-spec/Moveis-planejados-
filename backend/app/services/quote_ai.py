@@ -1,7 +1,8 @@
 import json
-import os
 from datetime import datetime, timezone
 from decimal import Decimal
+
+from app.services.openai_config import openai_api_key, openai_model
 
 
 def _financial_signals(*, base_cost: Decimal, suggested_total: Decimal, profit_margin: Decimal) -> dict[str, object]:
@@ -108,7 +109,7 @@ def analyze_quote(*, base_cost: Decimal, suggested_total: Decimal, profit_margin
         "requires_approval": True,
     }
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = openai_api_key()
     if not api_key:
         return result
 
@@ -117,7 +118,7 @@ def analyze_quote(*, base_cost: Decimal, suggested_total: Decimal, profit_margin
 
         client = OpenAI(api_key=api_key, timeout=10.0, max_retries=1)
         response = client.responses.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
+            model=openai_model(),
             input=[
                 {
                     "role": "system",

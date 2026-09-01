@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.api.deps import require_admin
 from app.database import SessionLocal
 from app.main import app
 from app.models import User
@@ -27,6 +28,21 @@ def test_quote_estimate_requires_authentication():
     client = TestClient(app)
 
     response = client.post("/api/v1/quotes/estimate", json=ESTIMATE_PAYLOAD)
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Autenticação necessária"
+
+
+def test_quote_ai_draft_requires_authentication():
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/quotes/draft",
+        json={
+            "customer_id": 1,
+            "request_text": "Armário de três metros em MDF branco.",
+        },
+    )
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Autenticação necessária"
@@ -80,7 +96,11 @@ def test_quote_estimate_allows_admin_and_keeps_financial_values_locked():
     )
     assert login.status_code == 200
 
-    response = client.post("/api/v1/quotes/estimate", json=ESTIMATE_PAYLOAD)
+    response = client.post(
+        "/api/v1/quotes/estimate",
+        json=ESTIMATE_PAYLOAD,
+        headers={"X-CSRF-Token": login.json()["csrf_token"]},
+    )
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -88,3 +108,38 @@ def test_quote_estimate_allows_admin_and_keeps_financial_values_locked():
     assert body["suggested_total"] == "3250.00"
     assert body["profit_margin"] == "30.00"
     assert body["requires_approval"] is True
+
+
+def test_quote_estimate_rejects_cookie_session_without_csrf_header():
+    """Defect: a stolen cross-site cookie could trigger billable AI estimates."""
+    app.dependency_overrides[require_admin] = lambda: object()
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        client.cookies.set("access_token", "cookie-session")
+
+        response = client.post("/api/v1/quotes/estimate", json=ESTIMATE_PAYLOAD)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "CSRF token inválido"
+
+
+def test_quote_ai_draft_rejects_cookie_session_without_csrf_header():
+    app.dependency_overrides[require_admin] = lambda: object()
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        client.cookies.set("access_token", "cookie-session")
+
+        response = client.post(
+            "/api/v1/quotes/draft",
+            json={
+                "customer_id": 1,
+                "request_text": "Armário de três metros em MDF branco.",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "CSRF token inválido"
