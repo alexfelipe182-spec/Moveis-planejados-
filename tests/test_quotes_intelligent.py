@@ -57,6 +57,7 @@ def test_quote_estimate_does_not_persist():
             "finishing_cost": "100.00",
             "profit_margin": "30.00",
         },
+        headers=csrf_headers(client),
     )
     assert response.status_code == 200
     body = response.json()

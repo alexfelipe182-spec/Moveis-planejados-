@@ -188,6 +188,7 @@ jobs:
           test -s frontend/professional.css
           test -s frontend/app.js
           test -s frontend/app.test.cjs
+          test -s frontend/saas-public.js
           test -s frontend/smart-quotes.js
           test -s frontend/quote-decisions.js
           test -s frontend/quote-proposal.js
@@ -195,6 +196,7 @@ jobs:
         run: |
           node --check frontend/app.js
           node --check frontend/app.test.cjs
+          node --check frontend/saas-public.js
           node --check frontend/smart-quotes.js
           node --check frontend/quote-decisions.js
           node --check frontend/quote-proposal.js
@@ -206,11 +208,12 @@ jobs:
           grep -q '<script src="./smart-quotes.js"></script>' frontend/index.html
           grep -q '<script src="./quote-decisions.js"></script>' frontend/index.html
           grep -q '<script src="./quote-proposal.js"></script>' frontend/index.html
+          grep -q '<script src="./saas-public.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
           grep -q '<link rel="stylesheet" href="./professional.css">' frontend/index.html
       - name: Accidental placeholders
         run: |
-          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js
+          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/saas-public.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js
       - name: Frontend smoke test
         run: |
           python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &

@@ -7,6 +7,7 @@ from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Quote, QuoteItem, User
 from app.schemas.quote_item import QuoteItemCreate, QuoteItemRead, QuoteItemUpdate
+from app.services.quote_workflow import ensure_quote_editable
 
 router = APIRouter(
     prefix="/quotes/{quote_id}/items",
@@ -24,6 +25,10 @@ def _get_quote(db: Session, quote_id: int) -> Quote:
     if not quote:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     return quote
+
+
+def _get_editable_quote(db: Session, quote_id: int) -> Quote:
+    return ensure_quote_editable(_get_quote(db, quote_id))
 
 
 def _recalculate_quote_total(db: Session, quote_id: int) -> Decimal:
@@ -61,7 +66,7 @@ def create_item(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    _get_quote(db, quote_id)
+    _get_editable_quote(db, quote_id)
     data = payload.model_dump()
     data.update(
         quote_id=quote_id,
@@ -100,7 +105,7 @@ def update_item(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    _get_quote(db, quote_id)
+    _get_editable_quote(db, quote_id)
     item = (
         db.query(QuoteItem)
         .filter(QuoteItem.id == item_id, QuoteItem.quote_id == quote_id)
@@ -141,7 +146,7 @@ def delete_item(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    _get_quote(db, quote_id)
+    _get_editable_quote(db, quote_id)
     item = (
         db.query(QuoteItem)
         .filter(QuoteItem.id == item_id, QuoteItem.quote_id == quote_id)

@@ -1,7 +1,11 @@
+from pathlib import Path
 from urllib.parse import urlparse
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BACKEND_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
@@ -27,8 +31,10 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: int = 10
     password_reset_expire_minutes: int = 30
     frontend_url: str = "http://localhost:3000"
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-5-mini"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=BACKEND_ENV_FILE, extra="ignore")
 
     @model_validator(mode="after")
     def validate_security_settings(self):

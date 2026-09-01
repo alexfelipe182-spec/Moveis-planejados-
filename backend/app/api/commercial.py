@@ -73,6 +73,7 @@ def _subscription_payload(subscription: Subscription | None, tenant: Tenant) -> 
     return {
         "tenant_id": tenant.id,
         "plan_code": tenant.plan_code,
+        "can_manage_billing": bool(subscription and subscription.provider_customer_id),
         "subscription": None
         if subscription is None
         else {
@@ -172,6 +173,12 @@ def create_checkout(
     if not price_id:
         raise HTTPException(status_code=503, detail="Preço recorrente não configurado para este plano")
     tenant = _tenant(db, current_user)
+    existing = db.scalar(select(Subscription).where(Subscription.tenant_id == tenant.id))
+    if existing and existing.status in {"active", "trialing"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Já existe uma assinatura ativa. Use o portal de cobrança para alterar o plano.",
+        )
     secret = _stripe_secret()
     form = {
         "mode": "subscription",
@@ -198,6 +205,36 @@ def create_checkout(
         raise HTTPException(status_code=502, detail="Falha ao iniciar cobrança recorrente") from exc
     data = response.json()
     return {"checkout_url": data.get("url"), "session_id": data.get("id")}
+
+
+@router.post("/billing/portal", dependencies=[Depends(require_cookie_csrf)])
+def create_billing_portal(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    tenant = _tenant(db, current_user)
+    subscription = db.scalar(select(Subscription).where(Subscription.tenant_id == tenant.id))
+    if subscription is None or not subscription.provider_customer_id:
+        raise HTTPException(status_code=409, detail="Assinatura Stripe ainda não disponível para gerenciamento")
+    secret = _stripe_secret()
+    try:
+        response = httpx.post(
+            "https://api.stripe.com/v1/billing_portal/sessions",
+            data={
+                "customer": subscription.provider_customer_id,
+                "return_url": f"{settings.frontend_url}/?billing=portal",
+            },
+            headers={"Authorization": f"Bearer {secret}"},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Falha ao abrir o portal de cobrança") from exc
+    data = response.json()
+    portal_url = data.get("url")
+    if not portal_url:
+        raise HTTPException(status_code=502, detail="O provedor não retornou o portal de cobrança")
+    return {"portal_url": portal_url}
 
 
 def _verify_stripe_signature(raw_body: bytes, signature: str | None) -> None:

@@ -87,6 +87,7 @@ def test_quote_analysis_flags_very_high_margin_for_review(monkeypatch):
 
 
 def test_external_ai_failure_falls_back_without_breaking_quote(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_DISABLED", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     fake_openai = ModuleType("openai")
@@ -110,6 +111,7 @@ def test_external_ai_failure_falls_back_without_breaking_quote(monkeypatch):
 
 
 def test_external_ai_success_replaces_only_analysis_text(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_DISABLED", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_MODEL", "test-model")
 

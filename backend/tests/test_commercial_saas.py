@@ -3,11 +3,14 @@ import hmac
 import json
 import os
 import time
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.database import SessionLocal
+from app.models import Subscription, Tenant, User
 
 PASSWORD = "Senha-Forte-123!"
 
@@ -79,6 +82,105 @@ def test_checkout_requires_billing_configuration():
                 headers=csrf_headers(client),
             )
         assert response.status_code == 503
+
+
+def test_checkout_creates_stripe_session_without_exposing_secret():
+    with TestClient(app) as client:
+        register_and_login(client, "billing.checkout@example.com")
+        stripe_response = type(
+            "StripeResponse",
+            (),
+            {
+                "raise_for_status": lambda self: None,
+                "json": lambda self: {
+                    "id": "cs_live_checkout",
+                    "url": "https://checkout.stripe.com/c/pay/cs_live_checkout",
+                },
+            },
+        )()
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "STRIPE_SECRET_KEY": "sk_live_test_only_not_real",
+                    "STRIPE_PRICE_PROFESSIONAL": "price_professional_test",
+                },
+            ),
+            patch("app.api.commercial.httpx.post", return_value=stripe_response) as stripe_post,
+        ):
+            response = client.post(
+                "/api/v1/billing/checkout",
+                json={"plan_code": "professional"},
+                headers=csrf_headers(client),
+            )
+
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "checkout_url": "https://checkout.stripe.com/c/pay/cs_live_checkout",
+            "session_id": "cs_live_checkout",
+        }
+        call = stripe_post.call_args
+        assert call.args[0] == "https://api.stripe.com/v1/checkout/sessions"
+        assert call.kwargs["data"]["line_items[0][price]"] == "price_professional_test"
+        assert call.kwargs["data"]["subscription_data[metadata][plan_code]"] == "professional"
+        assert call.kwargs["headers"] == {"Authorization": "Bearer sk_live_test_only_not_real"}
+        assert "sk_live" not in response.text
+
+
+def test_active_subscription_uses_billing_portal_and_blocks_duplicate_checkout():
+    email = "billing.portal@example.com"
+    with TestClient(app) as client:
+        register_and_login(client, email)
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == email).one()
+            tenant = db.get(Tenant, user.tenant_id)
+            db.add(
+                Subscription(
+                    tenant_id=tenant.id,
+                    provider="stripe",
+                    provider_customer_id="cus_portal_test",
+                    provider_subscription_id="sub_portal_test",
+                    plan_code="professional",
+                    status="active",
+                    current_period_end=datetime.now() + timedelta(days=30),
+                )
+            )
+            tenant.plan_code = "professional"
+            db.commit()
+
+        with patch.dict(
+            os.environ,
+            {
+                "STRIPE_SECRET_KEY": "sk_live_test_only_not_real",
+                "STRIPE_PRICE_BUSINESS": "price_business_test",
+            },
+        ):
+            duplicate = client.post(
+                "/api/v1/billing/checkout",
+                json={"plan_code": "business"},
+                headers=csrf_headers(client),
+            )
+        assert duplicate.status_code == 409
+        assert "portal de cobrança" in duplicate.json()["detail"]
+
+        stripe_response = type(
+            "StripeResponse",
+            (),
+            {
+                "raise_for_status": lambda self: None,
+                "json": lambda self: {"url": "https://billing.stripe.com/p/session/test"},
+            },
+        )()
+        with (
+            patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_live_test_only_not_real"}),
+            patch("app.api.commercial.httpx.post", return_value=stripe_response) as stripe_post,
+        ):
+            portal = client.post("/api/v1/billing/portal", headers=csrf_headers(client))
+
+        assert portal.status_code == 200, portal.text
+        assert portal.json() == {"portal_url": "https://billing.stripe.com/p/session/test"}
+        assert stripe_post.call_args.args[0] == "https://api.stripe.com/v1/billing_portal/sessions"
+        assert stripe_post.call_args.kwargs["data"]["customer"] == "cus_portal_test"
 
 
 def test_signed_subscription_webhook_updates_tenant_plan():

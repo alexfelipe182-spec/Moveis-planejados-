@@ -208,3 +208,198 @@ test('the official logo assets are present and wired into every logo mark', () =
 test('the public WhatsApp fallback uses the official business contact', () => {
   assert.match(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), /5513981236650/);
 });
+
+test('the billing panel follows the production subscription contract safely', () => {
+  const billing = fs.readFileSync(path.join(__dirname, 'saas-public.js'), 'utf8');
+
+  assert.match(billing, /billingApi\('\/billing\/subscription'\)/);
+  assert.match(billing, /data\?\.usage\?\.usage \|\| \{\}/);
+  assert.match(billing, /data\?\.usage\?\.limits \|\| \{\}/);
+  assert.match(billing, /billingApi\('\/billing\/portal', \{ method: 'POST' \}\)/);
+  assert.match(billing, /data-billing-portal/);
+  assert.match(billing, /https:\/\/checkout\.stripe\.com/);
+  assert.match(billing, /https:\/\/billing\.stripe\.com/);
+  assert.match(billing, /stripeOrigins\.has\(destination\.origin\)/);
+  assert.doesNotMatch(billing, /window\.location\.assign\(data\.(checkout|portal)_url\)/);
+});
+
+test('the proposal extension does not install a second registration flow', () => {
+  const submitListeners = [];
+  const registerForm = {};
+  const context = {
+    document: {
+      addEventListener: (event, listener) => {
+        if (event === 'submit') submitListeners.push(listener);
+      },
+      getElementById: id => (id === 'register-form' ? registerForm : null),
+      querySelector: () => null,
+    },
+    window: { renderResource: () => undefined },
+    state: { customers: [], tenant: null, rows: [], search: '', status: '' },
+    escapeHtml: value => String(value ?? ''),
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'quote-proposal.js'), 'utf8'), context);
+
+  assert.equal(submitListeners.length, 0);
+});
+
+test('the quote decision extension preserves the centralized authenticated fetch', () => {
+  const authenticatedFetch = async () => response(200);
+  const context = {
+    Headers,
+    Request,
+    confirm: () => true,
+    document: { createElement: () => ({ addEventListener: () => {}, dataset: {} }), querySelector: () => null },
+    window: { fetch: authenticatedFetch, renderResource: () => undefined },
+    state: { rows: [], search: '', status: '' },
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'quote-decisions.js'), 'utf8'), context);
+
+  assert.equal(context.window.fetch, authenticatedFetch);
+});
+
+test('smart quote analysis and AI draft use the centralized authenticated API client', async () => {
+  const calls = [];
+  const estimate = {
+    base_cost: '2500.00',
+    suggested_total: '3250.00',
+    profit_margin: '30.00',
+    warnings: [],
+    recommendations: [],
+  };
+  const panel = {};
+  const context = {
+    FormData,
+    api: async (path, options) => {
+      calls.push({ path, options });
+      return estimate;
+    },
+    document: {
+      createElement: () => ({}),
+      querySelector: selector => (selector === '#smart-quote-result' ? panel : null),
+    },
+    fetch: async () => { throw new Error('raw fetch bypassed authenticated API client'); },
+    location: { hostname: 'site.example' },
+    window: { API_BASE_URL: 'https://api.example/api/v1', createItem: () => undefined },
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'smart-quotes.js'), 'utf8'), context);
+
+  const result = await context.window.analyzeSmartQuote({ material_cost: 800 });
+  const draftPayload = {
+    customer_id: 7,
+    request_text: 'Armário de três metros em MDF branco.',
+    profit_margin: 30,
+  };
+  await context.window.createSmartQuoteDraft(draftPayload);
+
+  assert.equal(result, estimate);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].path, '/quotes/estimate');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(calls[0].options.body, { material_cost: 800 });
+  assert.equal(calls[1].path, '/quotes/draft');
+  assert.equal(calls[1].options.method, 'POST');
+  assert.deepEqual(calls[1].options.body, draftPayload);
+});
+
+test('decided quotes cannot be edited or deleted from the management table', () => {
+  const fullSource = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  const resourceSource = fullSource.slice(
+    fullSource.indexOf('const configs='),
+    fullSource.indexOf('async function boot'),
+  );
+  const section = { innerHTML: '' };
+  const context = {
+    FormData,
+    confirm: () => true,
+    state: {
+      rows: [{ id: 81, customer_id: 7, description: 'Armário', total: 3500, status: 'approved' }],
+      customers: [{ id: 7, name: 'Cliente' }],
+      categories: [],
+      search: '',
+      status: '',
+    },
+    statusLabels: { approved: 'Aprovado' },
+    escapeHtml: value => String(value ?? ''),
+    money: value => `R$ ${value}`,
+    $: selector => (selector === '#quotes' ? section : null),
+    $$: () => [],
+  };
+  vm.createContext(context);
+  vm.runInContext(`${resourceSource}\nglobalThis.testRenderResource=renderResource;`, context);
+
+  context.testRenderResource('quotes');
+
+  assert.doesNotMatch(section.innerHTML, />Editar</);
+  assert.doesNotMatch(section.innerHTML, />Excluir</);
+});
+
+test('quote technical edit form omits protected status and calculated total', () => {
+  const fullSource = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  const resourceSource = fullSource.slice(
+    fullSource.indexOf('const configs='),
+    fullSource.indexOf('async function boot'),
+  );
+  const context = {
+    FormData,
+    state: { customers: [{ id: 7, name: 'Cliente' }], categories: [] },
+    escapeHtml: value => String(value ?? ''),
+  };
+  vm.createContext(context);
+  vm.runInContext(`${resourceSource}\nglobalThis.testFormHtml=formHtml;`, context);
+
+  const html = context.testFormHtml('quotes', {
+    customer_id: 7,
+    description: 'Armário',
+    status: 'analysis',
+    total: 3500,
+    material_cost: 1200,
+    hardware_cost: 400,
+    labor_cost: 700,
+    finishing_cost: 200,
+    profit_margin: 30,
+  });
+
+  assert.doesNotMatch(html, /name="status"/);
+  assert.doesNotMatch(html, /name="total"/);
+  assert.match(html, /name="material_cost"/);
+  assert.match(html, /name="profit_margin"/);
+});
+
+test('operations forms expose suppliers and materials without bypassing project workflow', () => {
+  const fullSource = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  const resourceSource = fullSource.slice(
+    fullSource.indexOf('const configs='),
+    fullSource.indexOf('async function boot'),
+  );
+  const context = {
+    FormData,
+    state: {
+      customers: [{ id: 7, name: 'Cliente' }],
+      categories: [],
+      suppliers: [{ id: 4, name: 'Fornecedor MDF' }],
+    },
+    escapeHtml: value => String(value ?? ''),
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    `${resourceSource}\nglobalThis.testFormHtml=formHtml;globalThis.testConfigs=configs;`,
+    context,
+  );
+
+  assert.equal(context.testConfigs.suppliers.endpoint, '/suppliers');
+  assert.equal(context.testConfigs.materials.endpoint, '/materials');
+  const material = context.testFormHtml('materials', {});
+  assert.match(material, /name="supplier_id"/);
+  assert.match(material, /name="unit_cost"/);
+  assert.match(material, /name="waste_percent"/);
+  const project = context.testFormHtml('projects', {
+    customer_id: 7,
+    name: 'Cozinha',
+    status: 'production',
+  });
+  assert.doesNotMatch(project, /name="status"/);
+});

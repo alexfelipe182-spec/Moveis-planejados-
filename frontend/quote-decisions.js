@@ -1,32 +1,4 @@
 (() => {
-  const nativeFetch = window.fetch.bind(window);
-  const apiPrefix = 'https://ideal-marcenaria-api.onrender.com/api/v1';
-  let accessToken = '';
-
-  window.fetch = async function(input, init = {}) {
-    const url = typeof input === 'string' ? input : input?.url || '';
-    const isApiRequest = url.startsWith(apiPrefix) || url.startsWith('/api/v1');
-    const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
-
-    if (isApiRequest && accessToken && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${accessToken}`);
-    }
-
-    const response = await nativeFetch(input, { ...init, headers });
-
-    if (isApiRequest && response.ok && (url.includes('/auth/login') || url.includes('/auth/refresh'))) {
-      try {
-        const data = await response.clone().json();
-        if (typeof data?.access_token === 'string') accessToken = data.access_token;
-      } catch (_) {}
-    }
-
-    if (isApiRequest && url.includes('/auth/logout')) accessToken = '';
-    return response;
-  };
-})();
-
-(() => {
   const decisionLabels = { approved: 'Aprovar', rejected: 'Rejeitar' };
   const commercialLabels = { accepted: 'Cliente aceitou', declined: 'Cliente recusou' };
   const quoteStatusLabels = {

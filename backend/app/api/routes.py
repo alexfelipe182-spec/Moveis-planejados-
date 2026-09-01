@@ -17,6 +17,7 @@ from app.api.project_profitability import router as project_profitability_router
 from app.api.project_workflow import router as project_workflow_router
 from app.api.protected import router as protected_router
 from app.api.quote_decisions import router as quote_decisions_router
+from app.api.quote_drafts import router as quote_drafts_router
 from app.api.quote_intelligence import router as quote_intelligence_router
 from app.api.quote_items import router as quote_items_router
 from app.api.tenant import router as tenant_router
@@ -35,6 +36,7 @@ from app.services.automation import engine
 from app.services.plans import ensure_capacity, increment_usage
 from app.services.quote_ai import analyze_quote
 from app.services.quote_pricing import calculate_quote_suggestion
+from app.services.quote_workflow import ensure_quote_editable
 
 
 class QuoteEstimateRequest(BaseModel):
@@ -62,6 +64,7 @@ api_router.include_router(project_workflow_router)
 api_router.include_router(production_costs_router)
 api_router.include_router(project_profitability_router)
 api_router.include_router(quote_intelligence_router)
+api_router.include_router(quote_drafts_router)
 
 quotes_router = APIRouter(prefix="/quotes", tags=["Quotes"])
 
@@ -142,7 +145,7 @@ def create_quote(payload: QuoteCreate, current_user: User = Depends(require_admi
 @quotes_router.post(
     "/estimate",
     response_model=QuoteEstimateResponse,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
 )
 def estimate_quote(
     payload: QuoteEstimateRequest,
@@ -172,11 +175,7 @@ def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depend
             status_code=409,
             detail="Status do orçamento só pode ser alterado pelos fluxos de decisão e comercial",
         )
-    if item.status not in {"pending", "analysis"}:
-        raise HTTPException(
-            status_code=409,
-            detail="Orçamento com decisão registrada não pode ser alterado; crie uma nova revisão",
-        )
+    ensure_quote_editable(item)
     data = payload.model_dump(exclude_unset=True, exclude={"status"})
     pricing = _quote_calculation(payload, item)
     analysis = analyze_quote(base_cost=pricing["base_cost"], suggested_total=pricing["suggested_total"], profit_margin=pricing["profit_margin"])
@@ -197,6 +196,44 @@ def update_quote(item_id: int, payload: QuoteUpdate, current_user: User = Depend
     return item
 
 
+@quotes_router.delete(
+    "/{item_id}",
+    status_code=204,
+    dependencies=[Depends(require_admin), Depends(require_cookie_csrf)],
+)
+def delete_quote(
+    item_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    item = crud.get_item(db, Quote, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    ensure_quote_editable(item)
+    try:
+        crud.delete_item(db, item, commit=False)
+        db.add(
+            Activity(
+                user_id=current_user.id,
+                action="deleted",
+                entity="quote",
+                entity_id=item_id,
+                description=f"Excluiu quote #{item_id}",
+            )
+        )
+        db.commit()
+    except (IntegrityError, ValueError) as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Não foi possível excluir o orçamento porque ele está sendo utilizado",
+        ) from exc
+    engine.emit(
+        "quote.deleted",
+        {"entity": "quote", "item_id": item_id, "user_id": current_user.id},
+    )
+
+
 quotes_router.include_router(
     make_router(
         Quote,
@@ -207,6 +244,7 @@ quotes_router.include_router(
         include_list=False,
         include_create=False,
         include_update=False,
+        include_delete=False,
     )
 )
 api_router.include_router(quotes_router)

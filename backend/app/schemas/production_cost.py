@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 MaterialKind = Literal["mdf", "hardware", "profile", "accessory", "finish", "service", "other"]
 CostCategory = Literal["material", "labor", "freight", "installation", "outsourcing", "tax", "other"]
@@ -14,6 +14,11 @@ class SupplierBase(BaseModel):
     email: EmailStr | None = None
     notes: str | None = Field(default=None, max_length=5000)
     is_active: bool = True
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def blank_email_is_none(cls, value):
+        return None if value == "" else value
 
 
 class SupplierCreate(SupplierBase):
