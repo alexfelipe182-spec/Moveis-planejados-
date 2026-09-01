@@ -405,3 +405,74 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
     box-shadow:inset 0 4px 0 var(--ref-green),var(--ref-shadow);
   }
 }
+
+/* Correção definitiva do modal de autenticação: fundo branco e texto preto. */
+#auth-overlay .auth-card{
+  background:#ffffff!important;
+  color:#111111!important;
+}
+
+#auth-overlay .auth-card h1,
+#auth-overlay .auth-card h2,
+#auth-overlay .auth-card h3,
+#auth-overlay .auth-card p,
+#auth-overlay .auth-card label,
+#auth-overlay .auth-card strong,
+#auth-overlay .auth-card small,
+#auth-overlay .auth-card .auth-message,
+#auth-overlay .auth-card .auth-links button,
+#auth-overlay .auth-card .back-link{
+  color:#111111!important;
+}
+
+#auth-overlay .auth-card input,
+#auth-overlay .auth-card select,
+#auth-overlay .auth-card textarea{
+  background:#ffffff!important;
+  background-color:#ffffff!important;
+  color:#111111!important;
+  -webkit-text-fill-color:#111111!important;
+  border:1px solid #d8e8df!important;
+  box-shadow:none!important;
+  caret-color:#087a4f!important;
+}
+
+#auth-overlay .auth-card input::placeholder,
+#auth-overlay .auth-card textarea::placeholder{
+  color:#555555!important;
+  -webkit-text-fill-color:#555555!important;
+  opacity:1!important;
+}
+
+#auth-overlay .auth-card input:focus,
+#auth-overlay .auth-card select:focus,
+#auth-overlay .auth-card textarea:focus{
+  background:#ffffff!important;
+  color:#111111!important;
+  -webkit-text-fill-color:#111111!important;
+  border-color:#087a4f!important;
+  outline:none!important;
+  box-shadow:0 0 0 3px rgba(8,122,79,.15)!important;
+}
+
+#auth-overlay .auth-card input:-webkit-autofill,
+#auth-overlay .auth-card input:-webkit-autofill:hover,
+#auth-overlay .auth-card input:-webkit-autofill:focus,
+#auth-overlay .auth-card textarea:-webkit-autofill,
+#auth-overlay .auth-card select:-webkit-autofill{
+  -webkit-text-fill-color:#111111!important;
+  box-shadow:0 0 0 1000px #ffffff inset!important;
+  -webkit-box-shadow:0 0 0 1000px #ffffff inset!important;
+  caret-color:#087a4f!important;
+}
+
+#auth-overlay .auth-card .close{
+  color:#111111!important;
+}
+
+#auth-overlay .auth-card .btn.secondary,
+#auth-overlay .auth-card .btn.ghost{
+  background:#ffffff!important;
+  color:#111111!important;
+  border:1px solid #d8e8df!important;
+}
