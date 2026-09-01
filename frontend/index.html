@@ -23,18 +23,116 @@
   <link rel="stylesheet" href="./professional.css">
   <link rel="stylesheet" href="./commercial.css">
   <link rel="stylesheet" href="./design-refresh.css">
+  <link rel="stylesheet" href="./public-reference.css">
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
   <div id="public-site">
+    <div class="reference-public-dashboard" id="public-dashboard">
+      <aside class="reference-public-sidebar" aria-label="Navegação da plataforma">
+        <a class="reference-public-brand" href="#inicio" aria-label="Multi-Marcenarias — início">
+          <span class="reference-public-logo" aria-hidden="true">M</span>
+          <span><strong>Multi-Marcenarias</strong><small>Gestão inteligente para<br>marcenarias do futuro.</small></span>
+        </a>
+        <nav class="reference-public-nav">
+          <a class="active" href="#inicio"><span aria-hidden="true">⌂</span>Início</a>
+          <a href="#recursos"><span aria-hidden="true">♧</span>Clientes</a>
+          <a href="#planos"><span aria-hidden="true">▤</span>Orçamentos</a>
+          <a href="#plataforma"><span aria-hidden="true">▦</span>Projetos</a>
+          <a href="#recursos"><span aria-hidden="true">◇</span>Produtos</a>
+          <a href="#plataforma"><span aria-hidden="true">◈</span>Produção</a>
+          <a href="#contato"><span aria-hidden="true">＄</span>Financeiro</a>
+          <a href="#recursos"><span aria-hidden="true">▥</span>Relatórios</a>
+          <a href="#contato"><span aria-hidden="true">⚙</span>Configurações</a>
+        </nav>
+        <div class="reference-public-plan">
+          <span class="plan-crown" aria-hidden="true">♕</span>
+          <strong>Plano Profissional</strong>
+          <small>Sua marcenaria em outro nível.</small>
+          <a href="#planos">Ver plano <span aria-hidden="true">→</span></a>
+        </div>
+      </aside>
+      <div class="reference-public-main">
+        <header class="reference-public-topbar">
+          <label class="reference-public-search" for="public-global-search">
+            <span aria-hidden="true">⌕</span>
+            <input id="public-global-search" type="search" placeholder="Buscar clientes, projetos, orçamentos..." autocomplete="off">
+            <kbd>⌘ K</kbd>
+          </label>
+          <div class="reference-public-account-wrap">
+            <button class="reference-public-notification" type="button" aria-label="Notificações">♧<span aria-hidden="true"></span></button>
+            <span class="reference-public-divider" aria-hidden="true"></span>
+            <button id="open-login" class="reference-public-account" type="button" aria-label="Entrar na plataforma">
+              <span class="reference-public-account-copy"><strong>Marcenaria Premium</strong><small>Administrador</small></span>
+              <span class="reference-public-avatar" aria-hidden="true">M</span>
+              <span class="reference-public-chevron" aria-hidden="true">⌄</span>
+            </button>
+          </div>
+        </header>
+        <main class="reference-public-content" id="conteudo-publico">
+          <section class="reference-public-hero" id="inicio">
+            <div class="reference-public-hero-copy">
+              <span class="reference-public-kicker"><i aria-hidden="true"></i>Bem-vindo ao futuro da marcenaria</span>
+              <h1>Gestão completa.<br>Resultados <em>extraordinários.</em></h1>
+              <p>O Multi-Marcenarias centraliza sua operação, aumenta sua produtividade e impulsiona seus lucros com tecnologia de ponta.</p>
+              <div class="reference-public-actions">
+                <button class="btn primary" type="button" data-plan="professional">Solicitar orçamento <span aria-hidden="true">→</span></button>
+                <button class="btn secondary" type="button" data-plan="starter">Ver demonstração <span aria-hidden="true">▷</span></button>
+              </div>
+              <div class="reference-public-benefits">
+                <span><b aria-hidden="true">✦</b><strong>Orçamentos com IA<small>Mais precisão e agilidade</small></strong></span>
+                <span><b aria-hidden="true">♢</b><strong>Gestão integrada<small>Tudo em um só lugar</small></strong></span>
+                <span><b aria-hidden="true">↗</b><strong>Mais lucro<small>Decisões inteligentes</small></strong></span>
+              </div>
+            </div>
+            <div class="reference-public-hero-visual" role="img" aria-label="Sala planejada com cozinha de marcenaria premium">
+              <div class="reference-public-ai-card">
+                <span class="reference-public-ai-icon" aria-hidden="true">✦</span>
+                <div><strong>Orçamentos com IA</strong><p>Nossa IA analisa materiais, mão de obra e detalhes do projeto para gerar orçamentos precisos em segundos.</p></div>
+                <button class="btn light" type="button" data-plan="professional">Saiba mais <span aria-hidden="true">→</span></button>
+              </div>
+            </div>
+          </section>
+          <section class="reference-public-kpis" aria-label="Indicadores da prévia">
+            <article><span class="reference-public-kpi-icon" aria-hidden="true">♧</span><div><strong>128</strong><span>Clientes ativos</span><small>+12% este mês</small></div></article>
+            <article><span class="reference-public-kpi-icon" aria-hidden="true">▤</span><div><strong>46</strong><span>Orçamentos</span><small>+8% este mês</small></div></article>
+            <article><span class="reference-public-kpi-icon" aria-hidden="true">▱</span><div><strong>23</strong><span>Projetos em andamento</span><small>+15% este mês</small></div></article>
+            <article><span class="reference-public-kpi-icon" aria-hidden="true">＄</span><div><strong>R$ 72.540</strong><span>Faturamento do mês</span><small>+18% este mês</small></div></article>
+            <article><span class="reference-public-kpi-icon" aria-hidden="true">◇</span><div><strong>342</strong><span>Produtos cadastrados</span><small>+7 novos hoje</small></div></article>
+          </section>
+          <section class="reference-public-card-grid" aria-label="Resumo operacional">
+            <article class="reference-public-card">
+              <header><h2><span aria-hidden="true">♧</span>Clientes</h2><a href="#recursos">Ver todos <span aria-hidden="true">→</span></a></header>
+              <ul><li><span class="reference-public-avatar-small">JC</span><span><strong>João Carlos</strong><small>Projeto Cozinha Planejada</small></span><em>Ativo</em></li><li><span class="reference-public-avatar-small">MS</span><span><strong>Maria Silva</strong><small>Guarda-roupa Sob Medida</small></span><em>Ativo</em></li><li><span class="reference-public-avatar-small">AF</span><span><strong>Ana Ferreira</strong><small>Painel para Sala</small></span><em class="warning">Aguardando</em></li></ul>
+            </article>
+            <article class="reference-public-card">
+              <header><h2><span aria-hidden="true">▤</span>Orçamentos</h2><a href="#planos">Ver todos <span aria-hidden="true">→</span></a></header>
+              <ul><li><span><strong>Orçamento #1058</strong><small>Projeto Cozinha Planejada</small></span><b>R$ 12.450,00<em>Enviado</em></b></li><li><span><strong>Orçamento #1057</strong><small>Guarda-roupa Sob Medida</small></span><b>R$ 8.750,00<em class="warning">Em análise</em></b></li><li><span><strong>Orçamento #1056</strong><small>Painel para Sala</small></span><b>R$ 2.980,00<em class="muted">Rascunho</em></b></li></ul>
+            </article>
+            <article class="reference-public-card reference-public-project">
+              <header><h2><span aria-hidden="true">▦</span>Projetos</h2><a href="#plataforma">Ver todos <span aria-hidden="true">→</span></a></header>
+              <div class="reference-public-project-image" role="img" aria-label="Projeto de cozinha planejada"></div>
+              <strong>Projeto Cozinha Premium</strong><small>Produção em andamento</small><div class="reference-public-progress"><span><i></i></span><b>65%</b></div><div class="reference-public-dates"><span>◷ Início: 10/05/2024</span><span>◷ Entrega: 25/06/2024</span></div>
+            </article>
+            <article class="reference-public-card">
+              <header><h2><span aria-hidden="true">◇</span>Produtos</h2><a href="#recursos">Ver todos <span aria-hidden="true">→</span></a></header>
+              <ul><li><span class="reference-public-product-thumb wood"></span><span><strong>MDF Carvalho</strong><small>Chapas</small></span><em>Em estoque</em></li><li><span class="reference-public-product-thumb hardware"></span><span><strong>Dobradiça Soft Close</strong><small>Ferragens</small></span><em>Em estoque</em></li><li><span class="reference-public-product-thumb handle"></span><span><strong>Puxador Perfil Alumínio</strong><small>Ferragens</small></span><em class="warning">Estoque baixo</em></li></ul>
+            </article>
+          </section>
+          <section class="reference-public-ai-band">
+            <span class="reference-public-ai-band-icon" aria-hidden="true">✦</span><span><strong>Orçamentos com IA: mais precisão, menos tempo</strong><small>Use inteligência artificial para calcular materiais, mão de obra e sugerir preços com mais assertividade.</small></span><button class="btn primary" type="button" data-plan="professional">Experimentar agora <span aria-hidden="true">✦</span></button>
+          </section>
+        </main>
+      </div>
+    </div>
     <header class="site-header">
-      <a class="logo" href="#inicio" aria-label="Multi-Marcenarias"><span class="logo-mark" aria-hidden="true">MM</span><span><strong>Multi</strong><small>Marcenarias</small></span></a>
+      <a class="logo" href="#legacy-inicio" aria-label="Multi-Marcenarias"><span class="logo-mark" aria-hidden="true">MM</span><span><strong>Multi</strong><small>Marcenarias</small></span></a>
       <nav class="site-nav" aria-label="Navegação principal"><a href="#inicio">Início</a><a href="#recursos">Recursos</a><a href="#plataforma">Plataforma</a><a href="#planos">Planos</a></nav>
-      <div class="header-actions"><a class="btn whatsapp mini" href="https://wa.me/5513981236650?text=Ol%C3%A1%21%20Quero%20conhecer%20a%20plataforma%20Multi-Marcenarias%20para%20minha%20marcenaria." target="_blank" rel="noopener noreferrer" aria-label="Falar com a Multi-Marcenarias pelo WhatsApp">WhatsApp</a><button class="btn ghost" id="open-login" type="button">Entrar</button></div>
+      <div class="header-actions"><a class="btn whatsapp mini" href="https://wa.me/5513981236650?text=Ol%C3%A1%21%20Quero%20conhecer%20a%20plataforma%20Multi-Marcenarias%20para%20minha%20marcenaria." target="_blank" rel="noopener noreferrer" aria-label="Falar com a Multi-Marcenarias pelo WhatsApp">WhatsApp</a><button class="btn ghost" id="open-login-legacy" type="button">Entrar</button></div>
     </header>
 
     <main id="conteudo">
-      <section class="hero" id="inicio">
+      <section class="hero" id="legacy-inicio">
         <div class="hero-copy">
           <span class="eyebrow">SaaS para marcenarias • multiempresa</span>
           <h1>Sua marcenaria mais organizada, <em>lucrativa e inteligente.</em></h1>
