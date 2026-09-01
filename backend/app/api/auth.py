@@ -163,8 +163,22 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     )
     db.add(user)
     try:
+        # The tenant-scoping hook creates and links a tenant for legacy users.
+        # Once flushed, grant that tenant the same commercial trial as the
+        # current business registration flow so no new account is born locked.
         db.flush()
-        db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email}"))
+        if not user.tenant_id:
+            raise RuntimeError("Cadastro criado sem marcenaria vinculada")
+        db.add(
+            Subscription(
+                tenant_id=user.tenant_id,
+                provider="manual",
+                plan_code="starter",
+                status="trialing",
+                trial_end=_now() + timedelta(days=TRIAL_DAYS),
+            )
+        )
+        db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email} com {TRIAL_DAYS} dias grátis"))
         db.commit()
         db.refresh(user)
     except Exception:
