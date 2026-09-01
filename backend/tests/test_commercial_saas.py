@@ -87,7 +87,7 @@ def test_expired_trial_blocks_platform_but_keeps_account_and_billing_accessible(
             subscription.trial_end = datetime.now() - timedelta(minutes=1)
             db.commit()
 
-        me = client.get("/api/v1/protected/me")
+        me = client.get("/api/v1/me")
         assert me.status_code == 200, me.text
 
         billing = client.get("/api/v1/billing/subscription")
