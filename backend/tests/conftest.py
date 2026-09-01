@@ -3,6 +3,8 @@ import os
 import pytest
 import redis
 
+os.environ.setdefault("OPENAI_API_DISABLED", "true")
+
 from app.main import rate_limiter
 
 
