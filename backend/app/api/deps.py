@@ -6,8 +6,23 @@ from sqlalchemy.orm import Session
 from app.core.security import decode_token
 from app.database import get_db
 from app.models import Tenant, User
+from app.services.plans import ensure_commercial_access
 
 CSRF_COOKIE = "csrf_token"
+COMMERCIAL_ACCESS_EXEMPT_PATHS = {
+    "/api/v1/billing/subscription",
+    "/api/v1/billing/checkout",
+    "/api/v1/billing/portal",
+    "/api/v1/protected/me",
+}
+
+
+def _requires_commercial_access(path: str) -> bool:
+    if path in COMMERCIAL_ACCESS_EXEMPT_PATHS:
+        return False
+    if path.startswith("/api/v1/platform/"):
+        return False
+    return True
 
 
 def get_current_user(
@@ -41,6 +56,8 @@ def get_current_user(
     if not tenant or not tenant.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Marcenaria indisponível")
     db.info["tenant_id"] = user.tenant_id
+    if _requires_commercial_access(request.url.path):
+        ensure_commercial_access(db, tenant)
     return user
 
 
