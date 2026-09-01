@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title>Monograma dourado Multi-Marcenarias</title>
+  <defs>
+    <linearGradient id="gold" x1="16" y1="108" x2="108" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a96a11"/>
+      <stop offset=".48" stop-color="#e9bd58"/>
+      <stop offset="1" stop-color="#c4861e"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 104V27l46 44 46-44v77" fill="none" stroke="url(#gold)" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M31 93V50l33 31 33-31v43" fill="none" stroke="#edc66a" stroke-width="5" stroke-linejoin="round"/>
+</svg>
