@@ -1,16 +1,17 @@
 /* Public dashboard reference — Multi-Marcenarias */
 :root{
   --ref-surface:#ffffff;
-  --ref-canvas:#f8faf8;
-  --ref-ink:#15201d;
-  --ref-muted:#68756f;
-  --ref-line:#e2e8e3;
+  --ref-canvas:#ffffff;
+  --ref-ink:#102f24;
+  --ref-muted:#46675a;
+  --ref-line:#d8e8df;
   --ref-gold:#c58c27;
   --ref-gold-soft:#f3e7c9;
-  --ref-green:#0a6545;
-  --ref-green-dark:#06452f;
-  --ref-led:#22d889;
-  --ref-shadow:0 8px 24px rgba(16,68,42,.06);
+  --ref-green:#087a4f;
+  --ref-green-dark:#055c3b;
+  --ref-green-soft:#eaf7f0;
+  --ref-led:#18aa70;
+  --ref-shadow:0 10px 28px rgba(8,122,79,.075);
 }
 body{background:var(--ref-canvas);color:var(--ref-ink)}
 #public-site{min-height:100vh;background:var(--ref-canvas);color:var(--ref-ink)}
@@ -192,4 +193,215 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 }
 @media (prefers-reduced-motion:reduce){
   .reference-public-nav a,.reference-public-actions .btn{transition:none}
+}
+
+/* Tema esmeralda final — mantém o site branco e neutraliza o antigo tema neon. */
+#public-site > #conteudo:not(.reference-public-content),
+#public-site > #conteudo:not(.reference-public-content) > section,
+#public-site > footer{
+  background:#fff;
+  color:var(--ref-ink);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .section-heading h2,
+#public-site > #conteudo:not(.reference-public-content) .service-card h3,
+#public-site > #conteudo:not(.reference-public-content) .project-card h3,
+#public-site > #conteudo:not(.reference-public-content) .price-card h3,
+#public-site > #conteudo:not(.reference-public-content) .contact-card h2,
+#public-site > #conteudo:not(.reference-public-content) .commercial-band h2{
+  color:var(--ref-green-dark);
+  text-shadow:none;
+}
+
+#public-site > #conteudo:not(.reference-public-content) .section-heading p,
+#public-site > #conteudo:not(.reference-public-content) .service-card p,
+#public-site > #conteudo:not(.reference-public-content) .price-card p,
+#public-site > #conteudo:not(.reference-public-content) .price-card li,
+#public-site > #conteudo:not(.reference-public-content) .contact-card p,
+#public-site > #conteudo:not(.reference-public-content) .commercial-band p{
+  color:var(--ref-muted);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .eyebrow,
+#public-site > #conteudo:not(.reference-public-content) .project-card span{
+  color:var(--ref-green);
+  text-shadow:none;
+}
+
+#public-site > #conteudo:not(.reference-public-content) .service-card,
+#public-site > #conteudo:not(.reference-public-content) .price-card,
+#public-site > #conteudo:not(.reference-public-content) .contact-card,
+#public-site > #conteudo:not(.reference-public-content) .commercial-band{
+  border:1px solid var(--ref-line);
+  background:#fff;
+  box-shadow:var(--ref-shadow);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .service-card::before{
+  background:linear-gradient(135deg,rgba(8,122,79,.055),transparent 48%);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .service-card::after{
+  display:none;
+}
+
+#public-site > #conteudo:not(.reference-public-content) .service-card:hover,
+#public-site > #conteudo:not(.reference-public-content) .project-card:hover{
+  border-color:rgba(8,122,79,.38);
+  box-shadow:0 18px 42px rgba(8,92,59,.12);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .service-icon{
+  color:var(--ref-green);
+  border:1px solid #c7e7d6;
+  background:var(--ref-green-soft);
+  box-shadow:0 8px 22px rgba(8,122,79,.12);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .projects-section{
+  background:linear-gradient(180deg,#fff 0%,#f7fcf9 100%);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .project-card{
+  border:1px solid var(--ref-line);
+  background-color:#fff;
+  box-shadow:var(--ref-shadow);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .project-one{
+  background-image:linear-gradient(145deg,#fff 28%,#e9f8f0 100%);
+  box-shadow:inset 0 -3px 0 #087a4f,var(--ref-shadow);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .project-two{
+  background-image:linear-gradient(145deg,#fff 28%,#e4f5ed 100%);
+  box-shadow:inset 0 -3px 0 #18a46d,var(--ref-shadow);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .project-three{
+  background-image:linear-gradient(145deg,#fff 28%,#eef9f3 100%);
+  box-shadow:inset 0 -3px 0 #c58c27,var(--ref-shadow);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .pricing-section{
+  background:#f5fbf7;
+}
+
+#public-site > #conteudo:not(.reference-public-content) .price-card.featured{
+  border-color:rgba(8,122,79,.48);
+  box-shadow:0 18px 44px rgba(8,122,79,.14);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .price,
+#public-site > #conteudo:not(.reference-public-content) .price small{
+  color:var(--ref-green-dark);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .price-badge{
+  color:#fff;
+  background:var(--ref-green);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .price-card li::before{
+  color:var(--ref-green);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .commercial-band{
+  color:var(--ref-ink);
+  box-shadow:inset 4px 0 0 var(--ref-green),var(--ref-shadow);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .commercial-band .eyebrow{
+  color:var(--ref-green);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .contact-list > a,
+#public-site > #conteudo:not(.reference-public-content) .contact-list > div{
+  color:var(--ref-ink);
+  border-color:var(--ref-line);
+  background:#fff;
+}
+
+#public-site > #conteudo:not(.reference-public-content) .contact-list strong{
+  color:var(--ref-green-dark);
+}
+
+#public-site > #conteudo:not(.reference-public-content) .contact-list span{
+  color:var(--ref-muted);
+}
+
+#public-site .btn.primary{
+  color:#fff;
+  border-color:var(--ref-green);
+  background:var(--ref-green);
+  background-image:none;
+  box-shadow:0 10px 24px rgba(8,122,79,.2);
+  animation:none;
+}
+
+#public-site .btn.primary:hover{
+  border-color:var(--ref-green-dark);
+  background:var(--ref-green-dark);
+  box-shadow:0 13px 28px rgba(5,92,59,.24);
+}
+
+#public-site .btn.secondary,
+#public-site .btn.ghost{
+  color:var(--ref-green-dark);
+  border-color:#bcdccc;
+  background:#fff;
+}
+
+#public-site .btn.secondary:hover,
+#public-site .btn.ghost:hover{
+  color:var(--ref-green-dark);
+  border-color:var(--ref-green);
+  background:var(--ref-green-soft);
+  box-shadow:none;
+}
+
+#auth-overlay{
+  background:rgba(5,64,41,.42);
+}
+
+#auth-overlay .auth-card{
+  color:var(--ref-ink);
+  border-color:var(--ref-line);
+  background:#fff;
+  box-shadow:0 28px 80px rgba(5,64,41,.24);
+}
+
+#auth-overlay .auth-card::before{
+  background:linear-gradient(90deg,transparent,var(--ref-green),var(--ref-gold),transparent);
+}
+
+#auth-overlay h2,
+#auth-overlay label{
+  color:var(--ref-green-dark);
+}
+
+#auth-overlay p,
+#auth-overlay .muted{
+  color:var(--ref-muted);
+}
+
+#auth-overlay input{
+  color:var(--ref-ink);
+  border-color:var(--ref-line);
+  background:#fff;
+}
+
+#auth-overlay input::placeholder{
+  color:#718b80;
+}
+
+#auth-overlay a,
+#auth-overlay .link-button{
+  color:var(--ref-green);
+}
+
+@media (max-width:760px){
+  #public-site > #conteudo:not(.reference-public-content) .commercial-band{
+    box-shadow:inset 0 4px 0 var(--ref-green),var(--ref-shadow);
+  }
 }
