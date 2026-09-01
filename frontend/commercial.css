@@ -56,3 +56,58 @@
  .commercial-band{margin:18px 18px 62px;padding:28px 22px;display:block}.commercial-band .btn{margin-top:12px;width:100%;justify-content:center}
  #public-site .service-grid{grid-template-columns:1fr}
 }
+
+/* Correção de contraste da autenticação: texto preto real em fundo branco. */
+#auth-overlay .auth-card h1,
+#auth-overlay .auth-card h2,
+#auth-overlay .auth-card h3,
+#auth-overlay .auth-card p,
+#auth-overlay .auth-card label,
+#auth-overlay .auth-card span:not(.eyebrow),
+#auth-overlay .auth-card strong,
+#auth-overlay .auth-card small,
+#auth-overlay .auth-card legend,
+#auth-overlay .auth-card .muted,
+#auth-overlay .auth-card .auth-message,
+#auth-overlay .auth-card .form-message{
+  color:#111111!important;
+  -webkit-text-fill-color:#111111!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}
+
+#auth-overlay .auth-card input,
+#auth-overlay .auth-card select,
+#auth-overlay .auth-card textarea{
+  background:#ffffff!important;
+  background-color:#ffffff!important;
+  color:#111111!important;
+  -webkit-text-fill-color:#111111!important;
+  caret-color:#111111!important;
+  border-color:#d8e8df!important;
+  opacity:1!important;
+}
+
+#auth-overlay .auth-card input::placeholder,
+#auth-overlay .auth-card textarea::placeholder{
+  color:#111111!important;
+  -webkit-text-fill-color:#111111!important;
+  opacity:1!important;
+}
+
+#auth-overlay .auth-card select option{
+  background:#ffffff!important;
+  color:#111111!important;
+  -webkit-text-fill-color:#111111!important;
+}
+
+#auth-overlay .auth-card input:-webkit-autofill,
+#auth-overlay .auth-card input:-webkit-autofill:hover,
+#auth-overlay .auth-card input:-webkit-autofill:focus,
+#auth-overlay .auth-card textarea:-webkit-autofill,
+#auth-overlay .auth-card select:-webkit-autofill{
+  -webkit-text-fill-color:#111111!important;
+  -webkit-box-shadow:0 0 0 1000px #ffffff inset!important;
+  box-shadow:0 0 0 1000px #ffffff inset!important;
+  caret-color:#111111!important;
+}
