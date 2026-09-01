@@ -2,8 +2,8 @@
 :root{
   --ref-surface:#ffffff;
   --ref-canvas:#ffffff;
-  --ref-ink:#102f24;
-  --ref-muted:#46675a;
+  --ref-ink:#111111;
+  --ref-muted:#333333;
   --ref-line:#d8e8df;
   --ref-gold:#c58c27;
   --ref-gold-soft:#f3e7c9;
@@ -209,7 +209,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 #public-site > #conteudo:not(.reference-public-content) .price-card h3,
 #public-site > #conteudo:not(.reference-public-content) .contact-card h2,
 #public-site > #conteudo:not(.reference-public-content) .commercial-band h2{
-  color:var(--ref-green-dark);
+  color:var(--ref-ink);
   text-shadow:none;
 }
 
@@ -224,7 +224,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 
 #public-site > #conteudo:not(.reference-public-content) .eyebrow,
 #public-site > #conteudo:not(.reference-public-content) .project-card span{
-  color:var(--ref-green);
+  color:var(--ref-ink);
   text-shadow:none;
 }
 
@@ -294,7 +294,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 
 #public-site > #conteudo:not(.reference-public-content) .price,
 #public-site > #conteudo:not(.reference-public-content) .price small{
-  color:var(--ref-green-dark);
+  color:var(--ref-ink);
 }
 
 #public-site > #conteudo:not(.reference-public-content) .price-badge{
@@ -312,7 +312,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 }
 
 #public-site > #conteudo:not(.reference-public-content) .commercial-band .eyebrow{
-  color:var(--ref-green);
+  color:var(--ref-ink);
 }
 
 #public-site > #conteudo:not(.reference-public-content) .contact-list > a,
@@ -323,7 +323,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 }
 
 #public-site > #conteudo:not(.reference-public-content) .contact-list strong{
-  color:var(--ref-green-dark);
+  color:var(--ref-ink);
 }
 
 #public-site > #conteudo:not(.reference-public-content) .contact-list span{
@@ -377,7 +377,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 
 #auth-overlay h2,
 #auth-overlay label{
-  color:var(--ref-green-dark);
+  color:var(--ref-ink);
 }
 
 #auth-overlay p,
