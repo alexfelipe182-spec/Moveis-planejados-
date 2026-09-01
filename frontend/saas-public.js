@@ -43,7 +43,7 @@
     if (!form || !message) return;
 
     message.className = 'form-message';
-    message.textContent = 'Criando sua marcenaria...';
+    message.textContent = 'Criando sua marcenaria e ativando 30 dias grátis...';
 
     const payload = {
       business_name: $('#register-business-name')?.value.trim(),
@@ -63,7 +63,7 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || `Erro ${response.status}`);
       message.classList.add('success');
-      message.textContent = 'Marcenaria criada com sucesso. Entre com seu e-mail para acessar o painel.';
+      message.textContent = 'Marcenaria criada. Seus 30 dias grátis estão ativos — entre para começar a usar a plataforma.';
       form.reset();
       setTimeout(() => {
         $('#login-email').value = payload.email;
@@ -84,10 +84,11 @@
   }
 
   function billingStatusLabel(subscription) {
-    if (!subscription) return 'Sem assinatura ativa';
+    if (!subscription) return 'Plano necessário';
     const labels = {
       active: 'Ativa',
-      trialing: 'Período de teste',
+      trialing: 'Teste grátis ativo',
+      trial_expired: 'Teste grátis encerrado',
       past_due: 'Pagamento pendente',
       unpaid: 'Pagamento não concluído',
       canceled: 'Cancelada',
@@ -98,7 +99,7 @@
   }
 
   function billingStatusTone(subscription) {
-    if (!subscription) return '';
+    if (!subscription) return 'warning';
     if (['active', 'trialing'].includes(subscription.status)) return 'success';
     if (['past_due', 'incomplete'].includes(subscription.status)) return 'warning';
     return 'danger';
@@ -128,7 +129,7 @@
     const previous = button?.textContent;
     if (button) {
       button.disabled = true;
-      button.textContent = 'Abrindo pagamento...';
+      button.textContent = 'Abrindo assinatura...';
     }
     try {
       const data = await billingApi('/billing/checkout', {
@@ -181,6 +182,12 @@
     return billingRequestPromise;
   }
 
+  function planButtons() {
+    return `<button class="btn secondary" type="button" data-billing-plan="starter">Essencial · R$ 149/mês</button>
+      <button class="btn primary" type="button" data-billing-plan="professional">Profissional · R$ 299/mês</button>
+      <button class="btn secondary" type="button" data-billing-plan="business">Empresa · R$ 599/mês</button>`;
+  }
+
   async function refreshBillingPanel() {
     if (!$('#saas-billing-panel') || typeof window.api !== 'function') return;
     try {
@@ -190,10 +197,13 @@
       const subscription = data?.subscription || null;
       const planCode = data?.plan_code || subscription?.plan_code || 'starter';
       const planName = planNames[planCode] || planNames.starter;
-      const period = subscription?.current_period_end
-        ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
-        : '—';
       const status = billingStatusLabel(subscription);
+      const trialDays = Number(data?.trial_days_remaining || subscription?.trial_days_remaining || 0);
+      const isTrial = subscription?.status === 'trialing';
+      const isTrialExpired = subscription?.status === 'trial_expired';
+      const periodSource = (isTrial || isTrialExpired) ? subscription?.trial_end : subscription?.current_period_end;
+      const period = periodSource ? new Date(periodSource).toLocaleDateString('pt-BR') : '—';
+      const periodLabel = (isTrial || isTrialExpired) ? 'Teste grátis até' : 'Próxima renovação/período';
       const usage = data?.usage?.usage || {};
       const limits = data?.usage?.limits || {};
       const usageRows = Object.entries(usage)
@@ -204,21 +214,30 @@
           return `<span>${usageNames[key]}: <strong>${Number(value).toLocaleString('pt-BR')} / ${limitLabel}</strong></span>`;
         })
         .join('');
-      const hasActiveSubscription = ['active', 'trialing'].includes(subscription?.status);
-      const actions = data?.can_manage_billing
-        ? '<button class="btn primary" type="button" data-billing-portal>Gerenciar assinatura</button>'
-        : hasActiveSubscription
-          ? '<span class="muted">Assinatura administrada pela plataforma.</span>'
-          : `<button class="btn secondary" type="button" data-billing-plan="starter">Essencial · R$ 149/mês</button>
-             <button class="btn primary" type="button" data-billing-plan="professional">Profissional · R$ 299/mês</button>
-             <button class="btn secondary" type="button" data-billing-plan="business">Empresa · R$ 599/mês</button>`;
+
+      let trialMessage = '';
+      if (isTrial) {
+        trialMessage = `<p><strong>${trialDays} ${trialDays === 1 ? 'dia restante' : 'dias restantes'}</strong> no seu teste grátis de 30 dias. Você pode escolher um plano agora e a cobrança começa após o período gratuito.</p>`;
+      } else if (isTrialExpired) {
+        trialMessage = '<p><strong>Seu período gratuito terminou.</strong> Escolha um plano para continuar usando os recursos da plataforma.</p>';
+      }
+
+      let actions;
+      if (data?.can_manage_billing) {
+        actions = '<button class="btn primary" type="button" data-billing-portal>Gerenciar assinatura</button>';
+      } else if (subscription?.status === 'active') {
+        actions = '<span class="muted">Assinatura administrada pela plataforma.</span>';
+      } else {
+        actions = planButtons();
+      }
 
       panel.innerHTML = `
         <div class="panel-title">
           <div><span class="eyebrow">Assinatura SaaS</span><h3>Plano ${escapeHtml(planName)}</h3></div>
           <span class="badge ${billingStatusTone(subscription)}">${escapeHtml(status)}</span>
         </div>
-        <p>Próxima renovação/período: <strong>${escapeHtml(period)}</strong></p>
+        ${trialMessage}
+        <p>${escapeHtml(periodLabel)}: <strong>${escapeHtml(period)}</strong></p>
         <div class="trust">${usageRows || '<span>Uso mensal disponível no seu plano.</span>'}</div>
         <div class="toolbar-actions" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
           ${actions}
@@ -266,8 +285,8 @@
     const params = new URLSearchParams(location.search);
     const result = params.get('billing');
     const messages = {
-      success: 'Pagamento concluído. Entre na plataforma para confirmar sua assinatura.',
-      cancelled: 'Pagamento não concluído. Você pode tentar novamente quando quiser.',
+      success: 'Assinatura configurada. Seu período grátis continua até a data mostrada no painel.',
+      cancelled: 'Assinatura não concluída. Seu teste grátis continua normalmente enquanto estiver dentro dos 30 dias.',
       portal: 'Configurações de cobrança atualizadas.',
     };
     if (!messages[result]) return;
