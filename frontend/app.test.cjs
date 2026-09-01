@@ -209,6 +209,20 @@ test('the public WhatsApp fallback uses the official business contact', () => {
   assert.match(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), /5513981236650/);
 });
 
+test('the billing panel follows the production subscription contract safely', () => {
+  const billing = fs.readFileSync(path.join(__dirname, 'saas-public.js'), 'utf8');
+
+  assert.match(billing, /billingApi\('\/billing\/subscription'\)/);
+  assert.match(billing, /data\?\.usage\?\.usage \|\| \{\}/);
+  assert.match(billing, /data\?\.usage\?\.limits \|\| \{\}/);
+  assert.match(billing, /billingApi\('\/billing\/portal', \{ method: 'POST' \}\)/);
+  assert.match(billing, /data-billing-portal/);
+  assert.match(billing, /https:\/\/checkout\.stripe\.com/);
+  assert.match(billing, /https:\/\/billing\.stripe\.com/);
+  assert.match(billing, /stripeOrigins\.has\(destination\.origin\)/);
+  assert.doesNotMatch(billing, /window\.location\.assign\(data\.(checkout|portal)_url\)/);
+});
+
 test('the proposal extension does not install a second registration flow', () => {
   const submitListeners = [];
   const registerForm = {};
