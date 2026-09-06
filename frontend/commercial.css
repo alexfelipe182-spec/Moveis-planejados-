@@ -111,3 +111,29 @@
   box-shadow:0 0 0 1000px #ffffff inset!important;
   caret-color:#111111!important;
 }
+
+/* Mantém o cadastro acessível em telas baixas e celulares. */
+#auth-overlay{
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+#auth-overlay .auth-card{
+  max-height:calc(100vh - 32px);
+  max-height:calc(100dvh - 32px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+@media(max-width:760px){
+  #auth-overlay{
+    place-items:start center;
+    padding:12px;
+  }
+  #auth-overlay .auth-card{
+    width:100%;
+    max-height:calc(100vh - 24px);
+    max-height:calc(100dvh - 24px);
+    margin:0 auto;
+    padding-bottom:calc(28px + env(safe-area-inset-bottom));
+  }
+}
