@@ -329,3 +329,11 @@
     if (dashboard) observer.observe(dashboard, { childList: true });
   });
 })();
+
+(() => {
+  if (document.querySelector('script[data-mm-account-controls]')) return;
+  const script = document.createElement('script');
+  script.src = './account-controls.js';
+  script.dataset.mmAccountControls = 'true';
+  document.head.appendChild(script);
+})();
