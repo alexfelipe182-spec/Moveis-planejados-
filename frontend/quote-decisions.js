@@ -109,3 +109,12 @@
   window.decideQuote = decideQuote;
   window.setQuoteCommercialStatus = setCommercialStatus;
 })();
+
+(() => {
+  if (document.querySelector('script[data-mm-account-controls]')) return;
+  const script = document.createElement('script');
+  script.src = './account-controls.js?v=20260906-2';
+  script.dataset.mmAccountControls = 'true';
+  script.async = false;
+  document.head.appendChild(script);
+})();
