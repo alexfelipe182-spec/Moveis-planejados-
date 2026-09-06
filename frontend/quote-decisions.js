@@ -111,6 +111,7 @@
 })();
 
 (() => {
+  if (!document?.head || typeof document.createElement !== 'function') return;
   if (document.querySelector('script[data-mm-account-controls]')) return;
   const script = document.createElement('script');
   script.src = './account-controls.js?v=20260906-2';
