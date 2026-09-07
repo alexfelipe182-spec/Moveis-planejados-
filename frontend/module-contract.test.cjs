@@ -19,3 +19,17 @@ test('account menu owns account controls and sidebar layout', () => {
   assert.match(source, /mm-menu-logout/);
   assert.match(source, /#admin-app #admin-nav\{flex:1 1 auto/);
 });
+
+test('dashboard search is functional and uses the authenticated API client', () => {
+  const source = read('dashboard-search.js');
+  assert.match(source, /searchDashboard/);
+  assert.match(source, /api\(`\$\{resource\.endpoint\}\?limit=100`\)/);
+  assert.match(source, /data-dashboard-search-resource/);
+  assert.doesNotMatch(source, /\bfetch\s*\(/);
+});
+
+test('saas loader includes account menu and dashboard search with cache versions', () => {
+  const source = read('saas-public.js');
+  assert.match(source, /account-menu-v2\.js\?v=/);
+  assert.match(source, /dashboard-search\.js\?v=/);
+});
