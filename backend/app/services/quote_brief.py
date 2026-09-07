@@ -204,9 +204,9 @@ def _local_quote_brief(
     normalized_request = _normalized(description)
 
     measurement_pattern = re.compile(
-        r"\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?\s*[x×]\s*"
+        r"\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?\s*[x\u00d7]\s*"
         r"\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?"
-        r"(?:\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?)?",
+        r"(?:\s*[x\u00d7]\s*\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?)?",
         re.IGNORECASE,
     )
     measurements = [match.group(0).strip() for match in measurement_pattern.finditer(description)]
