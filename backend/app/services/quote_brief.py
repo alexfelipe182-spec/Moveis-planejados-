@@ -21,10 +21,11 @@ MaterialKind = Literal[
     "service",
     "other",
 ]
+InterpretationSource = Literal["openai", "assisted_local"]
 
 
 class QuoteAIUnavailable(RuntimeError):
-    """Raised when a real provider interpretation cannot be produced safely."""
+    """Compatibilidade para integrações antigas que tratavam indisponibilidade externa."""
 
 
 class QuoteBriefItem(BaseModel):
@@ -55,6 +56,11 @@ class QuoteBrief(BaseModel):
     confidence_score: int = Field(ge=0, le=100)
 
 
+class QuoteBriefInterpretation(BaseModel):
+    source: InterpretationSource
+    brief: QuoteBrief
+
+
 class CatalogMaterial(BaseModel):
     id: int = Field(gt=0)
     name: str
@@ -80,6 +86,7 @@ class UnpricedRequirement(BaseModel):
 
 class QuotePreview(BaseModel):
     brief: QuoteBrief
+    interpretation_source: InterpretationSource = "openai"
     priced_items: list[PricedRequirement]
     unpriced_items: list[UnpricedRequirement]
     material_cost: Decimal
@@ -138,6 +145,7 @@ def build_quote_preview(
     catalog: Sequence[CatalogMaterial],
     *,
     profit_margin: Decimal,
+    interpretation_source: InterpretationSource = "openai",
 ) -> QuotePreview:
     buckets = {
         "material_cost": Decimal("0"),
@@ -189,6 +197,7 @@ def build_quote_preview(
     )
     return QuotePreview(
         brief=brief,
+        interpretation_source=interpretation_source,
         priced_items=priced,
         unpriced_items=unpriced,
         **pricing,
@@ -270,15 +279,26 @@ def _local_quote_brief(
     )
 
 
-def extract_quote_brief(
+def _local_interpretation(
+    request_text: str,
+    catalog: Sequence[CatalogMaterial],
+) -> QuoteBriefInterpretation:
+    return QuoteBriefInterpretation(
+        source="assisted_local",
+        brief=_local_quote_brief(request_text, catalog),
+    )
+
+
+def extract_quote_brief_result(
     request_text: str,
     *,
     catalog: Sequence[CatalogMaterial] = (),
-) -> QuoteBrief:
+) -> QuoteBriefInterpretation:
+    """Interpreta o pedido e informa se a origem foi OpenAI ou fallback local."""
     api_key = openai_api_key()
     if not api_key:
         logger.info("OpenAI quote brief key unavailable; using local assisted fallback")
-        return _local_quote_brief(request_text, catalog)
+        return _local_interpretation(request_text, catalog)
 
     catalog_context = [
         {"name": item.name, "kind": item.kind, "unit": item.unit}
@@ -312,11 +332,23 @@ def extract_quote_brief(
         message = completion.choices[0].message
         if getattr(message, "refusal", None):
             logger.warning("OpenAI refused quote brief; using local assisted fallback")
-            return _local_quote_brief(request_text, catalog)
+            return _local_interpretation(request_text, catalog)
         if message.parsed is None:
             logger.warning("OpenAI returned incomplete quote brief; using local assisted fallback")
-            return _local_quote_brief(request_text, catalog)
-        return message.parsed
+            return _local_interpretation(request_text, catalog)
+        return QuoteBriefInterpretation(source="openai", brief=message.parsed)
     except Exception as exc:
-        logger.warning("OpenAI quote brief failed: %s; using local assisted fallback", type(exc).__name__)
-        return _local_quote_brief(request_text, catalog)
+        logger.warning(
+            "OpenAI quote brief failed: %s; using local assisted fallback",
+            type(exc).__name__,
+        )
+        return _local_interpretation(request_text, catalog)
+
+
+def extract_quote_brief(
+    request_text: str,
+    *,
+    catalog: Sequence[CatalogMaterial] = (),
+) -> QuoteBrief:
+    """Compatibilidade: retorna somente o briefing estruturado."""
+    return extract_quote_brief_result(request_text, catalog=catalog).brief
