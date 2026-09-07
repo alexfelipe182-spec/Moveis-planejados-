@@ -11,7 +11,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import CSRF_COOKIE, require_csrf
+from app.api.deps import CSRF_COOKIE, require_csrf, require_refresh_csrf
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 from app.database import get_db
@@ -251,7 +251,12 @@ def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(
 
 
 @router.post("/refresh")
-def refresh(response: Response, _: None = Depends(require_csrf), refresh_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
+def refresh(
+    response: Response,
+    _: None = Depends(require_refresh_csrf),
+    refresh_token: str | None = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Refresh token ausente")
     try:
