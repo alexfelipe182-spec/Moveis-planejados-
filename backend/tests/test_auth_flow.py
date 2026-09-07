@@ -1,10 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.database import SessionLocal
 from app.main import app
 from app.models import User
-from app.core.config import settings
 
 
 @pytest.fixture
@@ -65,6 +65,13 @@ def test_production_docs_hide_auth_test_and_cookie_diagnostic(client, monkeypatc
     assert diagnostic.status_code == 404
 
 
+def test_anonymous_refresh_is_unauthorized_not_a_csrf_failure(client):
+    refresh = client.post("/api/v1/auth/refresh")
+
+    assert refresh.status_code == 401
+    assert refresh.json()["detail"] == "Refresh token ausente"
+
+
 def test_auth_flow(client):
     email = "teste.auth@example.com"
     password = "Senha-Forte-123!"
@@ -106,7 +113,8 @@ def test_auth_flow(client):
     assert "refresh_token" not in client.cookies
     assert "csrf_token" not in client.cookies
     logged_out_refresh = client.post("/api/v1/auth/refresh")
-    assert logged_out_refresh.status_code == 403
+    assert logged_out_refresh.status_code == 401
+    assert logged_out_refresh.json()["detail"] == "Refresh token ausente"
 
 
 def test_protected_endpoint_requires_auth(client):
