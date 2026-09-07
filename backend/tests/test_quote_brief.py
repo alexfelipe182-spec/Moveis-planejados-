@@ -2,11 +2,8 @@ import sys
 from decimal import Decimal
 from types import ModuleType, SimpleNamespace
 
-import pytest
-
 from app.services.quote_brief import (
     CatalogMaterial,
-    QuoteAIUnavailable,
     QuoteBrief,
     QuoteBriefItem,
     QuoteRequirement,
@@ -75,16 +72,20 @@ def test_extract_quote_brief_uses_a_validated_structured_output(monkeypatch):
     assert calls[0]["response_format"] is QuoteBrief
 
 
-def test_extract_quote_brief_fails_explicitly_without_a_provider_key(monkeypatch):
-    """Defect: the UI could label a local placeholder as a real AI interpretation."""
+def test_extract_quote_brief_falls_back_safely_without_a_provider_key(monkeypatch):
     monkeypatch.setenv("OPENAI_API_DISABLED", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "")
 
-    with pytest.raises(QuoteAIUnavailable, match="não está configurada"):
-        extract_quote_brief("Armário em MDF branco")
+    result = extract_quote_brief("Armário em MDF branco com 3,00m x 2,40m")
+
+    assert result.normalized_description.startswith("Armário em MDF branco")
+    assert result.measurements_summary == "3,00m x 2,40m"
+    assert "MDF" in (result.materials_summary or "")
+    assert result.requirements == []
+    assert any("assistida local" in question for question in result.questions)
 
 
-def test_extract_quote_brief_maps_provider_failure_without_fabricating_a_result(monkeypatch):
+def test_extract_quote_brief_falls_back_when_provider_is_unavailable(monkeypatch):
     monkeypatch.setenv("OPENAI_API_DISABLED", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     fake_openai = ModuleType("openai")
@@ -96,8 +97,11 @@ def test_extract_quote_brief_maps_provider_failure_without_fabricating_a_result(
     fake_openai.OpenAI = BrokenOpenAI
     monkeypatch.setitem(sys.modules, "openai", fake_openai)
 
-    with pytest.raises(QuoteAIUnavailable, match="temporariamente indisponível"):
-        extract_quote_brief("Armário em MDF branco")
+    result = extract_quote_brief("Armário em MDF branco")
+
+    assert result.normalized_description == "Armário em MDF branco"
+    assert result.requirements == []
+    assert any("assistida local" in question for question in result.questions)
 
 
 def test_catalog_prices_are_deterministic_and_unmatched_items_stay_unpriced():
