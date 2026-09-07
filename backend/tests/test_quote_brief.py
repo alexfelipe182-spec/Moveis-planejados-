@@ -9,6 +9,7 @@ from app.services.quote_brief import (
     QuoteRequirement,
     build_quote_preview,
     extract_quote_brief,
+    extract_quote_brief_result,
 )
 
 
@@ -39,32 +40,51 @@ def armario_brief() -> QuoteBrief:
     )
 
 
+def _fake_openai(monkeypatch, *, broken: bool = False):
+    calls = []
+    fake_openai = ModuleType("openai")
+
+    if broken:
+        class BrokenOpenAI:
+            def __init__(self, **kwargs):
+                raise RuntimeError("provider unavailable")
+
+        fake_openai.OpenAI = BrokenOpenAI
+    else:
+        class FakeCompletions:
+            def parse(self, **kwargs):
+                calls.append(kwargs)
+                return SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(
+                            message=SimpleNamespace(parsed=armario_brief(), refusal=None)
+                        )
+                    ]
+                )
+
+        class FakeOpenAI:
+            def __init__(self, **kwargs):
+                self.chat = SimpleNamespace(completions=FakeCompletions())
+
+        fake_openai.OpenAI = FakeOpenAI
+
+    monkeypatch.setitem(sys.modules, "openai", fake_openai)
+    return calls
+
+
 def test_extract_quote_brief_uses_a_validated_structured_output(monkeypatch):
     """Defect: free-form model text could omit doors, drawers or measurements."""
     monkeypatch.setenv("OPENAI_API_DISABLED", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_MODEL", "test-model")
-    calls = []
-    fake_openai = ModuleType("openai")
+    calls = _fake_openai(monkeypatch)
 
-    class FakeCompletions:
-        def parse(self, **kwargs):
-            calls.append(kwargs)
-            return SimpleNamespace(
-                choices=[SimpleNamespace(message=SimpleNamespace(parsed=armario_brief(), refusal=None))]
-            )
-
-    class FakeOpenAI:
-        def __init__(self, **kwargs):
-            self.chat = SimpleNamespace(completions=FakeCompletions())
-
-    fake_openai.OpenAI = FakeOpenAI
-    monkeypatch.setitem(sys.modules, "openai", fake_openai)
-
-    result = extract_quote_brief(
+    interpretation = extract_quote_brief_result(
         "Quero um armário de 3 metros, MDF branco, seis portas e três gavetas."
     )
+    result = interpretation.brief
 
+    assert interpretation.source == "openai"
     assert result.items[0].width_m == 3
     assert result.items[0].doors == 6
     assert result.items[0].drawers == 3
@@ -72,12 +92,25 @@ def test_extract_quote_brief_uses_a_validated_structured_output(monkeypatch):
     assert calls[0]["response_format"] is QuoteBrief
 
 
+def test_extract_quote_brief_compatibility_returns_only_brief(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_DISABLED", "false")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    _fake_openai(monkeypatch)
+
+    result = extract_quote_brief("Armário em MDF branco")
+
+    assert isinstance(result, QuoteBrief)
+    assert result.normalized_description.startswith("Armário")
+
+
 def test_extract_quote_brief_falls_back_safely_without_a_provider_key(monkeypatch):
     monkeypatch.setenv("OPENAI_API_DISABLED", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "")
 
-    result = extract_quote_brief("Armário em MDF branco com 3,00m x 2,40m")
+    interpretation = extract_quote_brief_result("Armário em MDF branco com 3,00m x 2,40m")
+    result = interpretation.brief
 
+    assert interpretation.source == "assisted_local"
     assert result.normalized_description.startswith("Armário em MDF branco")
     assert result.measurements_summary == "3,00m x 2,40m"
     assert "MDF" in (result.materials_summary or "")
@@ -88,17 +121,12 @@ def test_extract_quote_brief_falls_back_safely_without_a_provider_key(monkeypatc
 def test_extract_quote_brief_falls_back_when_provider_is_unavailable(monkeypatch):
     monkeypatch.setenv("OPENAI_API_DISABLED", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    fake_openai = ModuleType("openai")
+    _fake_openai(monkeypatch, broken=True)
 
-    class BrokenOpenAI:
-        def __init__(self, **kwargs):
-            raise RuntimeError("provider unavailable")
+    interpretation = extract_quote_brief_result("Armário em MDF branco")
+    result = interpretation.brief
 
-    fake_openai.OpenAI = BrokenOpenAI
-    monkeypatch.setitem(sys.modules, "openai", fake_openai)
-
-    result = extract_quote_brief("Armário em MDF branco")
-
+    assert interpretation.source == "assisted_local"
     assert result.normalized_description == "Armário em MDF branco"
     assert result.requirements == []
     assert any("assistida local" in question for question in result.questions)
@@ -113,8 +141,14 @@ def test_catalog_prices_are_deterministic_and_unmatched_items_stay_unpriced():
         CatalogMaterial(id=4, name="Montagem", kind="service", unit="h", unit_cost=Decimal("40"), waste_percent=Decimal("0")),
     ]
 
-    preview = build_quote_preview(armario_brief(), catalog, profit_margin=Decimal("30"))
+    preview = build_quote_preview(
+        armario_brief(),
+        catalog,
+        profit_margin=Decimal("30"),
+        interpretation_source="openai",
+    )
 
+    assert preview.interpretation_source == "openai"
     assert preview.material_cost == Decimal("594.00")
     assert preview.hardware_cost == Decimal("255.00")
     assert preview.labor_cost == Decimal("320.00")
@@ -123,6 +157,26 @@ def test_catalog_prices_are_deterministic_and_unmatched_items_stay_unpriced():
     assert preview.suggested_total == Decimal("1519.70")
     assert [item.requirement.name for item in preview.unpriced_items] == ["Laca branca"]
     assert preview.requires_approval is True
+
+
+def test_assisted_preview_preserves_source_without_inventing_price():
+    preview = build_quote_preview(
+        QuoteBrief(
+            normalized_description="Armário em MDF branco",
+            items=[QuoteBriefItem(name="Móvel planejado")],
+            requirements=[],
+            questions=["Confirmar custos."],
+            confidence_score=25,
+        ),
+        [],
+        profit_margin=Decimal("30"),
+        interpretation_source="assisted_local",
+    )
+
+    assert preview.interpretation_source == "assisted_local"
+    assert preview.base_cost == Decimal("0.00")
+    assert preview.suggested_total == Decimal("0.00")
+    assert preview.priced_items == []
 
 
 def test_catalog_match_requires_compatible_kind_and_unit():
