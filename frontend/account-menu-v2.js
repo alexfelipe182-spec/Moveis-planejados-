@@ -20,6 +20,30 @@
       #mm-account-menu button{width:100%;border:0;background:transparent;border-radius:10px;padding:10px 12px;text-align:left;color:#102119;font:inherit;font-weight:700;cursor:pointer}
       #mm-account-menu button:hover,#mm-account-menu button:focus-visible{background:#eef8f2;outline:none}
       #mm-account-menu button[data-danger="true"]{color:#9b2c2c}
+
+      /* Contraste forte para os resultados do orçamento inteligente. */
+      #admin-app .smart-result-card strong,
+      #admin-app .smart-quote-grid strong{
+        color:#111827!important;
+        opacity:1!important;
+        font-weight:800!important;
+        text-shadow:none!important;
+      }
+      #admin-app .smart-result-card small,
+      #admin-app .smart-quote-grid small{
+        color:#374151!important;
+        opacity:1!important;
+        font-weight:700;
+      }
+      body.dark #admin-app .smart-result-card strong,
+      body.dark #admin-app .smart-quote-grid strong{
+        color:#f8fafc!important;
+      }
+      body.dark #admin-app .smart-result-card small,
+      body.dark #admin-app .smart-quote-grid small{
+        color:#d1d5db!important;
+      }
+
       @media(max-width:760px){#mm-account-menu{position:fixed;right:12px;top:72px;width:min(320px,calc(100vw - 24px))}}
     `;
     document.head.appendChild(style);
