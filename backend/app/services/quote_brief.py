@@ -1,7 +1,8 @@
 import json
 import logging
+import re
 import unicodedata
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Sequence
 
 from pydantic import BaseModel, Field
@@ -194,6 +195,79 @@ def build_quote_preview(
     )
 
 
+def _local_quote_brief(
+    request_text: str,
+    catalog: Sequence[CatalogMaterial],
+) -> QuoteBrief:
+    """Fallback seguro: organiza o pedido sem inventar quantidades ou preços."""
+    description = " ".join(request_text.split())[:3000]
+    normalized_request = _normalized(description)
+
+    measurement_pattern = re.compile(
+        r"\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?\s*[x×]\s*"
+        r"\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?"
+        r"(?:\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?)?",
+        re.IGNORECASE,
+    )
+    measurements = [match.group(0).strip() for match in measurement_pattern.finditer(description)]
+    measurements_summary = "; ".join(dict.fromkeys(measurements[:6])) or None
+
+    material_names: list[str] = []
+    for item in list(catalog)[:300]:
+        candidate = _normalized(item.name)
+        if candidate and candidate in normalized_request and item.name not in material_names:
+            material_names.append(item.name)
+        if len(material_names) >= 12:
+            break
+
+    generic_materials = (
+        "MDF",
+        "MDP",
+        "compensado",
+        "madeira",
+        "alumínio",
+        "vidro",
+        "ferragens",
+        "dobradiça",
+        "corrediça",
+        "puxador",
+    )
+    for material in generic_materials:
+        if _normalized(material) in normalized_request and material not in material_names:
+            material_names.append(material)
+    materials_summary = ", ".join(material_names[:12]) or None
+
+    finish = next(
+        (
+            finish_name
+            for finish_name in ("laca", "fosco", "brilho", "acetinado", "verniz")
+            if _normalized(finish_name) in normalized_request
+        ),
+        None,
+    )
+
+    questions = [
+        "Confirme as medidas finais antes de liberar o orçamento.",
+        "Revise materiais, ferragens e acabamento antes da aprovação.",
+        "Interpretação assistida local ativa; conecte a IA externa para uma leitura técnica mais detalhada.",
+    ]
+    if measurements_summary is None:
+        questions.insert(0, "Informe largura, altura e profundidade sempre que possível.")
+    if materials_summary is None:
+        questions.insert(1, "Informe os materiais desejados pelo cliente.")
+
+    return QuoteBrief(
+        normalized_description=description,
+        measurements_summary=measurements_summary,
+        materials_summary=materials_summary,
+        items=[QuoteBriefItem(name="Móvel planejado", quantity=1)],
+        requirements=[],
+        finish=finish,
+        questions=questions,
+        confidence_score=35 if measurements_summary else 25,
+    )
+
+
 def extract_quote_brief(
     request_text: str,
     *,
@@ -201,7 +275,8 @@ def extract_quote_brief(
 ) -> QuoteBrief:
     api_key = openai_api_key()
     if not api_key:
-        raise QuoteAIUnavailable("A IA de orçamento não está configurada")
+        logger.info("OpenAI quote brief key unavailable; using local assisted fallback")
+        return _local_quote_brief(request_text, catalog)
 
     catalog_context = [
         {"name": item.name, "kind": item.kind, "unit": item.unit}
@@ -234,12 +309,12 @@ def extract_quote_brief(
         )
         message = completion.choices[0].message
         if getattr(message, "refusal", None):
-            raise QuoteAIUnavailable("A IA não pôde interpretar este pedido")
+            logger.warning("OpenAI refused quote brief; using local assisted fallback")
+            return _local_quote_brief(request_text, catalog)
         if message.parsed is None:
-            raise QuoteAIUnavailable("A IA retornou uma interpretação incompleta")
+            logger.warning("OpenAI returned incomplete quote brief; using local assisted fallback")
+            return _local_quote_brief(request_text, catalog)
         return message.parsed
-    except QuoteAIUnavailable:
-        raise
     except Exception as exc:
-        logger.warning("OpenAI quote brief failed: %s", type(exc).__name__)
-        raise QuoteAIUnavailable("A IA de orçamento está temporariamente indisponível") from exc
+        logger.warning("OpenAI quote brief failed: %s; using local assisted fallback", type(exc).__name__)
+        return _local_quote_brief(request_text, catalog)
