@@ -177,6 +177,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -188,6 +191,7 @@ jobs:
           test -s frontend/professional.css
           test -s frontend/app.js
           test -s frontend/app.test.cjs
+          test -s frontend/module-contract.test.cjs
           test -s frontend/saas-public.js
           test -s frontend/smart-quotes.js
           test -s frontend/quote-decisions.js
@@ -196,12 +200,14 @@ jobs:
         run: |
           node --check frontend/app.js
           node --check frontend/app.test.cjs
+          node --check frontend/module-contract.test.cjs
           node --check frontend/saas-public.js
           node --check frontend/smart-quotes.js
           node --check frontend/quote-decisions.js
           node --check frontend/quote-proposal.js
+          node --check frontend/account-menu-v2.js
       - name: Frontend behavior
-        run: node frontend/app.test.cjs
+        run: node --test frontend/app.test.cjs frontend/module-contract.test.cjs
       - name: HTML assets
         run: |
           grep -q '<script src="./app.js"></script>' frontend/index.html
@@ -213,7 +219,7 @@ jobs:
           grep -q '<link rel="stylesheet" href="./professional.css">' frontend/index.html
       - name: Accidental placeholders
         run: |
-          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/saas-public.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js
+          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/saas-public.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js frontend/account-menu-v2.js
       - name: Frontend smoke test
         run: |
           python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &
