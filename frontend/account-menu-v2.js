@@ -53,16 +53,29 @@
         opacity:1!important;
         font-weight:700;
       }
+      #admin-app .smart-result-badges{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+      #admin-app .smart-result-badges .badge:first-child{background:#eaf7ef;border-color:#b9dec7;color:#125c36;font-weight:800}
+      #admin-app .smart-quote-create .btn[aria-busy="true"]{cursor:progress;opacity:.72;pointer-events:none}
+      #admin-app .smart-quote-create .btn:disabled{cursor:not-allowed;filter:saturate(.72)}
+      #admin-app .smart-quote-result .empty{border-style:dashed;background:#fbfcfb}
+      #admin-app .smart-quote-result .empty strong{display:block;color:#111827;margin-bottom:5px}
+      #admin-app .smart-quote-result .empty p{margin:0;color:#4b5563}
       body.dark #admin-app .smart-result-card strong,
-      body.dark #admin-app .smart-quote-grid strong{
+      body.dark #admin-app .smart-quote-grid strong,
+      body.dark #admin-app .smart-quote-result .empty strong{
         color:#f8fafc!important;
       }
       body.dark #admin-app .smart-result-card small,
       body.dark #admin-app .smart-quote-grid small{
         color:#d1d5db!important;
       }
+      body.dark #admin-app .smart-result-badges .badge:first-child{background:#153f2b;border-color:#2d6849;color:#d9fbe7}
+      body.dark #admin-app .smart-quote-result .empty p{color:#d1d5db}
 
-      @media(max-width:760px){#mm-account-menu{position:fixed;right:12px;top:72px;width:min(320px,calc(100vw - 24px))}}
+      @media(max-width:760px){
+        #mm-account-menu{position:fixed;right:12px;top:72px;width:min(320px,calc(100vw - 24px))}
+        #admin-app .smart-result-badges{justify-content:flex-start;width:100%}
+      }
     `;
     document.head.appendChild(style);
   }
