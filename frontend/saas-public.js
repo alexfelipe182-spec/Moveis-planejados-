@@ -333,7 +333,7 @@
 (() => {
   if (document.querySelector('script[data-mm-account-menu-v2]')) return;
   const script = document.createElement('script');
-  script.src = './account-menu-v2.js?v=20260907-1';
+  script.src = './account-menu-v2.js?v=20260907-3';
   script.dataset.mmAccountMenuV2 = 'true';
   document.head.appendChild(script);
 })();
