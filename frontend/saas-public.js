@@ -337,3 +337,11 @@
   script.dataset.mmAccountMenuV2 = 'true';
   document.head.appendChild(script);
 })();
+
+(() => {
+  if (document.querySelector('script[data-mm-dashboard-search]')) return;
+  const script = document.createElement('script');
+  script.src = './dashboard-search.js?v=20260907-1';
+  script.dataset.mmDashboardSearch = 'true';
+  document.head.appendChild(script);
+})();

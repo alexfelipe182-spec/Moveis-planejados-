@@ -12,6 +12,25 @@
       #admin-app #logout{display:none!important}
       #admin-app #account-settings-nav,
       #admin-app #direct-relogin{display:none!important}
+
+      @media (min-width:761px){
+        #admin-app .sidebar{height:100vh;max-height:100vh;overflow:hidden;display:flex;flex-direction:column}
+        #admin-app .side-brand{flex:0 0 auto}
+        #admin-app #admin-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding-right:4px;scrollbar-width:thin;scrollbar-color:#b5cfc1 transparent}
+        #admin-app #admin-nav::-webkit-scrollbar{width:6px}
+        #admin-app #admin-nav::-webkit-scrollbar-track{background:transparent}
+        #admin-app #admin-nav::-webkit-scrollbar-thumb{background:#b5cfc1;border-radius:999px}
+        #admin-app .side-bottom{flex:0 0 auto;margin-top:8px;padding-top:8px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+      }
+      @media (min-width:761px) and (max-height:900px){
+        #admin-app .sidebar{padding-top:10px;padding-bottom:8px}
+        #admin-app .side-brand{padding-top:4px;padding-bottom:6px;margin-bottom:4px}
+        #admin-app #admin-nav .nav{min-height:34px;padding-top:7px;padding-bottom:7px;margin-top:1px;margin-bottom:1px}
+        #admin-app .side-plan-card{display:none!important}
+        #admin-app .side-bottom{padding-top:5px}
+        #admin-app .logout{padding-top:8px;padding-bottom:8px}
+      }
+
       #mm-account-menu{position:absolute;right:0;top:calc(100% + 10px);width:min(290px,calc(100vw - 24px));padding:10px;background:#fff;border:1px solid rgba(13,89,61,.16);border-radius:16px;box-shadow:0 18px 50px rgba(9,54,38,.18);display:none;z-index:1000}
       #mm-account-menu.open{display:grid;gap:6px}
       #mm-account-menu .mm-account-head{padding:8px 10px 10px;border-bottom:1px solid rgba(13,89,61,.10);margin-bottom:2px}
@@ -21,7 +40,6 @@
       #mm-account-menu button:hover,#mm-account-menu button:focus-visible{background:#eef8f2;outline:none}
       #mm-account-menu button[data-danger="true"]{color:#9b2c2c}
 
-      /* Contraste forte para os resultados do orçamento inteligente. */
       #admin-app .smart-result-card strong,
       #admin-app .smart-quote-grid strong{
         color:#111827!important;
