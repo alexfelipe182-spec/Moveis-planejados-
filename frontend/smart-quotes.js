@@ -14,6 +14,19 @@
     return Number(fieldValue(root, name) || 0);
   }
 
+  function setButtonBusy(button, busy, busyLabel, idleLabel) {
+    if (!button) return;
+    button.disabled = busy;
+    button.setAttribute?.('aria-busy', busy ? 'true' : 'false');
+    button.textContent = busy ? busyLabel : idleLabel;
+  }
+
+  function interpretationLabel(source) {
+    if (source === 'openai') return 'IA OpenAI';
+    if (source === 'assisted_local') return 'Modo assistido';
+    return 'Cálculo protegido';
+  }
+
   function renderPanel(result, target = null) {
     let panel = target || document.querySelector('#smart-quote-result');
     if (!panel) {
@@ -24,7 +37,8 @@
     }
     const warnings = (result.warnings || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhum alerta financeiro.</li>';
     const recommendations = (result.recommendations || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>Nenhuma recomendação adicional.</li>';
-    panel.innerHTML = `<div class="panel"><div class="panel-title"><div><span class="eyebrow">Inteligência de orçamento</span><h3>Análise automática</h3></div><span class="badge">Requer aprovação</span></div><div class="smart-quote-grid"><div><small>Custo base</small><strong>${money(result.base_cost)}</strong></div><div><small>Preço sugerido</small><strong>${money(result.suggested_total)}</strong></div><div><small>Margem</small><strong>${Number(result.profit_margin || 0).toFixed(2)}%</strong></div></div><div class="smart-quote-columns"><div><h4>Alertas</h4><ul>${warnings}</ul></div><div><h4>Recomendações</h4><ul>${recommendations}</ul></div></div></div>`;
+    const source = interpretationLabel(result.interpretation_source);
+    panel.innerHTML = `<div class="panel"><div class="panel-title"><div><span class="eyebrow">Inteligência de orçamento</span><h3>Análise automática</h3></div><div class="smart-result-badges"><span class="badge">${escapeHtml(source)}</span><span class="badge">Requer aprovação</span></div></div><div class="smart-quote-grid"><div><small>Custo base</small><strong>${money(result.base_cost)}</strong></div><div><small>Preço sugerido</small><strong>${money(result.suggested_total)}</strong></div><div><small>Margem</small><strong>${Number(result.profit_margin || 0).toFixed(2)}%</strong></div></div><div class="smart-quote-columns"><div><h4>Alertas</h4><ul>${warnings}</ul></div><div><h4>Recomendações</h4><ul>${recommendations}</ul></div></div></div>`;
   }
 
   async function analyze(payload) {
@@ -78,8 +92,7 @@
         return;
       }
       const button = form.querySelector('#quote-item-add');
-      button.disabled = true;
-      button.textContent = 'Adicionando...';
+      setButtonBusy(button, true, 'Adicionando...', '+ Adicionar móvel');
       try {
         const parts = raw.replace(/,/g, '.').split(/[x×]/).map(x => Number(x.trim())).filter(Number.isFinite);
         const item = await api(`/quotes/${quoteId}/items`, { method: 'POST', body: { name, quantity, unit_price, width: parts[0] || null, height: parts[1] || null, depth: parts[2] || null } });
@@ -90,8 +103,7 @@
       } catch (err) {
         toast(err.message, 'error');
       } finally {
-        button.disabled = false;
-        button.textContent = '+ Adicionar móvel';
+        setButtonBusy(button, false, 'Adicionando...', '+ Adicionar móvel');
       }
     });
 
@@ -114,8 +126,7 @@
           }
           const parts = raw.replace(/,/g, '.').split(/[x×]/).map(x => Number(x.trim())).filter(Number.isFinite);
           const save = row.querySelector('.quote-item-save');
-          save.disabled = true;
-          save.textContent = 'Salvando...';
+          setButtonBusy(save, true, 'Salvando...', 'Salvar alterações');
           try {
             const updated = await api(`/quotes/${quoteId}/items/${item.id}`, { method: 'PUT', body: { name, quantity, unit_price, width: parts[0] || null, height: parts[1] || null, depth: parts[2] || null } });
             const index = items.findIndex(x => x.id === item.id);
@@ -124,8 +135,7 @@
             toast('Móvel atualizado. Total recalculado automaticamente.');
           } catch (err) {
             toast(err.message, 'error');
-            save.disabled = false;
-            save.textContent = 'Salvar alterações';
+            setButtonBusy(save, false, 'Salvando...', 'Salvar alterações');
           }
         });
         return;
@@ -134,6 +144,7 @@
       const deleteButton = event.target.closest('.quote-item-delete');
       if (!deleteButton) return;
       if (!confirm('Excluir este móvel do orçamento?')) return;
+      deleteButton.disabled = true;
       try {
         await api(`/quotes/${quoteId}/items/${deleteButton.dataset.id}`, { method: 'DELETE' });
         const index = items.findIndex(x => String(x.id) === String(deleteButton.dataset.id));
@@ -141,6 +152,7 @@
         renderItems(items);
         toast('Móvel removido. Total atualizado.');
       } catch (err) {
+        deleteButton.disabled = false;
         toast(err.message, 'error');
       }
     });
@@ -171,6 +183,7 @@
     const saveButton = smartForm.querySelector('[data-smart-save]');
     const resultPanel = smartForm.querySelector('#smart-quote-result');
     let lastEstimate = null;
+    let interpretationSource = null;
 
     const payloadFromForm = () => ({
       material_cost: numberValue(smartForm, 'material_cost'),
@@ -185,6 +198,17 @@
       if (control) control.value = value ?? '';
     };
 
+    const invalidateEstimate = () => {
+      if (!lastEstimate) return;
+      lastEstimate = null;
+      saveButton.disabled = true;
+      resultPanel.innerHTML = '<div class="panel empty"><strong>Valores alterados.</strong><p>Calcule novamente o preço antes de salvar o orçamento.</p></div>';
+    };
+
+    ['material_cost', 'hardware_cost', 'labor_cost', 'finishing_cost', 'profit_margin'].forEach(name => {
+      field(smartForm, name)?.addEventListener('input', invalidateEstimate);
+    });
+
     smartForm.querySelector('[data-smart-interpret]').addEventListener('click', async () => {
       const customerId = numberValue(smartForm, 'customer_id');
       const requestText = fieldValue(smartForm, 'request_text').trim();
@@ -198,14 +222,14 @@
       }
 
       const button = smartForm.querySelector('[data-smart-interpret]');
-      button.disabled = true;
-      button.textContent = 'Interpretando...';
+      setButtonBusy(button, true, 'Interpretando...', '✨ Interpretar pedido');
       try {
         const draft = await createDraft({
           customer_id: customerId,
           request_text: requestText,
           profit_margin: numberValue(smartForm, 'profit_margin'),
         });
+        interpretationSource = draft.interpretation_source || 'openai';
         setValue('description', draft.brief?.normalized_description || '');
         setValue('measurements', draft.brief?.measurements_summary || '');
         setValue('materials', draft.brief?.materials_summary || '');
@@ -213,31 +237,48 @@
         const missing = (draft.unpriced_items || []).map(item => `${item.requirement.name}: ${item.reason}`);
         lastEstimate = { ...draft, warnings: missing, recommendations: draft.brief?.questions || [] };
         renderPanel(lastEstimate, resultPanel);
+
         const hasMissing = missing.length > 0;
-        saveButton.disabled = hasMissing;
-        toast(hasMissing ? 'Prévia gerada. Complete os itens sem preço e recalcule antes de salvar.' : 'Prévia gerada com o catálogo da marcenaria.', hasMissing ? 'error' : 'success');
+        const hasPositiveTotal = Number(draft.suggested_total || 0) > 0;
+        const assisted = interpretationSource === 'assisted_local';
+        saveButton.disabled = assisted || hasMissing || !hasPositiveTotal;
+
+        if (assisted) {
+          toast('Pedido organizado em modo assistido. Revise os custos e clique em Calcular preço antes de salvar.');
+        } else if (hasMissing) {
+          toast('IA concluída. Complete os itens sem preço e recalcule antes de salvar.', 'error');
+        } else if (!hasPositiveTotal) {
+          toast('IA concluída, mas ainda faltam custos para formar um preço válido.', 'error');
+        } else {
+          toast('IA concluída com catálogo e preço calculado. Revise antes de salvar.');
+        }
       } catch (err) {
         toast(err.message, 'error');
       } finally {
-        button.disabled = false;
-        button.textContent = '✨ Interpretar pedido';
+        setButtonBusy(button, false, 'Interpretando...', '✨ Interpretar pedido');
       }
     });
 
     smartForm.querySelector('[data-smart-analyze]').addEventListener('click', async () => {
       const button = smartForm.querySelector('[data-smart-analyze]');
-      button.disabled = true;
-      button.textContent = 'Calculando...';
+      setButtonBusy(button, true, 'Calculando...', 'Calcular preço');
       try {
-        lastEstimate = await api('/quotes/estimate', { method: 'POST', body: payloadFromForm() });
+        const estimate = await api('/quotes/estimate', { method: 'POST', body: payloadFromForm() });
+        lastEstimate = { ...estimate, interpretation_source: interpretationSource || undefined };
         renderPanel(lastEstimate, resultPanel);
-        saveButton.disabled = false;
-        toast('Análise concluída. Revise o preço antes de salvar.');
+        const validTotal = Number(lastEstimate.suggested_total || 0) > 0;
+        saveButton.disabled = !validTotal;
+        toast(
+          validTotal
+            ? 'Análise concluída. Revise o preço antes de salvar.'
+            : 'Informe pelo menos um custo maior que zero e calcule novamente.',
+          validTotal ? 'success' : 'error',
+        );
       } catch (err) {
+        saveButton.disabled = true;
         toast(err.message, 'error');
       } finally {
-        button.disabled = false;
-        button.textContent = 'Calcular preço';
+        setButtonBusy(button, false, 'Calculando...', 'Calcular preço');
       }
     });
 
@@ -246,6 +287,11 @@
     saveButton.addEventListener('click', async () => {
       if (!lastEstimate) {
         toast('Calcule o orçamento antes de salvar.', 'error');
+        return;
+      }
+      if (Number(lastEstimate.suggested_total || 0) <= 0) {
+        saveButton.disabled = true;
+        toast('O preço sugerido precisa ser maior que zero antes de salvar.', 'error');
         return;
       }
 
@@ -268,16 +314,14 @@
       data.total = Number(lastEstimate.suggested_total || 0);
       data.status = 'analysis';
 
-      saveButton.disabled = true;
-      saveButton.textContent = 'Salvando...';
+      setButtonBusy(saveButton, true, 'Salvando...', 'Salvar orçamento');
       try {
         const quote = await api('/quotes', { method: 'POST', body: data });
         toast('Orçamento criado. Agora adicione os móveis.');
         await openQuoteItems(quote.id, quote.description);
       } catch (err) {
         toast(err.message, 'error');
-        saveButton.disabled = false;
-        saveButton.textContent = 'Salvar orçamento';
+        setButtonBusy(saveButton, false, 'Salvando...', 'Salvar orçamento');
       }
     });
 
