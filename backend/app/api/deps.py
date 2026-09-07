@@ -74,6 +74,20 @@ def require_csrf(
     _validate_csrf(csrf_cookie, csrf_header)
 
 
+def require_refresh_csrf(
+    refresh_token: str | None = Cookie(default=None),
+    csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
+    csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
+) -> None:
+    """Retorna 401 para visitante sem sessão e 403 somente para CSRF realmente inválido."""
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token ausente",
+        )
+    _validate_csrf(csrf_cookie, csrf_header)
+
+
 def require_cookie_csrf(
     access_token: str | None = Cookie(default=None),
     csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
