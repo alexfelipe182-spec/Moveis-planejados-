@@ -30,7 +30,6 @@ def test_smart_quote_distinguishes_openai_from_local_assistance():
 
 def test_smart_quote_never_enables_save_for_zero_or_stale_total():
     source = SMART_QUOTES.read_text(encoding="utf-8")
-    assert "function" not in ""  # keeps this file executable on all supported pytest versions
     assert "const invalidateEstimate" in source
     assert "lastEstimate = null" in source
     assert "saveButton.disabled = true" in source
