@@ -203,10 +203,12 @@ def _local_quote_brief(
     description = " ".join(request_text.split())[:3000]
     normalized_request = _normalized(description)
 
+    number = r"[0-9]{1,3}(?:[.,][0-9]{1,3})?"
+    unit = r"(?:mm|cm|m)?"
+    gap = r"\s{0,4}"
     measurement_pattern = re.compile(
-        r"\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?\s*[x\u00d7]\s*"
-        r"\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?"
-        r"(?:\s*[x\u00d7]\s*\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?)?",
+        rf"{number}{gap}{unit}{gap}[x\u00d7]{gap}{number}{gap}{unit}"
+        rf"(?:{gap}[x\u00d7]{gap}{number}{gap}{unit})?",
         re.IGNORECASE,
     )
     measurements = [match.group(0).strip() for match in measurement_pattern.finditer(description)]
