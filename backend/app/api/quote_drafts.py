@@ -11,10 +11,9 @@ from app.models import Activity, Customer, Material, Tenant, User
 from app.services.plans import ensure_capacity, increment_usage
 from app.services.quote_brief import (
     CatalogMaterial,
-    QuoteAIUnavailable,
     QuotePreview,
     build_quote_preview,
-    extract_quote_brief,
+    extract_quote_brief_result,
 )
 
 router = APIRouter(prefix="/quotes", tags=["Quote AI Drafts"])
@@ -74,15 +73,17 @@ def create_quote_draft(
         )
         for item in rows
     ]
-    try:
-        brief = extract_quote_brief(payload.request_text, catalog=catalog)
-    except QuoteAIUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    interpretation = extract_quote_brief_result(payload.request_text, catalog=catalog)
 
     margin = payload.profit_margin
     if margin is None:
         margin = tenant.default_profit_margin
-    preview = build_quote_preview(brief, catalog, profit_margin=margin)
+    preview = build_quote_preview(
+        interpretation.brief,
+        catalog,
+        profit_margin=margin,
+        interpretation_source=interpretation.source,
+    )
 
     increment_usage(db, tenant.id, "ai_month")
     db.add(
@@ -91,7 +92,10 @@ def create_quote_draft(
             action="ai_quote_draft",
             entity="customer",
             entity_id=customer.id,
-            description=f"Gerou prévia inteligente de orçamento para o cliente #{customer.id}",
+            description=(
+                f"Gerou prévia inteligente ({interpretation.source}) "
+                f"para o cliente #{customer.id}"
+            ),
         )
     )
     db.commit()
