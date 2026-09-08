@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models import Activity, Category, Customer, Product, Project, Quote, Tenant, User
 from app.schemas.activity import ActivityRead
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.services.integration_status import get_integration_status
 from app.services.plans import ensure_capacity
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
@@ -33,6 +34,12 @@ def dashboard(current_user: User = Depends(require_admin), db: Session = Depends
         },
         "recent_activities": [ActivityRead.model_validate(item).model_dump(mode="json") for item in recent],
     }
+
+
+@router.get("/integrations")
+def integrations(_: User = Depends(require_admin)):
+    """Diagnóstico seguro para o administrador, sem expor chaves ou credenciais."""
+    return get_integration_status()
 
 
 @router.get("/users", response_model=list[UserRead])
