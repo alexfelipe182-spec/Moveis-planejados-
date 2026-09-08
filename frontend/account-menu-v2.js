@@ -60,9 +60,23 @@
       #admin-app .smart-quote-result .empty{border-style:dashed;background:#fbfcfb}
       #admin-app .smart-quote-result .empty strong{display:block;color:#111827;margin-bottom:5px}
       #admin-app .smart-quote-result .empty p{margin:0;color:#4b5563}
+
+      #admin-app .integration-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+      #admin-app .integration-card{border:1px solid rgba(13,89,61,.14);background:#fbfdfb;border-radius:14px;padding:14px;min-width:0}
+      #admin-app .integration-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+      #admin-app .integration-card-head strong{color:#111827;font-size:14px}
+      #admin-app .integration-card p{margin:0;color:#5b685f;font-size:13px;line-height:1.45}
+      #admin-app .integration-state{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:800;white-space:nowrap}
+      #admin-app .integration-state::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px currentColor inset;opacity:.9}
+      #admin-app .integration-state.ready{background:#eaf7ef;color:#12623a}
+      #admin-app .integration-state.partial{background:#fff6df;color:#8b5b00}
+      #admin-app .integration-state.missing{background:#fff0f0;color:#9b2c2c}
+      #admin-app .integration-loading{margin-top:14px;padding:14px;border-radius:14px;background:#f6f8f7;color:#536158}
+
       body.dark #admin-app .smart-result-card strong,
       body.dark #admin-app .smart-quote-grid strong,
-      body.dark #admin-app .smart-quote-result .empty strong{
+      body.dark #admin-app .smart-quote-result .empty strong,
+      body.dark #admin-app .integration-card-head strong{
         color:#f8fafc!important;
       }
       body.dark #admin-app .smart-result-card small,
@@ -71,7 +85,11 @@
       }
       body.dark #admin-app .smart-result-badges .badge:first-child{background:#153f2b;border-color:#2d6849;color:#d9fbe7}
       body.dark #admin-app .smart-quote-result .empty p{color:#d1d5db}
+      body.dark #admin-app .integration-card{background:#132019;border-color:#284033}
+      body.dark #admin-app .integration-card p{color:#c7d1ca}
+      body.dark #admin-app .integration-loading{background:#132019;color:#c7d1ca}
 
+      @media(max-width:900px){#admin-app .integration-grid{grid-template-columns:1fr}}
       @media(max-width:760px){
         #mm-account-menu{position:fixed;right:12px;top:72px;width:min(320px,calc(100vw - 24px))}
         #admin-app .smart-result-badges{justify-content:flex-start;width:100%}
@@ -96,14 +114,54 @@
     return section;
   }
 
+  function stateBadge(label, state) {
+    return `<span class="integration-state ${state}">${label}</span>`;
+  }
+
+  async function renderIntegrationStatus() {
+    const target = $('#settings-integrations');
+    if (!target || typeof window.api !== 'function') return;
+    try {
+      const data = await window.api('/admin/integrations');
+      if (!target.isConnected) return;
+      const openaiReady = Boolean(data?.openai?.configured);
+      const emailReady = Boolean(data?.email?.configured);
+      const stripeReady = Boolean(data?.stripe?.fully_configured);
+      const stripePartial = Boolean(data?.stripe?.checkout_ready || data?.stripe?.secret_configured || data?.stripe?.webhook_configured);
+      const stripeState = stripeReady ? 'ready' : stripePartial ? 'partial' : 'missing';
+      const stripeLabel = stripeReady ? 'Completo' : stripePartial ? 'Parcial' : 'Pendente';
+      const prices = data?.stripe?.prices_configured || {};
+      const readyPlans = Object.entries(prices).filter(([, ready]) => ready).map(([plan]) => ({ starter:'Essencial', professional:'Profissional', business:'Empresa' }[plan] || plan));
+      target.innerHTML = `
+        <div class="integration-grid">
+          <div class="integration-card">
+            <div class="integration-card-head"><strong>Inteligência Artificial</strong>${stateBadge(openaiReady ? 'Configurada' : 'Modo assistido', openaiReady ? 'ready' : 'partial')}</div>
+            <p>${openaiReady ? `OpenAI ativa com ${String(data.openai.model || 'modelo configurado').replace(/[&<>'\"]/g, '')}.` : 'A plataforma continua funcionando em modo assistido local, sem inventar preços.'}</p>
+          </div>
+          <div class="integration-card">
+            <div class="integration-card-head"><strong>E-mail de recuperação</strong>${stateBadge(emailReady ? 'Configurado' : 'Pendente', emailReady ? 'ready' : 'missing')}</div>
+            <p>${emailReady ? 'SMTP configurado para envio de links de recuperação.' : 'Configure o SMTP de produção para entregar links de redefinição de senha.'}</p>
+          </div>
+          <div class="integration-card">
+            <div class="integration-card-head"><strong>Stripe</strong>${stateBadge(stripeLabel, stripeState)}</div>
+            <p>${stripeReady ? 'Checkout, portal, webhook e preços dos três planos configurados.' : readyPlans.length ? `Preços configurados: ${readyPlans.join(', ')}. Ainda há itens pendentes para a cobrança completa.` : 'Configuração de cobrança ainda não está completa.'}</p>
+          </div>
+        </div>`;
+    } catch (error) {
+      if (!target.isConnected) return;
+      target.innerHTML = `<div class="integration-loading">Não foi possível consultar o diagnóstico das integrações agora: ${String(error?.message || 'erro desconhecido').replace(/[&<>'\"]/g, '')}</div>`;
+    }
+  }
+
   function renderSettings() {
     const section = ensureSettingsSection();
     if (!section) return;
     section.innerHTML = `
       <div class="panel">
-        <div class="panel-title"><div><span class="eyebrow">Configurações</span><h2>Conta e acesso</h2></div></div>
-        <p class="muted">Gerencie sua sessão e troque de conta com segurança.</p>
+        <div class="panel-title"><div><span class="eyebrow">Configurações</span><h2>Conta e integrações</h2></div></div>
+        <p class="muted">Gerencie sua sessão e acompanhe a prontidão das integrações de produção.</p>
         <div class="panel" style="margin-top:16px"><strong>${accountName().replace(/[&<>'\"]/g, '')}</strong><p class="muted">Administrador da marcenaria</p></div>
+        <div id="settings-integrations" class="integration-loading" aria-live="polite">Verificando OpenAI, e-mail e Stripe...</div>
         <div class="toolbar-actions" style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
           <button id="settings-relogin" class="btn primary" type="button">↻ Sair e entrar novamente</button>
           <button id="settings-logout" class="btn secondary" type="button">↪ Sair da conta</button>
@@ -113,6 +171,7 @@
     $('#settings-relogin')?.addEventListener('click', () => performLogout(true));
     $('#settings-logout')?.addEventListener('click', () => performLogout(false));
     $('#settings-dashboard')?.addEventListener('click', () => window.showSection?.('dashboard'));
+    renderIntegrationStatus();
   }
 
   function showSettings() {
