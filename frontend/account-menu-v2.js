@@ -42,7 +42,8 @@
 
       #admin-app .smart-result-card strong,
       #admin-app .smart-quote-grid strong{
-        color:#111827!important;
+        color:#111111!important;
+        -webkit-text-fill-color:#111111!important;
         opacity:1!important;
         font-weight:800!important;
         text-shadow:none!important;
@@ -50,6 +51,7 @@
       #admin-app .smart-result-card small,
       #admin-app .smart-quote-grid small{
         color:#374151!important;
+        -webkit-text-fill-color:#374151!important;
         opacity:1!important;
         font-weight:700;
       }
@@ -58,16 +60,18 @@
       #admin-app .smart-quote-create .btn[aria-busy="true"]{cursor:progress;opacity:.72;pointer-events:none}
       #admin-app .smart-quote-create .btn:disabled{cursor:not-allowed;filter:saturate(.72)}
       #admin-app .smart-quote-result .empty{border-style:dashed;background:#fbfcfb}
-      #admin-app .smart-quote-result .empty strong{display:block;color:#111827;margin-bottom:5px}
+      #admin-app .smart-quote-result .empty strong{display:block;color:#111111;-webkit-text-fill-color:#111111;margin-bottom:5px}
       #admin-app .smart-quote-result .empty p{margin:0;color:#4b5563}
       body.dark #admin-app .smart-result-card strong,
       body.dark #admin-app .smart-quote-grid strong,
       body.dark #admin-app .smart-quote-result .empty strong{
         color:#f8fafc!important;
+        -webkit-text-fill-color:#f8fafc!important;
       }
       body.dark #admin-app .smart-result-card small,
       body.dark #admin-app .smart-quote-grid small{
         color:#d1d5db!important;
+        -webkit-text-fill-color:#d1d5db!important;
       }
       body.dark #admin-app .smart-result-badges .badge:first-child{background:#153f2b;border-color:#2d6849;color:#d9fbe7}
       body.dark #admin-app .smart-quote-result .empty p{color:#d1d5db}
