@@ -493,7 +493,7 @@ input:focus,textarea:focus,select:focus{
   border-color:rgba(103,232,249,.16);
   background:linear-gradient(145deg,rgba(34,211,238,.09),rgba(139,92,246,.055));
 }
-.smart-result-card strong,.smart-quote-grid strong{color:#a5f3fc}
+.smart-result-card strong,.smart-quote-grid strong{color:#111111;text-shadow:none}
 .toast{background:linear-gradient(135deg,#0e7490,#4338ca);box-shadow:0 18px 50px rgba(0,0,0,.36)}
 .toast.error{background:linear-gradient(135deg,#be123c,#7f1d1d)}
 
@@ -759,8 +759,8 @@ input:focus,textarea:focus,select:focus{
   box-shadow:0 24px 70px rgba(0,0,0,.36),0 0 34px rgba(37,99,255,.12);
 }
 .smart-result-card strong,.smart-quote-grid strong{
-  color:#bcfbff;
-  text-shadow:0 0 12px rgba(0,245,255,.24);
+  color:#111111;
+  text-shadow:none;
 }
 .badge.success{
   color:#b7ffc8;
