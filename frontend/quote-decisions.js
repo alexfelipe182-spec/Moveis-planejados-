@@ -144,3 +144,11 @@
   window.decideQuote = decideQuote;
   window.setQuoteCommercialStatus = setCommercialStatus;
 })();
+
+(() => {
+  if (!document.head || document.querySelector('script[data-mm-project-profitability]')) return;
+  const script = document.createElement('script');
+  script.src = './project-profitability.js?v=20260909-1';
+  script.dataset.mmProjectProfitability = 'true';
+  document.head.appendChild(script);
+})();
