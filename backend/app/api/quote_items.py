@@ -3,6 +3,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app import crud
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Quote, QuoteItem, User
@@ -28,7 +29,10 @@ def _get_quote(db: Session, quote_id: int) -> Quote:
 
 
 def _get_editable_quote(db: Session, quote_id: int) -> Quote:
-    return ensure_quote_editable(_get_quote(db, quote_id))
+    quote = crud.get_item_for_update(db, Quote, quote_id)
+    if quote is None:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    return ensure_quote_editable(quote)
 
 
 def _recalculate_quote_total(db: Session, quote_id: int) -> Decimal:
@@ -75,6 +79,7 @@ def create_item(
     item = QuoteItem(**data)
     db.add(item)
     db.flush()
+    db.flush()
     total = _recalculate_quote_total(db, quote_id)
     db.add(
         Activity(
@@ -117,6 +122,7 @@ def update_item(
     for key, value in data.items():
         setattr(item, key, value)
     item.subtotal = _subtotal(item.quantity, item.unit_price)
+    db.flush()
     total = _recalculate_quote_total(db, quote_id)
     db.add(
         Activity(
@@ -155,6 +161,7 @@ def delete_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item do orçamento não encontrado")
     db.delete(item)
+    db.flush()
     db.flush()
     total = _recalculate_quote_total(db, quote_id)
     db.add(

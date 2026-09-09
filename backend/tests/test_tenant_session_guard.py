@@ -119,6 +119,10 @@ def test_every_business_record_model_is_tenant_scoped():
         "quotes",
         "suppliers",
         "users",
+        "subscriptions",
+        "usage_counters",
+        "automation_jobs",
+        "ai_usage",
     }
     actual = {
         mapper.local_table.name

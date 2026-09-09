@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.services.quote_brief import QuoteBrief
+
 QuoteStatus = Literal[
     "pending",
     "analysis",
@@ -26,6 +28,8 @@ class QuoteBase(BaseModel):
 
 
 class QuoteCreate(QuoteBase):
+    technical_brief: QuoteBrief | None = None
+    human_reviewed: bool = False
     material_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
     hardware_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
     labor_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=12, decimal_places=2)
@@ -47,6 +51,8 @@ class QuoteUpdate(BaseModel):
 
 
 class QuoteEstimateResponse(BaseModel):
+    interpretation_source: Literal["openai", "assisted_local"] = "assisted_local"
+    fallback_reason: str | None = None
     material_cost: Decimal
     hardware_cost: Decimal
     labor_cost: Decimal
@@ -72,3 +78,5 @@ class QuoteRead(QuoteBase):
     suggested_total: Decimal = Decimal("0")
     ai_analysis: str | None = None
     ai_analyzed_at: datetime | None = None
+    technical_brief: QuoteBrief | None = None
+    human_reviewed: bool = False

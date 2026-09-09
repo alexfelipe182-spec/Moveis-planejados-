@@ -42,7 +42,7 @@ async function api(path, options = {}, retryAuth = true) {
     return api(path, options, false);
   }
   if (!res.ok) {
-    throw new Error(data.detail || (res.status === 401 ? 'Sessão expirada. Faça login novamente.' : `Erro ${res.status}`));
+    throw new Error((typeof data.detail === 'object' ? data.detail.message : data.detail) || (res.status === 401 ? 'Sessão expirada. Faça login novamente.' : `Erro ${res.status}`));
   }
   if (typeof data?.csrf_token === 'string') state.csrfToken = data.csrf_token;
   if ((path === '/auth/login' || path === '/auth/refresh') && typeof data?.access_token === 'string') {

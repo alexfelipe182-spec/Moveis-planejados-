@@ -9,7 +9,15 @@ def list_items(db: Session, model, *, offset: int = 0, limit: int = 100):
 
 
 def get_item(db: Session, model, item_id: int):
-    return db.get(model, item_id)
+    item = db.get(model, item_id)
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id and item is not None and getattr(item, "tenant_id", tenant_id) != tenant_id:
+        return None
+    return item
+
+
+def get_item_for_update(db: Session, model, item_id: int):
+    return db.scalar(select(model).where(model.id == item_id).with_for_update().execution_options(populate_existing=True))
 
 
 def create_item(db: Session, obj, *, commit: bool = True):

@@ -7,7 +7,7 @@ from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Project, User
 from app.schemas.project import ProjectRead, ProjectStatus
-from app.services.automation import engine
+from app.services.automation import record_change
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -41,7 +41,7 @@ def advance_project_status(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    project = crud.get_item(db, Project, item_id)
+    project = crud.get_item_for_update(db, Project, item_id)
     if not project:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
 
@@ -69,18 +69,10 @@ def advance_project_status(
             description=f"Alterou projeto #{project.id}: {previous_status} → {requested_status}",
         )
     )
+    activity = next(obj for obj in db.new if isinstance(obj, Activity))
+    record_change(db, tenant_id=current_user.tenant_id, event_type="project.status_changed",
+                  entity_id=project.id, user_id=current_user.id, activity=activity)
     db.commit()
     db.refresh(project)
 
-    engine.emit(
-        "project.status_changed",
-        {
-            "entity": "project",
-            "item_id": project.id,
-            "user_id": current_user.id,
-            "previous_status": previous_status,
-            "status": requested_status,
-            "quote_id": project.quote_id,
-        },
-    )
     return project

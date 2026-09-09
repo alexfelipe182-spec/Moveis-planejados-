@@ -6,7 +6,7 @@ from app import crud
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Tenant, User
-from app.services.automation import engine
+from app.services.automation import record_change
 from app.services.plans import ensure_capacity
 
 
@@ -35,11 +35,10 @@ def _log(db: Session, user: User, action: str, model, item_id: int | None, descr
     )
 
 
-def _emit(action: str, model, item_id: int, user_id: int) -> None:
-    engine.emit(
-        _event_name(action, model),
-        {"entity": _entity_name(model), "item_id": item_id, "user_id": user_id},
-    )
+def _emit(action: str, model, item_id: int, user_id: int, db: Session) -> None:
+    activity = next(obj for obj in db.new if isinstance(obj, Activity))
+    record_change(db, tenant_id=db.info["tenant_id"], event_type="record.changed",
+                  entity_id=item_id, user_id=user_id, activity=activity)
 
 
 def _payload_data(payload) -> dict:
@@ -125,9 +124,9 @@ def make_router(
             try:
                 item = crud.create_item(db, model(**_payload_data(payload)), commit=False)
                 _log(db, current_user, "created", model, item.id, f"Criou {_entity_name(model)} #{item.id}")
+                _emit("created", model, item.id, current_user.id, db)
                 _commit_or_conflict(db)
                 db.refresh(item)
-                _emit("created", model, item.id, current_user.id)
                 return item
             except ValueError as exc:
                 db.rollback()
@@ -152,9 +151,9 @@ def make_router(
             try:
                 item = crud.update_item(db, item, _payload_data(payload), commit=False)
                 _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
+                _emit("updated", model, item.id, current_user.id, db)
                 _commit_or_conflict(db)
                 db.refresh(item)
-                _emit("updated", model, item.id, current_user.id)
                 return item
             except ValueError as exc:
                 db.rollback()
@@ -178,8 +177,8 @@ def make_router(
             try:
                 crud.delete_item(db, item, commit=False)
                 _log(db, current_user, "deleted", model, item_id, f"Excluiu {_entity_name(model)} #{item_id}")
+                _emit("deleted", model, item_id, current_user.id, db)
                 _commit_or_conflict(db)
-                _emit("deleted", model, item_id, current_user.id)
             except ValueError as exc:
                 db.rollback()
                 raise _database_conflict(exc) from exc

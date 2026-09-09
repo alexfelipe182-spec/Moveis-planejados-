@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, inspect, select
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, with_loader_criteria
 
 from app.core.config import settings
@@ -24,10 +24,22 @@ class Base(DeclarativeBase):
 @event.listens_for(Session, "do_orm_execute")
 def _tenant_filter(execute_state) -> None:
     tenant_id = execute_state.session.info.get("tenant_id")
-    if not tenant_id or not execute_state.is_select or execute_state.execution_options.get("skip_tenant_scope"):
+    if not tenant_id or execute_state.execution_options.get("skip_tenant_scope"):
         return
 
     from app.models.tenant import TenantScopedMixin
+
+    if execute_state.is_update or execute_state.is_delete:
+        mapper = execute_state.bind_mapper
+        if mapper and issubclass(mapper.class_, TenantScopedMixin):
+            if execute_state.is_update:
+                values = getattr(execute_state.statement, "_values", {}) or {}
+                if any(getattr(key, "key", key) == "tenant_id" for key in values):
+                    raise ValueError("Não é permitido transferir dados entre marcenarias")
+            execute_state.statement = execute_state.statement.where(mapper.class_.tenant_id == tenant_id)
+        return
+    if not execute_state.is_select:
+        return
 
     execute_state.statement = execute_state.statement.options(
         with_loader_criteria(
@@ -95,13 +107,15 @@ def _assign_and_validate_tenant(session: Session, _flush_context, _instances) ->
     if not tenant_id:
         return
 
-    for obj in session.new:
+    for obj in set(session.new).union(session.dirty).union(session.deleted):
         if isinstance(obj, TenantScopedMixin):
             current = getattr(obj, "tenant_id", None)
-            if current is None:
+            if current is None and obj in session.new:
                 obj.tenant_id = tenant_id
             elif current != tenant_id:
                 raise ValueError("Tentativa de gravar dados em outra marcenaria")
+            if obj not in session.new and inspect(obj).attrs.tenant_id.history.has_changes():
+                raise ValueError("Não é permitido transferir dados entre marcenarias")
 
     for obj in set(session.new).union(session.dirty):
         _validate_tenant_references(session, obj)

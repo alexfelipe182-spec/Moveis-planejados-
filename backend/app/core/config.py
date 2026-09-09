@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-5-mini"
+    openai_enabled: bool = True
+    openai_timeout_seconds: float = Field(default=20, gt=0, le=120, allow_inf_nan=False)
+    openai_max_retries: int = Field(default=2, ge=0, le=5)
 
     model_config = SettingsConfigDict(env_file=BACKEND_ENV_FILE, extra="ignore")
 

@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.core.config import settings
 from app.database import get_db
 from app.models import Subscription, Tenant, User
+from app.services.automation import SubscriptionPayload, enqueue, process_job
 from app.services.plans import PLANS, effective_subscription_status, trial_days_remaining, usage_snapshot
 
 router = APIRouter(tags=["SaaS Commercial"])
@@ -285,32 +286,6 @@ def _unix_datetime(value) -> datetime | None:
     return datetime.fromtimestamp(int(value), tz=timezone.utc).replace(tzinfo=None)
 
 
-def _upsert_subscription(db: Session, obj: dict) -> None:
-    metadata = obj.get("metadata") or {}
-    tenant_id = metadata.get("tenant_id")
-    if not tenant_id:
-        return
-    tenant = db.get(Tenant, int(tenant_id))
-    if tenant is None:
-        return
-    plan_code = metadata.get("plan_code") or tenant.plan_code
-    if plan_code not in PLANS:
-        plan_code = "starter"
-    subscription = db.scalar(select(Subscription).where(Subscription.tenant_id == tenant.id))
-    if subscription is None:
-        subscription = Subscription(tenant_id=tenant.id)
-        db.add(subscription)
-    subscription.provider = "stripe"
-    subscription.provider_customer_id = obj.get("customer") or subscription.provider_customer_id
-    subscription.provider_subscription_id = obj.get("id") or subscription.provider_subscription_id
-    subscription.plan_code = plan_code
-    subscription.status = obj.get("status") or subscription.status
-    subscription.current_period_end = _unix_datetime(obj.get("current_period_end"))
-    subscription.trial_end = _unix_datetime(obj.get("trial_end")) or subscription.trial_end
-    subscription.cancel_at_period_end = bool(obj.get("cancel_at_period_end", False))
-    tenant.plan_code = plan_code
-
-
 @router.post("/billing/webhook")
 async def stripe_webhook(
     request: Request,
@@ -318,16 +293,42 @@ async def stripe_webhook(
     db: Session = Depends(get_db),
 ):
     raw_body = await request.body()
+    if len(raw_body) > 262144:
+        raise HTTPException(status_code=413, detail="Webhook muito grande")
     _verify_stripe_signature(raw_body, stripe_signature)
     try:
         event = json.loads(raw_body)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=400, detail="Webhook inválido") from exc
-    event_type = event.get("type", "")
-    obj = ((event.get("data") or {}).get("object") or {})
-    if event_type.startswith("customer.subscription."):
-        _upsert_subscription(db, obj)
+        event_type = event.get("type", "")
+        if event_type not in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
+            return {"received": True}
+        obj = event["data"]["object"]
+        tenant_id = int(obj.get("metadata", {}).get("tenant_id", 0))
+        if not tenant_id:
+            return {"received": True}
+        tenant = db.scalar(select(Tenant).where(Tenant.id == tenant_id).with_for_update())
+        if tenant is None:
+            return {"received": True}
+        db.info["tenant_id"] = tenant_id
+        payload = SubscriptionPayload(
+            subscription_id=obj["id"], customer_id=obj["customer"],
+            plan_code=obj.get("metadata", {}).get("plan_code", tenant.plan_code),
+            status="canceled" if event_type.endswith("deleted") else obj["status"],
+            event_created=event.get("created", 0),
+            current_period_end=_unix_datetime(obj.get("current_period_end")),
+            trial_end=_unix_datetime(obj.get("trial_end")),
+            cancel_at_period_end=bool(obj.get("cancel_at_period_end", False)),
+        )
+        # Legacy signed fixtures without an event id still have stable content identity.
+        event_id = str(event.get("id") or hashlib.sha256(raw_body).hexdigest())
+        if len(event_id) > 150:
+            raise ValueError("event_id")
+        job = enqueue(db, tenant_id=tenant_id, event_type="subscription.changed",
+                      payload=payload.model_dump(mode="json"), idempotency_key=f"stripe:{event_id}")
+        process_job(db, job)
         db.commit()
+    except (ValueError, TypeError, KeyError, AttributeError, ValidationError):
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Webhook inválido") from None
     return {"received": True}
 
 

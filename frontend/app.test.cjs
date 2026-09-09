@@ -279,6 +279,7 @@ test('smart quote analysis and AI draft use the centralized authenticated API cl
     document: {
       createElement: () => ({}),
       querySelector: selector => (selector === '#smart-quote-result' ? panel : null),
+      addEventListener: () => {},
     },
     fetch: async () => { throw new Error('raw fetch bypassed authenticated API client'); },
     location: { hostname: 'site.example' },

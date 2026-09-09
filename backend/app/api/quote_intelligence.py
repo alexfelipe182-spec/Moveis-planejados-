@@ -1,7 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/quotes/intelligence", tags=["Quote Intelligence"])
 
 
 class QuoteRecommendationRequest(BaseModel):
+    model_config = ConfigDict(validate_default=True)
     material_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
     hardware_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
     labor_cost: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)

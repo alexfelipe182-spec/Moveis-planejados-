@@ -30,6 +30,8 @@ def calculate_quote_suggestion(
     profit_margin = _decimal(profit_margin)
 
     values = [material_cost, hardware_cost, labor_cost, finishing_cost]
+    if not all(value.is_finite() for value in [*values, profit_margin]):
+        raise ValueError("Valores financeiros devem ser finitos")
     if any(value < 0 for value in values):
         raise ValueError("Os custos não podem ser negativos")
     if profit_margin < 0 or profit_margin > 100:

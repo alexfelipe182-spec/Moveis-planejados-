@@ -9,6 +9,16 @@ from app.main import rate_limiter
 
 
 @pytest.fixture(autouse=True)
+def forbid_real_openai(monkeypatch):
+    import openai
+
+    def blocked(**_kwargs):
+        raise AssertionError("Testes devem mockar o provider; chamadas reais são proibidas")
+
+    monkeypatch.setattr(openai, "OpenAI", blocked)
+
+
+@pytest.fixture(autouse=True)
 def reset_api_rate_limit_state():
     """Evita que requisições de um teste consumam a cota de outro teste.
 

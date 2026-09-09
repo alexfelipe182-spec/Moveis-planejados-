@@ -2,7 +2,18 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from app.services.openai_config import openai_api_key, openai_model
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
+
+from app.services.openai_config import structured_completion
+
+
+class QuoteCommentary(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_max_length=2000)
+    summary: str = Field(min_length=1, max_length=2000)
+    warnings: list[str] = Field(default_factory=list, max_length=30)
+    recommendations: list[str] = Field(default_factory=list, max_length=30)
+    commercial_questions: list[str] = Field(default_factory=list, max_length=30)
 
 
 def _financial_signals(*, base_cost: Decimal, suggested_total: Decimal, profit_margin: Decimal) -> dict[str, object]:
@@ -72,7 +83,8 @@ def _local_analysis(*, base_cost: Decimal, suggested_total: Decimal, profit_marg
     )
 
 
-def analyze_quote(*, base_cost: Decimal, suggested_total: Decimal, profit_margin: Decimal) -> dict[str, object]:
+def analyze_quote(*, base_cost: Decimal, suggested_total: Decimal, profit_margin: Decimal,
+                  db: Session | None = None, tenant_id: int | None = None, use_provider: bool = True) -> dict[str, object]:
     """Analisa risco e qualidade do orçamento sem permitir que a IA altere valores financeiros."""
     warnings: list[str] = []
     recommendations: list[str] = []
@@ -109,49 +121,24 @@ def analyze_quote(*, base_cost: Decimal, suggested_total: Decimal, profit_margin
         "requires_approval": True,
     }
 
-    api_key = openai_api_key()
-    if not api_key:
+    result["interpretation_source"] = "assisted_local"
+    result["fallback_reason"] = None
+    if not use_provider:
         return result
-
-    try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key, timeout=10.0, max_retries=1)
-        response = client.responses.create(
-            model=openai_model(),
-            input=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Você é um analista comercial especializado em marcenaria sob medida. "
-                        "Avalie escopo, riscos, margem, confiança e pontos que exigem confirmação humana. "
-                        "Os valores financeiros recebidos são imutáveis: nunca recalcule, substitua ou invente preços. "
-                        "Responda somente JSON com summary, warnings, recommendations e commercial_questions."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {
-                            "base_cost": str(base_cost),
-                            "suggested_total": str(suggested_total),
-                            "profit_margin": str(profit_margin),
-                            "projected_profit": str(signals["projected_profit"]),
-                            "markup_percent": str(signals["markup_percent"]),
-                            "risk_score": signals["risk_score"],
-                            "risk_level": signals["risk_level"],
-                            "confidence_score": signals["confidence_score"],
-                        },
-                        ensure_ascii=False,
-                    ),
-                },
-            ],
-        )
-        if response.output_text:
-            result["ai_analysis"] = response.output_text
-            result["ai_analyzed_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
-    except Exception:
-        # A análise determinística permanece disponível; falha externa não quebra o fluxo comercial.
-        pass
-
+    completion = structured_completion(
+        operation="quote_analysis", instructions="Avalie riscos e perguntas comerciais. Os valores recebidos são imutáveis.",
+        data={"financial_snapshot": {key: str(result[key]) for key in
+              ("base_cost", "suggested_total", "profit_margin", "risk_score", "risk_level")}},
+        schema=QuoteCommentary, db=db, tenant_id=tenant_id,
+    )
+    result["fallback_reason"] = completion.error_code
+    if completion.value is not None:
+        result["interpretation_source"] = "openai"
+        commentary = completion.value.model_dump()
+        # Preserve all deterministic warnings; the provider can only add commentary.
+        commentary["warnings"] = list(dict.fromkeys(warnings + commentary["warnings"]))
+        commentary["recommendations"] = list(dict.fromkeys(recommendations + commentary["recommendations"]))
+        result["warnings"] = commentary["warnings"]
+        result["recommendations"] = commentary["recommendations"]
+        result["ai_analysis"] = json.dumps({"source": "openai", "financial_values_locked": True, **commentary}, ensure_ascii=False)
     return result
