@@ -106,6 +106,41 @@
     return result;
   };
 
+  const originalAdvanceProject = window.advanceProject;
+  const advancingProjects = new Set();
+
+  if (typeof originalAdvanceProject === 'function') {
+    window.advanceProject = async function(projectId, status) {
+      const key = String(projectId);
+      if (advancingProjects.has(key)) return;
+
+      advancingProjects.add(key);
+      const buttons = [...document.querySelectorAll('#projects button')].filter((candidate) => {
+        const handler = candidate.getAttribute('onclick') || '';
+        return handler.includes(`advanceProject(${projectId},'${status}')`);
+      });
+      buttons.forEach((candidate) => {
+        candidate.disabled = true;
+        candidate.setAttribute('aria-busy', 'true');
+        candidate.dataset.idleLabel = candidate.textContent;
+        candidate.textContent = 'Avançando...';
+      });
+
+      try {
+        await originalAdvanceProject(projectId, status);
+      } finally {
+        advancingProjects.delete(key);
+        buttons.forEach((candidate) => {
+          if (!candidate.isConnected) return;
+          candidate.disabled = false;
+          candidate.removeAttribute('aria-busy');
+          candidate.textContent = candidate.dataset.idleLabel || 'Avançar →';
+          delete candidate.dataset.idleLabel;
+        });
+      }
+    };
+  }
+
   window.decideQuote = decideQuote;
   window.setQuoteCommercialStatus = setCommercialStatus;
 })();
