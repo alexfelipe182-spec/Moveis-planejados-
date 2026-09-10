@@ -5,7 +5,9 @@
     const admin = $('#admin-app');
     if (!admin) return;
 
-    admin.classList.add('reference-public-dashboard', 'reference-authenticated-dashboard');
+    if (!admin.classList.contains('reference-authenticated-dashboard')) {
+      admin.classList.add('reference-public-dashboard', 'reference-authenticated-dashboard');
+    }
 
     const sidebar = $('.sidebar', admin);
     sidebar?.classList.add('reference-public-sidebar');
