@@ -100,3 +100,16 @@ def test_render_blueprint_matches_linked_production_resources():
         "name": "ideal-marcenaria-redis",
         "property": "connectionString",
     }
+
+
+def test_existing_frontend_has_a_documented_production_server_without_blueprint_duplication():
+    requirements = (ROOT / "requirements-frontend.txt").read_text(encoding="utf-8")
+    server = (ROOT / "frontend_server.py").read_text(encoding="utf-8")
+    docs = (ROOT / "docs" / "frontend-hosting.md").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "postgres.yml").read_text(encoding="utf-8")
+
+    assert "starlette>=1.6,<2.0" in requirements
+    assert "uvicorn[standard]>=0.52.3,<1.0" in requirements
+    assert "uvicorn frontend_server:app --host 0.0.0.0 --port $PORT" in docs
+    assert 'Route("/health"' in server
+    assert "python scripts/serve_frontend.py --port 8080" in workflow

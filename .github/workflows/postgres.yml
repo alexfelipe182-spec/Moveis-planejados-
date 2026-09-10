@@ -74,9 +74,9 @@ jobs:
           python -m pip install pytest-cov pip-audit
       - name: Ruff
         working-directory: backend
-        run: ruff check .
+        run: ruff check . ../scripts ../frontend_server.py
       - name: Compile Python
-        run: python -m compileall -q backend
+        run: python -m compileall -q backend scripts frontend_server.py
       - name: pip check
         run: python -m pip check
       - name: Verify imports
@@ -195,6 +195,12 @@ jobs:
           test -s frontend/quote-proposal.js
           test -s frontend/account-menu-v2.js
           test -s frontend/dashboard-search.js
+          test -s frontend/notifications.js
+          test -s frontend/notifications.css
+          test -s frontend/notifications.test.cjs
+          test -s frontend/routing.test.cjs
+          test -s frontend_server.py
+          test -s requirements-frontend.txt
       - name: JavaScript syntax
         run: |
           node --check frontend/app.js
@@ -206,10 +212,15 @@ jobs:
           node --check frontend/quote-proposal.js
           node --check frontend/account-menu-v2.js
           node --check frontend/dashboard-search.js
+          node --check frontend/notifications.js
+          node --check frontend/notifications.test.cjs
+          node --check frontend/routing.test.cjs
       - name: Frontend behavior
         run: node frontend/app.test.cjs
       - name: Frontend module contracts
         run: node frontend/module-contract.test.cjs
+      - name: Frontend notifications and routing
+        run: node --test frontend/notifications.test.cjs frontend/routing.test.cjs
       - name: HTML assets
         run: |
           grep -q '<script src="./app.js"></script>' frontend/index.html
@@ -217,20 +228,24 @@ jobs:
           grep -q '<script src="./quote-decisions.js"></script>' frontend/index.html
           grep -q '<script src="./quote-proposal.js"></script>' frontend/index.html
           grep -q '<script src="./saas-public.js"></script>' frontend/index.html
+          grep -q '<script src="./notifications.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
           grep -q '<link rel="stylesheet" href="./professional.css">' frontend/index.html
+          grep -q '<link rel="stylesheet" href="./notifications.css">' frontend/index.html
       - name: Accidental placeholders
         run: |
-          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/saas-public.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js frontend/account-menu-v2.js frontend/dashboard-search.js
+          ! grep -RniE 'TODO:.*IMPLEMENT|lorem ipsum|>\s*PLACEHOLDER\s*<' frontend/index.html frontend/styles.css frontend/professional.css frontend/app.js frontend/saas-public.js frontend/smart-quotes.js frontend/quote-decisions.js frontend/quote-proposal.js frontend/account-menu-v2.js frontend/dashboard-search.js frontend/notifications.js
       - name: Frontend smoke test
         run: |
-          python -m http.server 8080 --directory frontend >/tmp/frontend.log 2>&1 &
+          python scripts/serve_frontend.py --port 8080 >/tmp/frontend.log 2>&1 &
           pid=$!; trap 'kill $pid 2>/dev/null || true' EXIT
           for i in {1..20}; do curl --fail --silent http://127.0.0.1:8080/ >/tmp/frontend.html && break; sleep 1; done
           grep -q 'Multi-Marcenarias' /tmp/frontend.html
           grep -q 'smart-quotes.js' /tmp/frontend.html
           grep -q 'quote-decisions.js' /tmp/frontend.html
           grep -q 'quote-proposal.js' /tmp/frontend.html
+          curl --fail --silent http://127.0.0.1:8080/dashboard/ | grep -q 'Multi-Marcenarias'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/assets/missing.png)" = 404
 
   ci-summary:
     name: CI summary
