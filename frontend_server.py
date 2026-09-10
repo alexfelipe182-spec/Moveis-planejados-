@@ -6,13 +6,14 @@ from starlette.applications import Starlette
 from starlette.exceptions import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import FileResponse, PlainTextResponse, Response
+from starlette.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from starlette.routing import Route
 
 
 ROOT = Path(__file__).resolve().parent
 FRONTEND = ROOT / "frontend"
 INDEX = FRONTEND / "index.html"
+DASHBOARD_GUARD_SCRIPT = '<script src="/dashboard-route-guard.js"></script>'
 PRIVATE_ROOTS = {".git", "backend", "scripts", "tests"}
 PRIVATE_SUFFIXES = {".cjs", ".py", ".pyc"}
 
@@ -33,6 +34,16 @@ def _safe_target(path: str) -> Path | None:
     return target
 
 
+def _index_response(path: str) -> Response:
+    normalized = path.strip("/")
+    if normalized == "dashboard" or normalized.startswith("dashboard/"):
+        html = INDEX.read_text(encoding="utf-8")
+        if DASHBOARD_GUARD_SCRIPT not in html:
+            html = html.replace("</body>", f"  {DASHBOARD_GUARD_SCRIPT}\n</body>")
+        return HTMLResponse(html)
+    return FileResponse(INDEX)
+
+
 async def health(_: Request) -> Response:
     return PlainTextResponse("ok")
 
@@ -46,7 +57,7 @@ async def frontend(request: Request) -> Response:
         return FileResponse(target)
     if path.startswith(("api/", "assets/")) or target.suffix:
         raise HTTPException(status_code=404)
-    return FileResponse(INDEX)
+    return _index_response(path)
 
 
 async def frontend_headers(request: Request, call_next):
