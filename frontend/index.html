@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <base href="/">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <meta name="description" content="Multi-Marcenarias — SaaS de gestão para marcenarias com clientes, orçamentos inteligentes, produção, projetos, lucro e planos por assinatura.">
@@ -24,6 +25,7 @@
   <link rel="stylesheet" href="./commercial.css">
   <link rel="stylesheet" href="./design-refresh.css">
   <link rel="stylesheet" href="./public-reference.css">
+  <link rel="stylesheet" href="./notifications.css">
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
@@ -229,6 +231,6 @@
   <div id="admin-app" class="hidden"><aside class="sidebar"><div class="side-brand"><span class="logo-mark" aria-hidden="true">MM</span><div><strong>Multi-Marcenarias</strong><small>Painel de gestão</small></div></div><nav id="admin-nav" aria-label="Menu administrativo"><button class="nav active" data-section="dashboard" type="button">⌂ <span>Dashboard</span></button><button class="nav" data-section="customers" type="button">♙ <span>Clientes</span></button><button class="nav" data-section="quotes" type="button">▤ <span>Orçamentos</span></button><button class="nav" data-section="projects" type="button">▦ <span>Projetos</span></button><button class="nav" data-section="products" type="button">▧ <span>Produtos</span></button><button class="nav" data-section="categories" type="button">◈ <span>Serviços</span></button><button class="nav admin-only" data-section="users" type="button">♙ <span>Usuários</span></button><button class="nav admin-only" data-section="activities" type="button">◷ <span>Histórico</span></button></nav><div class="side-bottom"><a href="#planos">Planos</a><button id="logout" class="logout" type="button">↪ <span>Sair</span></button></div></aside><main class="admin-main"><header class="topbar"><div><span class="eyebrow">Multi-Marcenarias</span><h1 id="admin-title">Dashboard</h1></div><div class="top-actions"><button id="theme-toggle" class="icon-button" title="Alternar tema" aria-label="Alternar tema" type="button">☾</button><span class="user-pill"><span class="status-dot" aria-hidden="true"></span><span id="user-badge">Usuário</span></span></div></header><div id="toast" class="toast" role="status" aria-live="polite"></div><section id="dashboard" class="admin-section"></section><section id="customers" class="admin-section hidden"></section><section id="quotes" class="admin-section hidden"></section><section id="projects" class="admin-section hidden"></section><section id="products" class="admin-section hidden"></section><section id="categories" class="admin-section hidden"></section><section id="users" class="admin-section hidden"></section><section id="activities" class="admin-section hidden"></section></main></div>
 
   <div id="modal" class="modal hidden" aria-hidden="true"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-head"><div><span class="eyebrow">Gerenciamento</span><h2 id="modal-title">Novo registro</h2></div><button id="modal-close" class="close" type="button" aria-label="Fechar">×</button></div><form id="item-form"></form></div></div>
-  <script src="./app.js"></script><script src="./smart-quotes.js"></script><script src="./quote-decisions.js"></script><script src="./quote-proposal.js"></script><script src="./saas-public.js"></script>
+  <script src="./app.js"></script><script src="./smart-quotes.js"></script><script src="./quote-decisions.js"></script><script src="./quote-proposal.js"></script><script src="./saas-public.js"></script><script src="./notifications.js"></script>
 </body>
 </html>
