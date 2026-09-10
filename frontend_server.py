@@ -13,6 +13,7 @@ from starlette.routing import Route
 ROOT = Path(__file__).resolve().parent
 FRONTEND = ROOT / "frontend"
 INDEX = FRONTEND / "index.html"
+SESSION_CONTROLS_SCRIPT = '<script src="/session-controls.js"></script>'
 AUTH_REFERENCE_STYLE = '<link rel="stylesheet" href="/authenticated-reference.css">'
 AUTH_REFERENCE_SCRIPT = '<script src="/authenticated-reference.js"></script>'
 DASHBOARD_GUARD_SCRIPT = '<script src="/dashboard-route-guard.js"></script>'
@@ -38,6 +39,8 @@ def _safe_target(path: str) -> Path | None:
 
 def _index_response(path: str) -> Response:
     html = INDEX.read_text(encoding="utf-8")
+    if SESSION_CONTROLS_SCRIPT not in html:
+        html = html.replace("</head>", f"  {SESSION_CONTROLS_SCRIPT}\n</head>")
     if AUTH_REFERENCE_STYLE not in html:
         html = html.replace("</head>", f"  {AUTH_REFERENCE_STYLE}\n</head>")
     if AUTH_REFERENCE_SCRIPT not in html:
