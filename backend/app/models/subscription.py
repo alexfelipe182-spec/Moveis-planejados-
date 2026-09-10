@@ -4,10 +4,10 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueCon
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-from app.models.tenant import utc_now_naive
+from app.models.tenant import TenantScopedMixin, utc_now_naive
 
 
-class Subscription(Base):
+class Subscription(TenantScopedMixin, Base):
     __tablename__ = "subscriptions"
     __table_args__ = (
         UniqueConstraint("tenant_id", name="uq_subscriptions_tenant_id"),
@@ -25,11 +25,12 @@ class Subscription(Base):
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     trial_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    provider_event_created: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, onupdate=utc_now_naive, nullable=False)
 
 
-class UsageCounter(Base):
+class UsageCounter(TenantScopedMixin, Base):
     __tablename__ = "usage_counters"
     __table_args__ = (UniqueConstraint("tenant_id", "metric", "period", name="uq_usage_tenant_metric_period"),)
 

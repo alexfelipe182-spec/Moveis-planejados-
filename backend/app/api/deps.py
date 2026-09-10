@@ -57,6 +57,7 @@ def get_current_user(
     if not tenant or not tenant.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Marcenaria indisponível")
     db.info["tenant_id"] = user.tenant_id
+    request.state.tenant_id = user.tenant_id
     if _requires_commercial_access(request.url.path):
         ensure_commercial_access(db, tenant)
     return user

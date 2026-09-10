@@ -20,6 +20,7 @@ from app.schemas.password_reset import PasswordResetConfirm, PasswordResetReques
 from app.schemas.tenant import BusinessRegister, BusinessRegisterResponse
 from app.schemas.user import UserCreate, UserRead
 from app.services.plans import TRIAL_DAYS
+from app.services.automation import enqueue, process_job
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -139,6 +140,10 @@ def register_business(payload: BusinessRegister, db: Session = Depends(get_db)):
                 description=f"Criou a marcenaria {tenant.name} com {TRIAL_DAYS} dias grátis",
             )
         )
+        job = enqueue(db, tenant_id=tenant.id, event_type="tenant.created",
+                      payload={"entity_id": tenant.id, "user_id": owner.id},
+                      idempotency_key=f"tenant.created:{tenant.id}")
+        process_job(db, job)
         db.commit()
         db.refresh(tenant)
         db.refresh(owner)
@@ -179,6 +184,10 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
             )
         )
         db.add(Activity(user_id=user.id, action="created", entity="user", entity_id=user.id, description=f"Cadastro de usuário {user.email} com {TRIAL_DAYS} dias grátis"))
+        job = enqueue(db, tenant_id=user.tenant_id, event_type="tenant.created",
+                      payload={"entity_id": user.tenant_id, "user_id": user.id},
+                      idempotency_key=f"tenant.created:{user.tenant_id}")
+        process_job(db, job)
         db.commit()
         db.refresh(user)
     except Exception:

@@ -1,5 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 
+from app.services.quote_pricing import calculate_quote_suggestion
+
 
 def _q(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -31,7 +33,7 @@ def recommend_from_history(
         confidence = "high" if sample_size >= 10 else "medium" if sample_size >= 3 else "low"
 
     recommended_margin = min(max(recommended_margin, Decimal("5")), Decimal("80"))
-    recommended_total = base_cost * (Decimal("1") + recommended_margin / Decimal("100"))
+    recommended_total = calculate_quote_suggestion(material_cost=base_cost, profit_margin=recommended_margin)["suggested_total"]
 
     risk_score = Decimal("20")
     if sample_size == 0:

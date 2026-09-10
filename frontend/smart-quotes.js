@@ -1,4 +1,6 @@
 (() => {
+  if (window.multiSmartQuotesReady) return;
+  window.multiSmartQuotesReady = true;
   const money = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const escapeHtml = (value = '') => String(value).replace(/[&<>'\"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c]));
 
@@ -22,8 +24,8 @@
   }
 
   function interpretationLabel(source) {
-    if (source === 'openai') return 'IA OpenAI';
-    if (source === 'assisted_local') return 'Modo assistido';
+    if (source === 'openai') return 'IA OpenAI ativa';
+    if (source === 'assisted_local') return 'Modo assistido · fallback local';
     return 'Cálculo protegido';
   }
 
@@ -83,6 +85,7 @@
     };
 
     form.querySelector('#quote-item-add').addEventListener('click', async () => {
+      if (form.querySelector('#quote-item-add').disabled) return;
       const name = form.querySelector('#qi-name').value.trim();
       const quantity = Number(form.querySelector('#qi-quantity').value || 0);
       const unit_price = Number(form.querySelector('#qi-price').value || 0);
@@ -116,6 +119,7 @@
         row.innerHTML = `<div class="form-grid"><label>Nome<input class="edit-name" value="${escapeHtml(item.name)}" maxlength="200"></label><label>Quantidade<input class="edit-quantity" type="number" min="0.01" step="0.01" value="${Number(item.quantity)}"></label><label>Medidas L × A × P<input class="edit-measurements" value="${escapeHtml(measurementText(item))}" maxlength="100"></label><label>Preço unitário<input class="edit-price" type="number" min="0" step="0.01" value="${Number(item.unit_price)}"></label></div><div class="modal-actions"><button type="button" class="btn secondary quote-item-cancel">Cancelar</button><button type="button" class="btn primary quote-item-save">Salvar alterações</button></div>`;
         row.querySelector('.quote-item-cancel').addEventListener('click', () => renderItems(items));
         row.querySelector('.quote-item-save').addEventListener('click', async () => {
+          if (row.querySelector('.quote-item-save').disabled) return;
           const name = row.querySelector('.edit-name').value.trim();
           const quantity = Number(row.querySelector('.edit-quantity').value || 0);
           const unit_price = Number(row.querySelector('.edit-price').value || 0);
@@ -142,7 +146,7 @@
       }
 
       const deleteButton = event.target.closest('.quote-item-delete');
-      if (!deleteButton) return;
+      if (!deleteButton || deleteButton.disabled) return;
       if (!confirm('Excluir este móvel do orçamento?')) return;
       deleteButton.disabled = true;
       try {
@@ -177,13 +181,42 @@
     const options = customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.email ? ` — ${escapeHtml(c.email)}` : ''}</option>`).join('');
     const form = document.querySelector('#item-form');
     document.querySelector('#modal-title').textContent = 'Novo orçamento inteligente';
-    form.innerHTML = `<div class="smart-quote-create"><div class="smart-quote-intro"><span class="eyebrow">Assistente de orçamento</span><h3>Transforme o pedido do cliente em uma prévia técnica</h3><p>A IA organiza o pedido; os preços vêm somente do catálogo da sua marcenaria e continuam sujeitos à sua aprovação.</p></div><div class="form-grid"><label class="span-2">Pedido do cliente<textarea name="request_text" minlength="10" maxlength="5000" placeholder="Ex.: Quero um armário de 3 metros, MDF branco, seis portas e três gavetas."></textarea></label><label>Cliente<select name="customer_id" required><option value="">Selecione o cliente...</option>${options}</select></label><label>Margem de lucro (%)<input name="profit_margin" type="number" value="30" min="0" max="100" step="0.01" required></label><label class="span-2">Descrição<textarea name="description" minlength="3" maxlength="3000" required placeholder="Ex.: Cozinha planejada em MDF, portas basculantes..."></textarea></label><label>Medidas<textarea name="measurements" maxlength="2000" placeholder="Ex.: 3,20m x 2,40m"></textarea></label><label>Materiais<textarea name="materials" maxlength="2000" placeholder="Ex.: MDF amadeirado 18mm, MDF branco..."></textarea></label></div><div class="cost-grid"><label>Material<input name="material_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Ferragens<input name="hardware_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Mão de obra<input name="labor_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Acabamento<input name="finishing_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label></div><div id="smart-quote-result" class="smart-quote-result" aria-live="polite"></div><div class="modal-actions"><button type="button" class="btn secondary" data-smart-cancel>Cancelar</button><button type="button" class="btn secondary" data-smart-interpret>✨ Interpretar pedido</button><button type="button" class="btn secondary" data-smart-analyze>Calcular preço</button><button type="button" class="btn primary" data-smart-save disabled>Salvar orçamento</button></div></div>`;
+    form.innerHTML = `<div class="smart-quote-create"><div class="smart-quote-intro"><span class="eyebrow">Assistente de orçamento</span><h3>Transforme o pedido do cliente em uma prévia técnica</h3><p>A IA organiza o pedido; os preços vêm somente do catálogo da sua marcenaria e continuam sujeitos à sua aprovação.</p></div><div class="form-grid"><label class="span-2">Pedido do cliente<textarea name="request_text" minlength="10" maxlength="5000" placeholder="Ex.: Quero um armário de 3 metros, MDF branco, seis portas e três gavetas."></textarea></label><label>Cliente<select name="customer_id" required><option value="">Selecione o cliente...</option>${options}</select></label><label>Margem de lucro (%)<input name="profit_margin" type="number" value="30" min="0" max="100" step="0.01" required></label><label class="span-2">Descrição<textarea name="description" minlength="3" maxlength="3000" required placeholder="Ex.: Cozinha planejada em MDF, portas basculantes..."></textarea></label><label>Medidas<textarea name="measurements" maxlength="2000" placeholder="Ex.: 3,20m x 2,40m"></textarea></label><label>Materiais<textarea name="materials" maxlength="2000" placeholder="Ex.: MDF amadeirado 18mm, MDF branco..."></textarea></label></div><div class="cost-grid"><label>Material<input name="material_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Ferragens<input name="hardware_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Mão de obra<input name="labor_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label><label>Acabamento<input name="finishing_cost" type="number" value="0" min="0" step="0.01" inputmode="decimal" required></label></div><div id="smart-quote-state" role="status" aria-live="polite">Descreva o pedido para iniciar a análise.</div><div id="smart-quote-brief"></div><label class="smart-review"><input type="checkbox" name="human_reviewed">Revisei medidas, materiais, quantidades, dados faltantes e custos desta prévia.</label><div id="smart-quote-result" class="smart-quote-result" aria-live="polite"></div><div class="modal-actions"><button type="button" class="btn secondary" data-smart-cancel>Cancelar</button><button type="button" class="btn secondary" data-smart-interpret>✨ Interpretar pedido</button><button type="button" class="btn secondary" data-smart-analyze>Calcular preço</button><button type="button" class="btn primary" data-smart-save disabled>Salvar orçamento</button></div></div>`;
 
     const smartForm = form.querySelector('.smart-quote-create');
     const saveButton = smartForm.querySelector('[data-smart-save]');
     const resultPanel = smartForm.querySelector('#smart-quote-result');
     let lastEstimate = null;
     let interpretationSource = null;
+    let technicalBrief = null;
+    let busy = false;
+    let revision = 0;
+    let calculatedRevision = -1;
+    let saveIdentity = null;
+    const statePanel = smartForm.querySelector('#smart-quote-state');
+    const briefPanel = smartForm.querySelector('#smart-quote-brief');
+    const reviewed = field(smartForm, 'human_reviewed');
+    const actionButtons = ['interpret', 'analyze', 'save'].map(action => smartForm.querySelector(`[data-smart-${action}]`));
+    const setState = text => { statePanel.textContent = text; };
+    const canSave = () => !busy && reviewed.checked && lastEstimate && calculatedRevision === revision && Number(lastEstimate.suggested_total || 0) > 0;
+    const syncSave = () => { saveButton.disabled = !canSave(); };
+    const begin = label => {
+      if (busy) return false;
+      busy = true;
+      actionButtons.forEach(button => { button.disabled = true; button.setAttribute?.('aria-busy', 'true'); });
+      setState(label);
+      return true;
+    };
+    const finish = () => {
+      busy = false;
+      actionButtons.forEach(button => { button.disabled = false; button.setAttribute?.('aria-busy', 'false'); });
+      syncSave();
+    };
+    const stillCurrent = version => version === revision && smartForm.isConnected !== false;
+    reviewed.addEventListener('change', () => {
+      syncSave();
+      setState(canSave() ? 'Pronto para salvar. O orçamento seguirá para aprovação interna.' : 'Revise os dados e calcule o preço.');
+    });
 
     const payloadFromForm = () => ({
       material_cost: numberValue(smartForm, 'material_cost'),
@@ -199,17 +232,20 @@
     };
 
     const invalidateEstimate = () => {
-      if (!lastEstimate) return;
+      revision += 1;
+      saveIdentity = null;
+      reviewed.checked = false;
       lastEstimate = null;
       saveButton.disabled = true;
-      resultPanel.innerHTML = '<div class="panel empty"><strong>Valores alterados.</strong><p>Calcule novamente o preço antes de salvar o orçamento.</p></div>';
+      setState('Dados alterados. Revise e calcule novamente antes de salvar.');
     };
-
-    ['material_cost', 'hardware_cost', 'labor_cost', 'finishing_cost', 'profit_margin'].forEach(name => {
+    ['request_text', 'customer_id', 'description', 'measurements', 'materials', 'material_cost', 'hardware_cost', 'labor_cost', 'finishing_cost', 'profit_margin'].forEach(name => {
       field(smartForm, name)?.addEventListener('input', invalidateEstimate);
+      field(smartForm, name)?.addEventListener('change', invalidateEstimate);
     });
 
     smartForm.querySelector('[data-smart-interpret]').addEventListener('click', async () => {
+      if (busy) return;
       const customerId = numberValue(smartForm, 'customer_id');
       const requestText = fieldValue(smartForm, 'request_text').trim();
       if (!customerId) {
@@ -222,6 +258,10 @@
       }
 
       const button = smartForm.querySelector('[data-smart-interpret]');
+      if (!begin('Analisando o pedido…')) return;
+      const version = revision;
+      reviewed.checked = false;
+      lastEstimate = null;
       setButtonBusy(button, true, 'Interpretando...', '✨ Interpretar pedido');
       try {
         const draft = await createDraft({
@@ -229,7 +269,11 @@
           request_text: requestText,
           profit_margin: numberValue(smartForm, 'profit_margin'),
         });
-        interpretationSource = draft.interpretation_source || 'openai';
+        if (!stillCurrent(version)) return;
+        technicalBrief = draft.brief;
+        interpretationSource = draft.interpretation_source || 'assisted_local';
+        const list = values => (values || []).map(value => `<li>${escapeHtml(value)}</li>`).join('') || '<li>Nenhum dado adicional indicado. Confirme na revisão.</li>';
+        briefPanel.innerHTML = `<div class="panel"><h4>Dados faltantes</h4><ul>${list(draft.brief?.missing_data)}</ul><h4>Perguntas sugeridas</h4><ul>${list(draft.brief?.questions)}</ul><h4>Riscos</h4><ul>${list(draft.brief?.risks)}</ul><p>Confiança da interpretação: ${Number(draft.brief?.confidence_score || 0)}%</p></div>`;
         setValue('description', draft.brief?.normalized_description || '');
         setValue('measurements', draft.brief?.measurements_summary || '');
         setValue('materials', draft.brief?.materials_summary || '');
@@ -241,7 +285,9 @@
         const hasMissing = missing.length > 0;
         const hasPositiveTotal = Number(draft.suggested_total || 0) > 0;
         const assisted = interpretationSource === 'assisted_local';
-        saveButton.disabled = assisted || hasMissing || !hasPositiveTotal;
+        saveButton.disabled = true;
+        calculatedRevision = -1;
+        setState(`${assisted ? 'Fallback local' : 'IA ativa'} · análise pronta. Revise os dados antes de calcular.${hasMissing || !hasPositiveTotal ? ' Complete os custos pendentes.' : ''}`);
 
         if (assisted) {
           toast('Pedido organizado em modo assistido. Revise os custos e clique em Calcular preço antes de salvar.');
@@ -253,21 +299,32 @@
           toast('IA concluída com catálogo e preço calculado. Revise antes de salvar.');
         }
       } catch (err) {
+        setState(`Erro recuperável: ${err.message}. Você pode revisar os dados e tentar novamente.`);
         toast(err.message, 'error');
       } finally {
         setButtonBusy(button, false, 'Interpretando...', '✨ Interpretar pedido');
+        finish();
       }
     });
 
     smartForm.querySelector('[data-smart-analyze]').addEventListener('click', async () => {
+      if (busy) return;
+      if (!reviewed.checked) { setState('Confirme a revisão humana dos dados e custos.'); return; }
+      if (!Object.values(payloadFromForm()).every(Number.isFinite)) { setState('Informe valores numéricos válidos.'); return; }
+      if (!begin('Pronto para calcular · calculando com os custos revisados…')) return;
+      const version = revision;
+      lastEstimate = null;
       const button = smartForm.querySelector('[data-smart-analyze]');
       setButtonBusy(button, true, 'Calculando...', 'Calcular preço');
       try {
         const estimate = await api('/quotes/estimate', { method: 'POST', body: payloadFromForm() });
-        lastEstimate = { ...estimate, interpretation_source: interpretationSource || undefined };
+        if (!stillCurrent(version)) return;
+        calculatedRevision = version;
+        lastEstimate = { ...estimate, interpretation_source: interpretationSource || estimate.interpretation_source };
         renderPanel(lastEstimate, resultPanel);
         const validTotal = Number(lastEstimate.suggested_total || 0) > 0;
         saveButton.disabled = !validTotal;
+        setState(validTotal ? 'Pronto para salvar. Revise o valor calculado.' : 'Complete os custos antes de salvar.');
         toast(
           validTotal
             ? 'Análise concluída. Revise o preço antes de salvar.'
@@ -275,16 +332,20 @@
           validTotal ? 'success' : 'error',
         );
       } catch (err) {
+        lastEstimate = null;
         saveButton.disabled = true;
+        setState(`Erro recuperável: ${err.message}. Tente calcular novamente.`);
         toast(err.message, 'error');
       } finally {
         setButtonBusy(button, false, 'Calculando...', 'Calcular preço');
+        finish();
       }
     });
 
     smartForm.querySelector('[data-smart-cancel]').addEventListener('click', closeModal);
 
     saveButton.addEventListener('click', async () => {
+      if (busy) return;
       if (!lastEstimate) {
         toast('Calcule o orçamento antes de salvar.', 'error');
         return;
@@ -306,7 +367,10 @@
         return;
       }
 
+      if (!canSave()) { syncSave(); setState('Revise e calcule novamente antes de salvar.'); return; }
       const data = payloadFromForm();
+      data.technical_brief = technicalBrief;
+      data.human_reviewed = reviewed.checked;
       data.customer_id = customerId;
       data.description = description;
       data.measurements = fieldValue(smartForm, 'measurements').trim() || null;
@@ -314,14 +378,18 @@
       data.total = Number(lastEstimate.suggested_total || 0);
       data.status = 'analysis';
 
+      if (!begin('Salvando orçamento…')) return;
+      saveIdentity ||= window.crypto?.randomUUID?.() || `quote-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       setButtonBusy(saveButton, true, 'Salvando...', 'Salvar orçamento');
       try {
-        const quote = await api('/quotes', { method: 'POST', body: data });
+        const quote = await api('/quotes', { method: 'POST', body: data, headers: { 'Idempotency-Key': saveIdentity } });
         toast('Orçamento criado. Agora adicione os móveis.');
         await openQuoteItems(quote.id, quote.description);
       } catch (err) {
         toast(err.message, 'error');
+        setState(`Erro recuperável: ${err.message}. Tente salvar novamente.`);
         setButtonBusy(saveButton, false, 'Salvando...', 'Salvar orçamento');
+        finish();
       }
     });
 
@@ -329,6 +397,14 @@
     $('#modal')?.setAttribute('aria-hidden', 'false');
   }
 
+  window.openSmartQuote = openSmartQuoteCreate;
+  // Capture Enter before the generic CRUD submit listener, without adding a second save handler.
+  document.addEventListener('submit', event => {
+    if (event.target?.querySelector?.('.smart-quote-create')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
   const originalCreateItem = window.createItem;
   window.createItem = function(resource) {
     if (resource === 'quotes') return openSmartQuoteCreate().catch(err => toast(err.message, 'error'));

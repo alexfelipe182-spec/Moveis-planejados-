@@ -19,6 +19,7 @@ from starlette.responses import Response
 from app.api.auth import router as auth_router
 from app.api.routes import api_router
 from app.core.config import settings
+from app.core.observability import request_id_context
 from app.core.resilience import DistributedRateLimiter
 from app.database import engine
 
@@ -77,13 +78,14 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         supplied_request_id = request.headers.get("x-request-id", "")
         request_id = supplied_request_id if REQUEST_ID_PATTERN.fullmatch(supplied_request_id) else uuid4().hex
         request.state.request_id = request_id
+        context_token = request_id_context.set(request_id)
         started = time.perf_counter()
 
         try:
             response = await call_next(request)
         except Exception:
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
-            logger.exception(
+            logger.error(
                 "request_failed request_id=%s method=%s path=%s duration_ms=%.2f",
                 request_id,
                 request.method,
@@ -91,6 +93,8 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 duration_ms,
             )
             raise
+        finally:
+            request_id_context.reset(context_token)
 
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
         response.headers["X-Request-ID"] = request_id
@@ -101,12 +105,13 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         else:
             log_method = logger.info
         log_method(
-            "request_completed request_id=%s method=%s path=%s status=%s duration_ms=%.2f",
+            "request_completed request_id=%s method=%s path=%s status=%s duration_ms=%.2f tenant_id=%s",
             request_id,
             request.method,
             request.url.path,
             response.status_code,
             duration_ms,
+            getattr(request.state, "tenant_id", None),
         )
         return response
 
@@ -138,7 +143,7 @@ app.add_middleware(
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-ID", "Idempotency-Key"],
     expose_headers=["X-Request-ID", "Retry-After", "X-RateLimit-Limit"],
 )
 # Wrap early 429 responses too; CORS preflight is handled before the limiter.

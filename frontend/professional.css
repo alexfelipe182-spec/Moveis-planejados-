@@ -1164,3 +1164,10 @@ input:focus,textarea:focus,select:focus{
     text-align:center;
   }
 }
+/* Human review and status messages in the existing quote workflow. */
+.smart-review { display:flex; align-items:flex-start; gap:12px; padding:16px; background:#ecfdf5; color:#064e3b; border:1px solid #6ee7b7; border-radius:12px; }
+.smart-review input { width:22px; height:22px; flex-shrink:0; accent-color:#047857; }
+#smart-quote-state { padding:12px 0; color:#134e4a; font-weight:600; overflow-wrap:anywhere; }
+#smart-quote-brief { color:#172b26; }
+#smart-quote-brief .panel { background:#fff; }
+@media (max-width:480px) { .smart-quote-create .modal-actions { flex-wrap:wrap; } .smart-quote-create .modal-actions button { min-height:44px; flex:1 1 45%; } }

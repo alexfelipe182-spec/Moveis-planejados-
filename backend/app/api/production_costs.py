@@ -1,15 +1,16 @@
 from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import crud
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.database import get_db
-from app.models import Activity, Material, Project, ProjectCost, User
+from app.models import Activity, Material, Project, ProjectCost, Tenant, User
 from app.schemas.production_cost import ProjectCostCreate, ProjectCostRead
-from app.services.automation import engine
+from app.services.automation import record_change
+from app.services.idempotency import ensure_same_request, request_identity
 
 router = APIRouter(prefix="/project-costs", tags=["Project Costs"])
 
@@ -52,9 +53,17 @@ def project_cost_total(project_id: int, db: Session = Depends(get_db)):
 )
 def create_project_cost(
     payload: ProjectCostCreate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    key, fingerprint = request_identity(idempotency_key, payload)
+    db.scalar(select(Tenant).where(Tenant.id == current_user.tenant_id).with_for_update())
+    if key:
+        existing = db.scalar(select(ProjectCost).where(ProjectCost.tenant_id == current_user.tenant_id, ProjectCost.idempotency_key == key))
+        if existing:
+            ensure_same_request(existing, fingerprint)
+            return existing
     project = crud.get_item(db, Project, payload.project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
@@ -75,6 +84,7 @@ def create_project_cost(
     total_cost = _money(quantity * unit_cost * waste_multiplier)
 
     item = ProjectCost(
+        idempotency_key=key, request_fingerprint=fingerprint,
         project_id=payload.project_id,
         material_id=payload.material_id,
         category=payload.category,
@@ -94,16 +104,9 @@ def create_project_cost(
             description=f"Adicionou custo de {total_cost} ao projeto #{project.id}: {payload.description}",
         )
     )
+    activity = next(obj for obj in db.new if isinstance(obj, Activity))
+    record_change(db, tenant_id=current_user.tenant_id, event_type="project.cost_added",
+                  entity_id=project.id, user_id=current_user.id, activity=activity)
     db.commit()
     db.refresh(item)
-    engine.emit(
-        "project.cost_added",
-        {
-            "entity": "project",
-            "item_id": project.id,
-            "cost_id": item.id,
-            "user_id": current_user.id,
-            "total_cost": total_cost,
-        },
-    )
     return item

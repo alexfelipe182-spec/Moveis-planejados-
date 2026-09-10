@@ -126,7 +126,7 @@ def test_create_success_logs_and_emits(monkeypatch):
     assert logged
     db.commit.assert_called_once_with()
     db.refresh.assert_called_once_with(created)
-    assert emitted == [("created", FakeModel, 7, 42)]
+    assert emitted == [("created", FakeModel, 7, 42, db)]
 
 
 def test_create_maps_value_error_to_409(monkeypatch):
@@ -183,7 +183,7 @@ def test_update_success_logs_and_emits(monkeypatch):
     assert logged
     db.commit.assert_called_once_with()
     db.refresh.assert_called_once_with(updated)
-    assert emitted == [("updated", FakeModel, 10, 42)]
+    assert emitted == [("updated", FakeModel, 10, 42, db)]
 
 
 def test_update_handles_missing_and_conflict(monkeypatch):
@@ -247,7 +247,7 @@ def test_delete_success_logs_and_emits(monkeypatch):
     assert deleted == [existing]
     assert logged
     db.commit.assert_called_once_with()
-    assert emitted == [("deleted", FakeModel, 20, 42)]
+    assert emitted == [("deleted", FakeModel, 20, 42, db)]
 
 
 def test_delete_handles_missing_and_conflict(monkeypatch):

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -46,6 +46,7 @@ class Material(TenantScopedMixin, Base):
 
 class ProjectCost(TenantScopedMixin, Base):
     __tablename__ = "project_costs"
+    __table_args__ = (UniqueConstraint("tenant_id", "idempotency_key", name="uq_cost_tenant_key"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(
@@ -59,4 +60,6 @@ class ProjectCost(TenantScopedMixin, Base):
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), default=1)
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, nullable=False)

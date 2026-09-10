@@ -91,6 +91,9 @@ def usage_quantity(db: Session, tenant_id: int, metric: str) -> int:
 
 
 def increment_usage(db: Session, tenant_id: int, metric: str, amount: int = 1) -> None:
+    if db.info.get("tenant_id") != tenant_id:
+        raise ValueError("Contexto de marcenaria inválido")
+    db.scalar(select(Tenant).where(Tenant.id == tenant_id).with_for_update())
     period = _period()
     counter = db.scalar(
         select(UsageCounter).where(
@@ -110,8 +113,9 @@ def _current_resource_count(db: Session, tenant_id: int, metric: str) -> int:
     if model is None:
         return usage_quantity(db, tenant_id, metric)
     query = select(func.count()).select_from(model)
+    query = query.where(model.tenant_id == tenant_id)
     if model is User:
-        query = query.where(User.tenant_id == tenant_id, User.is_active.is_(True))
+        query = query.where(User.is_active.is_(True))
     return int(db.scalar(query) or 0)
 
 
@@ -153,6 +157,8 @@ def ensure_commercial_access(db: Session, tenant: Tenant) -> Subscription:
 
 
 def ensure_capacity(db: Session, tenant: Tenant, metric: str, *, increment: int = 1) -> None:
+    # Serialize check + write for every commercial resource in this transaction.
+    db.scalar(select(Tenant).where(Tenant.id == tenant.id).with_for_update())
     ensure_commercial_access(db, tenant)
     plan = plan_for_tenant(tenant)
     limit = plan.limits.get(metric)

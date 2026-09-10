@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -14,6 +14,7 @@ def utc_now_naive() -> datetime:
 
 class Quote(TenantScopedMixin, Base):
     __tablename__ = "quotes"
+    __table_args__ = (UniqueConstraint("tenant_id", "idempotency_key", name="uq_quote_tenant_key"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
@@ -28,6 +29,10 @@ class Quote(TenantScopedMixin, Base):
     suggested_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     ai_analysis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    technical_brief: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    human_reviewed: Mapped[bool] = mapped_column(default=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ai_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)

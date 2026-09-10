@@ -1,4 +1,5 @@
 from app.models.activity import Activity
+from app.models.automation import AIUsage, AutomationJob
 from app.models.category import Category
 from app.models.customer import Customer
 from app.models.password_reset import PasswordResetToken
@@ -14,6 +15,8 @@ from app.models.user import User
 
 __all__ = [
     "Activity",
+    "AIUsage",
+    "AutomationJob",
     "Category",
     "Customer",
     "Material",

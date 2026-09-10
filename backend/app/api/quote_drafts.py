@@ -8,7 +8,6 @@ from app import crud
 from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
 from app.models import Activity, Customer, Material, Tenant, User
-from app.services.plans import ensure_capacity, increment_usage
 from app.services.quote_brief import (
     CatalogMaterial,
     QuotePreview,
@@ -50,14 +49,13 @@ def create_quote_draft(
 ):
     """Interpreta linguagem natural e precifica somente com o catálogo do tenant."""
     tenant = _tenant_for_user(db, current_user)
-    ensure_capacity(db, tenant, "ai_month")
     customer = crud.get_item(db, Customer, payload.customer_id)
     if customer is None:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
     rows = (
         db.query(Material)
-        .filter(Material.is_active.is_(True))
+        .filter(Material.is_active.is_(True), Material.tenant_id == tenant.id)
         .order_by(Material.name, Material.id)
         .limit(300)
         .all()
@@ -73,7 +71,7 @@ def create_quote_draft(
         )
         for item in rows
     ]
-    interpretation = extract_quote_brief_result(payload.request_text, catalog=catalog)
+    interpretation = extract_quote_brief_result(payload.request_text, catalog=catalog, db=db, tenant_id=tenant.id)
 
     margin = payload.profit_margin
     if margin is None:
@@ -83,9 +81,9 @@ def create_quote_draft(
         catalog,
         profit_margin=margin,
         interpretation_source=interpretation.source,
+        fallback_reason=interpretation.fallback_reason,
     )
 
-    increment_usage(db, tenant.id, "ai_month")
     db.add(
         Activity(
             user_id=current_user.id,

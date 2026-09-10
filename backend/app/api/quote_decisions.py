@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.api.deps import require_admin, require_cookie_csrf
 from app.database import get_db
-from app.models import Activity, Project, Quote, User
+from app.models import Activity, Project, Quote, Tenant, User
 from app.schemas import QuoteRead
-from app.services.automation import engine
+from app.services.automation import enqueue, process_job, record_change
+from app.services.plans import ensure_capacity
 
 router = APIRouter(prefix="/quotes", tags=["Quotes"])
 
@@ -33,7 +34,7 @@ def decide_quote(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = crud.get_item(db, Quote, item_id)
+    item = crud.get_item_for_update(db, Quote, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "analysis":
@@ -42,7 +43,6 @@ def decide_quote(
             detail="Orçamento precisa estar em análise para aprovação ou rejeição",
         )
 
-    previous_status = item.status
     item.status = payload.status
     db.add(
         Activity(
@@ -56,20 +56,12 @@ def decide_quote(
             ),
         )
     )
+    activity = next(obj for obj in db.new if isinstance(obj, Activity))
+    record_change(db, tenant_id=current_user.tenant_id, event_type="quote." + ("shared" if item.status == "sent" else item.status),
+                  entity_id=item.id, user_id=current_user.id, activity=activity)
     db.commit()
     db.refresh(item)
 
-    engine.emit(
-        f"quote.{payload.status}",
-        {
-            "entity": "quote",
-            "item_id": item.id,
-            "user_id": current_user.id,
-            "previous_status": previous_status,
-            "status": payload.status,
-            "suggested_total": item.suggested_total,
-        },
-    )
     return item
 
 
@@ -83,7 +75,7 @@ def record_quote_share(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = crud.get_item(db, Quote, item_id)
+    item = crud.get_item_for_update(db, Quote, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     if item.status != "approved":
@@ -92,7 +84,6 @@ def record_quote_share(
             detail="Somente orçamentos aprovados podem ser enviados ao cliente",
         )
 
-    previous_status = item.status
     item.status = "sent"
     db.add(
         Activity(
@@ -103,19 +94,11 @@ def record_quote_share(
             description=f"Registrou envio da proposta do quote #{item.id} ao cliente",
         )
     )
+    activity = next(obj for obj in db.new if isinstance(obj, Activity))
+    record_change(db, tenant_id=current_user.tenant_id, event_type="quote." + ("shared" if item.status == "sent" else item.status),
+                  entity_id=item.id, user_id=current_user.id, activity=activity)
     db.commit()
     db.refresh(item)
-    engine.emit(
-        "quote.shared",
-        {
-            "entity": "quote",
-            "item_id": item.id,
-            "user_id": current_user.id,
-            "previous_status": previous_status,
-            "status": item.status,
-            "suggested_total": item.suggested_total,
-        },
-    )
     return item
 
 
@@ -130,19 +113,25 @@ def update_quote_commercial_status(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = crud.get_item(db, Quote, item_id)
+    tenant = db.get(Tenant, current_user.tenant_id)
+    # Lock commercial capacity before quote, consistently with quote creation.
+    from sqlalchemy import select
+    db.scalar(select(Tenant).where(Tenant.id == tenant.id).with_for_update())
+    item = crud.get_item_for_update(db, Quote, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    if item.status == payload.status:
+        return item
     if item.status != "sent":
         raise HTTPException(
             status_code=409,
             detail="A proposta precisa estar enviada e aguardando o cliente",
         )
 
-    previous_status = item.status
+    if payload.status == "accepted" and not db.query(Project).filter(Project.quote_id == item.id).first():
+        ensure_capacity(db, tenant, "projects")
     item.status = payload.status
     label = "aceitou" if payload.status == "accepted" else "recusou"
-    created_project: Project | None = None
 
     db.add(
         Activity(
@@ -155,62 +144,16 @@ def update_quote_commercial_status(
     )
 
     if payload.status == "accepted":
-        existing_project = db.query(Project).filter(Project.quote_id == item.id).one_or_none()
-        if existing_project:
-            raise HTTPException(
-                status_code=409,
-                detail="Este orçamento já possui um projeto vinculado",
-            )
-
-        created_project = Project(
-            customer_id=item.customer_id,
-            quote_id=item.id,
-            name=f"Projeto do orçamento #{item.id}",
-            description=item.description,
-            measurements=item.measurements,
-            materials=item.materials,
-            status="planning",
-        )
-        db.add(created_project)
-        db.flush()
-        db.add(
-            Activity(
-                user_id=current_user.id,
-                action="created_from_quote",
-                entity="project",
-                entity_id=created_project.id,
-                description=(
-                    f"Criou automaticamente o projeto #{created_project.id} "
-                    f"a partir do quote #{item.id} aceito pelo cliente"
-                ),
-            )
-        )
+        job = enqueue(db, tenant_id=current_user.tenant_id, event_type="quote.accepted",
+                      payload={"entity_id": item.id, "user_id": current_user.id},
+                      idempotency_key=f"quote.accepted:{item.id}")
+        process_job(db, job)
+    else:
+        activity = next(obj for obj in db.new if isinstance(obj, Activity))
+        record_change(db, tenant_id=current_user.tenant_id, event_type="quote.declined",
+                      entity_id=item.id, user_id=current_user.id, activity=activity)
 
     db.commit()
     db.refresh(item)
 
-    engine.emit(
-        f"quote.{payload.status}",
-        {
-            "entity": "quote",
-            "item_id": item.id,
-            "user_id": current_user.id,
-            "previous_status": previous_status,
-            "status": item.status,
-            "suggested_total": item.suggested_total,
-            "project_id": created_project.id if created_project else None,
-        },
-    )
-    if created_project:
-        engine.emit(
-            "project.created",
-            {
-                "entity": "project",
-                "item_id": created_project.id,
-                "user_id": current_user.id,
-                "quote_id": item.id,
-                "customer_id": item.customer_id,
-                "status": created_project.status,
-            },
-        )
     return item

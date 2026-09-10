@@ -118,16 +118,17 @@ def test_external_ai_success_replaces_only_analysis_text(monkeypatch):
     fake_openai = ModuleType("openai")
     calls = []
 
-    class FakeResponses:
-        def create(self, **kwargs):
+    class FakeCompletions:
+        def parse(self, **kwargs):
             calls.append(kwargs)
             return SimpleNamespace(
-                output_text='{"summary":"ok","warnings":[],"recommendations":[]}'
+                choices=[SimpleNamespace(message=SimpleNamespace(
+                    parsed={"summary": "ok", "warnings": [], "recommendations": []}, refusal=None))]
             )
 
     class FakeOpenAI:
         def __init__(self, **kwargs):
-            self.responses = FakeResponses()
+            self.chat = SimpleNamespace(completions=FakeCompletions())
 
     fake_openai.OpenAI = FakeOpenAI
     monkeypatch.setitem(sys.modules, "openai", fake_openai)
@@ -141,6 +142,9 @@ def test_external_ai_success_replaces_only_analysis_text(monkeypatch):
     assert result["base_cost"] == Decimal("1000.00")
     assert result["suggested_total"] == Decimal("1350.00")
     assert result["profit_margin"] == Decimal("35")
-    assert result["ai_analysis"] == '{"summary":"ok","warnings":[],"recommendations":[]}'
+    analysis = json.loads(result["ai_analysis"])
+    assert analysis["summary"] == "ok"
+    assert analysis["financial_values_locked"] is True
+    assert analysis["source"] == "openai"
     assert result["requires_approval"] is True
     assert calls[0]["model"] == "test-model"
