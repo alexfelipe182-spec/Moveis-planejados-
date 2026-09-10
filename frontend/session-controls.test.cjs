@@ -49,3 +49,16 @@ test('literal public, notification and account-menu buttons declare a type', () 
     assert.deepEqual(missingType, []);
   }
 });
+
+test('every literal frontend button is explicit or covered by runtime hardening', () => {
+  const sourceFiles = fs.readdirSync(frontendDir)
+    .filter((name) => /\.(?:html|js)$/.test(name) && !name.endsWith('.test.js'));
+  const coveredAction = /\bonclick=|\bclass="[^"]*\b(?:nav|stat|dashboard-kpi|small-btn|icon-button|notification-button)\b|\bdata-dashboard-search-resource=/;
+
+  for (const file of sourceFiles) {
+    const source = fs.readFileSync(path.join(frontendDir, file), 'utf8');
+    const literalButtons = [...source.matchAll(/<button\b[^>]*>/g)].map((match) => match[0]);
+    const unsafe = literalButtons.filter((button) => !/\btype=/.test(button) && !coveredAction.test(button));
+    assert.deepEqual(unsafe, [], `${file} contains button markup with an implicit submit type`);
+  }
+});
