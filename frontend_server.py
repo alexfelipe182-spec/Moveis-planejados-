@@ -13,6 +13,8 @@ from starlette.routing import Route
 ROOT = Path(__file__).resolve().parent
 FRONTEND = ROOT / "frontend"
 INDEX = FRONTEND / "index.html"
+AUTH_REFERENCE_STYLE = '<link rel="stylesheet" href="/authenticated-reference.css">'
+AUTH_REFERENCE_SCRIPT = '<script src="/authenticated-reference.js"></script>'
 DASHBOARD_GUARD_SCRIPT = '<script src="/dashboard-route-guard.js"></script>'
 PRIVATE_ROOTS = {".git", "backend", "scripts", "tests"}
 PRIVATE_SUFFIXES = {".cjs", ".py", ".pyc"}
@@ -35,13 +37,17 @@ def _safe_target(path: str) -> Path | None:
 
 
 def _index_response(path: str) -> Response:
+    html = INDEX.read_text(encoding="utf-8")
+    if AUTH_REFERENCE_STYLE not in html:
+        html = html.replace("</head>", f"  {AUTH_REFERENCE_STYLE}\n</head>")
+    if AUTH_REFERENCE_SCRIPT not in html:
+        html = html.replace("</body>", f"  {AUTH_REFERENCE_SCRIPT}\n</body>")
+
     normalized = path.strip("/")
     if normalized == "dashboard" or normalized.startswith("dashboard/"):
-        html = INDEX.read_text(encoding="utf-8")
         if DASHBOARD_GUARD_SCRIPT not in html:
             html = html.replace("</body>", f"  {DASHBOARD_GUARD_SCRIPT}\n</body>")
-        return HTMLResponse(html)
-    return FileResponse(INDEX)
+    return HTMLResponse(html)
 
 
 async def health(_: Request) -> Response:
