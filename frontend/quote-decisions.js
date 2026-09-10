@@ -152,3 +152,11 @@
   script.dataset.mmProjectProfitability = 'true';
   document.head.appendChild(script);
 })();
+
+(() => {
+  if (!document.head || document.querySelector('script[data-mm-notification-panel]')) return;
+  const script = document.createElement('script');
+  script.src = './notification-panel.js?v=20260909-1';
+  script.dataset.mmNotificationPanel = 'true';
+  document.head.appendChild(script);
+})();
