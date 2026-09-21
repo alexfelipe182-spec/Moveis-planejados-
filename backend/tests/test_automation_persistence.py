@@ -179,7 +179,8 @@ def test_trial_scheduler_and_repeated_processing(businesses):
 
 def test_quote_e2e_acceptance_and_costs_are_idempotent(businesses):
     a, b = businesses
-    with client_for(a) as client, client_for(b) as other:
+    with client_for(a) as client:
+        other_headers = {"Authorization": f"Bearer {create_access_token(str(b.user_id))}"}
         draft = client.post("/api/v1/quotes/draft", json={"customer_id": a.customer_id, "request_text": "Armário de cozinha 3m x 2m em MDF branco"})
         assert draft.status_code == 200, draft.text
         assert draft.json()["interpretation_source"] == "assisted_local"
@@ -194,8 +195,8 @@ def test_quote_e2e_acceptance_and_costs_are_idempotent(businesses):
         assert quote.json()["total"] == "130.00"
         assert client.post("/api/v1/quotes", json=payload, headers=headers).json()["id"] == quote_id
         assert client.post("/api/v1/quotes", json=payload | {"material_cost": "200"}, headers=headers).status_code == 409
-        assert other.get(f"/api/v1/quotes/{quote_id}").status_code == 404
-        assert other.patch(f"/api/v1/quotes/{quote_id}/decision", json={"status": "approved"}).status_code == 404
+        assert client.get(f"/api/v1/quotes/{quote_id}", headers=other_headers).status_code == 404
+        assert client.patch(f"/api/v1/quotes/{quote_id}/decision", json={"status": "approved"}, headers=other_headers).status_code == 404
         assert client.patch(f"/api/v1/quotes/{quote_id}/decision", json={"status": "approved"}).status_code == 200
         assert client.post(f"/api/v1/quotes/{quote_id}/shared").status_code == 200
         for _ in range(2):
@@ -211,14 +212,14 @@ def test_quote_e2e_acceptance_and_costs_are_idempotent(businesses):
         second = client.post("/api/v1/project-costs", json=cost, headers=cost_headers)
         assert first.status_code == second.status_code == 201
         assert first.json()["id"] == second.json()["id"]
-        assert other.post("/api/v1/project-costs", json=cost).status_code == 404
+        assert client.post("/api/v1/project-costs", json=cost, headers=other_headers).status_code == 404
         profit = client.get(f"/api/v1/projects/{project_id}/profitability").json()
         assert profit["real_cost"] == "80.00" and profit["real_profit"] == "50.00"
-        assert other.get(f"/api/v1/projects/{project_id}/profitability").status_code == 404
+        assert client.get(f"/api/v1/projects/{project_id}/profitability", headers=other_headers).status_code == 404
         jobs = client.get("/api/v1/automations").json()
         assert jobs["counts"]["completed"] == 1
         assert all("payload" not in job for job in jobs["jobs"])
-        assert other.get("/api/v1/automations").json()["jobs"] == []
+        assert client.get("/api/v1/automations", headers=other_headers).json()["jobs"] == []
     while run_once(factory(a)):
         pass
     with factory(a)() as db:

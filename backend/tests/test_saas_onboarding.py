@@ -74,26 +74,30 @@ def test_business_onboarding_creates_admin_and_editable_tenant_profile():
 
 
 def test_two_businesses_are_isolated_across_customers_quotes_and_team():
-    with TestClient(app) as client_a, TestClient(app) as client_b:
+    from uuid import uuid4
+    sufixo = uuid4().hex
+    with TestClient(app) as client_a:
+        client_b = client_a
         business_a = register_business(
             client_a,
             business_name="Marcenaria SaaS Isolada A",
             owner_name="Owner A",
-            email="owner.saas.a@example.com",
+            email=f"owner.saas.a.{sufixo}@example.com",
         )
         business_b = register_business(
             client_b,
             business_name="Marcenaria SaaS Isolada B",
             owner_name="Owner B",
-            email="owner.saas.b@example.com",
+            email=f"owner.saas.b.{sufixo}@example.com",
         )
         assert business_a["tenant"]["id"] != business_b["tenant"]["id"]
         assert business_a["tenant"]["slug"] != business_b["tenant"]["slug"]
 
-        login(client_a, "owner.saas.a@example.com")
+        client_a.cookies.clear()
+        login(client_a, f"owner.saas.a.{sufixo}@example.com")
         customer_a = client_a.post(
             "/api/v1/customers",
-            json={"name": "Cliente exclusivo A", "email": "cliente.saas.a@example.com"},
+            json={"name": "Cliente exclusivo A", "email": f"cliente.saas.a.{sufixo}@example.com"},
             headers=csrf_headers(client_a),
         )
         assert customer_a.status_code == 201
@@ -115,7 +119,8 @@ def test_two_businesses_are_isolated_across_customers_quotes_and_team():
         assert quote_a.status_code == 201, quote_a.text
         quote_a_id = quote_a.json()["id"]
 
-        login(client_b, "owner.saas.b@example.com")
+        client_b.cookies.clear()
+        login(client_b, f"owner.saas.b.{sufixo}@example.com")
         assert client_b.get("/api/v1/customers").json() == []
         assert client_b.get(f"/api/v1/customers/{customer_a_id}").status_code == 404
         assert client_b.get(f"/api/v1/quotes/{quote_a_id}").status_code == 404
@@ -139,7 +144,7 @@ def test_two_businesses_are_isolated_across_customers_quotes_and_team():
             "/api/v1/admin/users",
             json={
                 "name": "Equipe B",
-                "email": "team.saas.b@example.com",
+                "email": f"team.saas.b.{sufixo}@example.com",
                 "password": PASSWORD,
                 "is_admin": False,
             },
@@ -150,9 +155,9 @@ def test_two_businesses_are_isolated_across_customers_quotes_and_team():
         users_b = client_b.get("/api/v1/admin/users")
         assert users_b.status_code == 200
         emails_b = {item["email"] for item in users_b.json()}
-        assert "owner.saas.b@example.com" in emails_b
-        assert "team.saas.b@example.com" in emails_b
-        assert "owner.saas.a@example.com" not in emails_b
+        assert f"owner.saas.b.{sufixo}@example.com" in emails_b
+        assert f"team.saas.b.{sufixo}@example.com" in emails_b
+        assert f"owner.saas.a.{sufixo}@example.com" not in emails_b
 
 
 def test_inactive_tenant_blocks_existing_session():
