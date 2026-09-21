@@ -37,25 +37,33 @@ def register_and_login_business(
 
 
 def test_two_businesses_cannot_read_modify_or_link_each_others_records():
-    with TestClient(app) as business_a, TestClient(app) as business_b:
+    from uuid import uuid4
+    sufixo = uuid4().hex
+    with TestClient(app) as business_a:
+        business_b = business_a
         register_and_login_business(
             business_a,
             business_name="Marcenaria Isolada A",
             owner_name="Admin Isolado A",
-            email="tenant-http-a@example.com",
+            email=f"tenant-http-a.{sufixo}@example.com",
         )
+        cookies_a = dict(business_a.cookies)
+        business_a.cookies.clear()
         register_and_login_business(
             business_b,
             business_name="Marcenaria Isolada B",
             owner_name="Admin Isolado B",
-            email="tenant-http-b@example.com",
+            email=f"tenant-http-b.{sufixo}@example.com",
         )
+        cookies_b = dict(business_b.cookies)
+        business_a.cookies.clear()
+        business_a.cookies.update(cookies_a)
 
         customer_a = business_a.post(
             "/api/v1/customers",
             json={
                 "name": "Cliente Privado A",
-                "email": "cliente-privado-a@example.com",
+                "email": f"cliente-privado-a.{sufixo}@example.com",
             },
             headers=csrf_headers(business_a),
         )
@@ -90,6 +98,9 @@ def test_two_businesses_cannot_read_modify_or_link_each_others_records():
         )
         assert project_a.status_code == 201, project_a.text
         project_a_id = project_a.json()["id"]
+
+        business_b.cookies.clear()
+        business_b.cookies.update(cookies_b)
 
         customer_b = business_b.post(
             "/api/v1/customers",
@@ -149,6 +160,9 @@ def test_two_businesses_cannot_read_modify_or_link_each_others_records():
         own_customer_b = business_b.get(f"/api/v1/customers/{customer_b_id}")
         assert own_customer_b.status_code == 200
         assert own_customer_b.json()["name"] == "Cliente B"
+
+        business_a.cookies.clear()
+        business_a.cookies.update(cookies_a)
 
         own_customer_a = business_a.get(f"/api/v1/customers/{customer_a_id}")
         assert own_customer_a.status_code == 200
