@@ -5,6 +5,15 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8').split('function openAuth')[0];
+test('loopback previews use a local API and explicit configuration takes precedence', () => {
+  const declaration = source.split('\n')[0];
+  for (const hostname of ['localhost', '127.0.0.1', '[::1]']) {
+    const context = { window: {}, location: { hostname } };
+    assert.equal(vm.runInNewContext(`${declaration}\nAPI`, context), `http://${hostname}:8000/api/v1`);
+    const override = { window: { API_BASE_URL: 'https://sandbox.example/api/v1' }, location: { hostname } };
+    assert.equal(vm.runInNewContext(`${declaration}\nAPI`, override), 'https://sandbox.example/api/v1');
+  }
+});
 const response = (status, body = {}) => ({ status, ok: status < 400, json: async () => body });
 function deferred() {
   let resolve;

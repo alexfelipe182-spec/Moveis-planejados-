@@ -221,6 +221,8 @@ jobs:
         run: node frontend/module-contract.test.cjs
       - name: Frontend notifications and routing
         run: node --test frontend/notifications.test.cjs frontend/routing.test.cjs
+      - name: Complete frontend regression suite
+        run: node --test frontend/*.test.cjs
       - name: HTML assets
         run: |
           grep -q '<script src="./app.js"></script>' frontend/index.html

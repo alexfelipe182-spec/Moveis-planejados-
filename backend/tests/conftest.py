@@ -1,11 +1,33 @@
 import os
+import smtplib
+from urllib.parse import urlparse
 
+import httpx
 import pytest
 import redis
 
+# Fail before importing the application or touching Redis/database state.
+if os.environ.get("ENVIRONMENT") != "test":
+    raise pytest.UsageError("Use ENVIRONMENT=test and scripts/validate_isolated.py")
+for variable, hosts in (("DATABASE_URL", {"127.0.0.1", "localhost", "postgres"}),
+                        ("REDIS_URL", {"127.0.0.1", "localhost", "redis"})):
+    if urlparse(os.environ.get(variable, "")).hostname not in hosts:
+        raise pytest.UsageError(f"{variable} must explicitly target an isolated local test service")
+
 os.environ.setdefault("OPENAI_API_DISABLED", "true")
 
-from app.main import rate_limiter
+from app.main import rate_limiter  # noqa: E402 - validate destinations before app import
+
+
+@pytest.fixture(autouse=True)
+def forbid_external_transports(monkeypatch):
+    def blocked(*_args, **_kwargs):
+        raise AssertionError("Real email and HTTP transports are forbidden in tests; use mocks")
+
+    monkeypatch.setattr(smtplib, "SMTP", blocked)
+    monkeypatch.setattr(smtplib, "SMTP_SSL", blocked)
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", blocked)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", blocked)
 
 
 @pytest.fixture(autouse=True)
