@@ -1,0 +1,5 @@
+# Reviewed false positive: hard-coded signing key used only by the disposable
+# validation runner with ENVIRONMENT=test, an internal Docker network, and
+# fresh PostgreSQL/Redis containers. This is not a production credential.
+# Limit the exception to this historical finding; keep all other scanning active.
+29ac3fe1009be7ff01ab0cd7f5eb7098b1509098:scripts/validate_isolated.py:generic-api-key:81
