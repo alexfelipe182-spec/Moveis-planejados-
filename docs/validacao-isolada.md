@@ -14,9 +14,11 @@ saída para a internet. Não forneça credenciais reais.
 Cada chamada cria uma rede Docker `--internal`, PostgreSQL 16 vazio e Redis 7
 exclusivos, sem publicar portas. Os nomes incluem um identificador aleatório.
 O PostgreSQL usa tmpfs. A execução não usa volumes ou bancos preexistentes.
-A cópia temporária contém somente fontes visíveis pelo Git e arquivos de
-contrato; `.env` e variantes são excluídos. Apenas `.env.production.example`
+A cópia temporária contém somente arquivos já rastreados pelo Git e arquivos de
+contrato; arquivos locais não rastreados nunca são copiados. `.env` e variantes são excluídos. Apenas `.env.production.example`
 é copiado como texto de referência e nunca carregado pela aplicação.
+O contexto enviado ao build da imagem contém somente o Dockerfile temporário e
+`backend/requirements.txt`, mesmo quando o daemon Docker é remoto.
 O processo Python do container começa com `env -i` e configurações de teste
 explícitas. Nenhuma variável SMTP, Stripe, bootstrap ou credencial do host
 é herdada. Os destinos efetivos de Settings são comparados com os destinos
@@ -44,8 +46,9 @@ Não rode pytest diretamente contra um banco usado por pessoas. O conftest
 rejeita ambiente diferente de test e hosts externos, mas um endereço local
 sozinho não comprova que um banco é descartável: use o executor.
 
-Ao terminar, mesmo com falha, o executor remove apenas os IDs dos containers
-criados por ele, seus volumes anônimos, sua rede e sua tag de imagem.
+Ao terminar, mesmo com falha, o executor tenta remover independentemente todos os
+IDs dos containers criados por ele, seus volumes anônimos, sua rede e sua tag de
+imagem. Uma falha de limpeza é informada sem impedir as tentativas seguintes.
 Imagens-base/cache do Docker podem permanecer. Não use `docker system prune`,
 `compose down -v` de outro projeto ou limpeza global. Em encerramento forçado
 do processo/sistema, confira os recursos com o identificador impresso antes
