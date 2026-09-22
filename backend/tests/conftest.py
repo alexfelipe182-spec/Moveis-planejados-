@@ -1,18 +1,26 @@
 import os
 import smtplib
-from urllib.parse import urlparse
 
 import httpx
 import pytest
 import redis
 
-# Fail before importing the application or touching Redis/database state.
+# Fail before importing the application or touching Redis/database state. Only
+# the exact disposable runner and GitHub CI targets are allowed; localhost by
+# itself is not proof that a database is safe to mutate.
 if os.environ.get("ENVIRONMENT") != "test":
     raise pytest.UsageError("Use ENVIRONMENT=test and scripts/validate_isolated.py")
-for variable, hosts in (("DATABASE_URL", {"127.0.0.1", "localhost", "postgres"}),
-                        ("REDIS_URL", {"127.0.0.1", "localhost", "redis"})):
-    if urlparse(os.environ.get(variable, "")).hostname not in hosts:
-        raise pytest.UsageError(f"{variable} must explicitly target an isolated local test service")
+targets = (os.environ.get("DATABASE_URL", ""), os.environ.get("REDIS_URL", ""))
+allowed_targets = {
+    ("postgresql+psycopg://postgres:isolated-test-only@postgres:5432/mm_validation",
+     "redis://redis:6379/0"),
+    ("postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_db",
+     "redis://127.0.0.1:6379/0"),
+}
+if targets not in allowed_targets:
+    raise pytest.UsageError(
+        "DATABASE_URL and REDIS_URL must exactly match the disposable validation runner or CI services"
+    )
 
 os.environ.setdefault("OPENAI_API_DISABLED", "true")
 
