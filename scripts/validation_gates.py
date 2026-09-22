@@ -17,11 +17,11 @@ def main():
     print("Confirmed: PostgreSQL postgres:5432/mm_validation; Redis redis:6379/0; environment=test", flush=True)
     if any(os.getenv(key) for key in ("SMTP_HOST", "STRIPE_SECRET_KEY", "OPENAI_API_KEY", "BOOTSTRAP_ADMIN_EMAIL")):
         raise RuntimeError("External credentials must not be supplied")
-    from alembic.config import Config
-    from alembic.script import ScriptDirectory
-    from alembic.runtime.migration import MigrationContext
-    from sqlalchemy import create_engine
     import redis
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import create_engine
 
     heads = tuple(ScriptDirectory.from_config(Config("alembic.ini")).get_heads())
     assert len(heads) == 1, heads
