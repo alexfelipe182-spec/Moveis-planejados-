@@ -4,11 +4,11 @@ import argparse
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +16,14 @@ ROOT = Path(__file__).resolve().parents[1]
 def run(*args, capture=False, cwd=ROOT):
     return subprocess.run(args, cwd=cwd, check=True, text=True,
                           stdout=subprocess.PIPE if capture else None).stdout
+
+
+def cleanup(*args):
+    """Attempt one cleanup operation without preventing the remaining ones."""
+    result = subprocess.run(args, cwd=ROOT, check=False, text=True, capture_output=True)
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip() or "no details"
+        print(f"Cleanup warning ({' '.join(args)}): {detail}", file=sys.stderr, flush=True)
 
 
 def main():
@@ -30,8 +38,8 @@ def main():
     print(f"Execution: {name}", flush=True)
     with tempfile.TemporaryDirectory(prefix=name + "-") as temporary:
         staging = Path(temporary)
-        # Copy only tracked/visible source files; never mount the user's checkout or .env.
-        files = run("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", capture=True)
+        # Copy only files already tracked by Git; untracked local material may contain secrets.
+        files = run("git", "ls-files", "-z", "--cached", capture=True)
         for relative in files.split("\0"):
             path = Path(relative)
             if not relative or (relative != ".env.production.example" and any(part.startswith(".env") for part in path.parts)):
@@ -45,13 +53,16 @@ def main():
                 shutil.copyfile(source, target)
         try:
             if not args.image:
-                (staging / "Dockerfile.validation").write_text(
+                build_context = staging / ".validation-image"
+                build_context.mkdir()
+                shutil.copyfile(staging / "backend" / "requirements.txt", build_context / "requirements.txt")
+                (build_context / "Dockerfile").write_text(
                     "FROM python:3.12-slim\n"
-                    "COPY backend/requirements.txt /tmp/requirements.txt\n"
+                    "COPY requirements.txt /tmp/requirements.txt\n"
                     "RUN pip install --no-cache-dir -r /tmp/requirements.txt pytest-cov pip-audit\n",
                     encoding="utf-8",
                 )
-                run("docker", "build", "-f", str(staging / "Dockerfile.validation"), "-t", image, str(staging))
+                run("docker", "build", "-t", image, str(build_context))
                 image_created = True
             run("docker", "network", "create", "--internal", name)
             network_created = True
@@ -65,7 +76,9 @@ def main():
             for container, command in ((created[0], ["pg_isready", "-U", "postgres", "-d", "mm_validation"]),
                                        (created[1], ["redis-cli", "ping"])):
                 for _attempt in range(60):
-                    probe = subprocess.run(["docker", "exec", container, *command], capture_output=True)
+                    probe = subprocess.run(
+                        ["docker", "exec", container, *command], check=False, capture_output=True
+                    )
                     if probe.returncode == 0:
                         break
                     time.sleep(1)
@@ -93,11 +106,11 @@ def main():
         finally:
             # IDs come only from successful creates in this invocation. No global prune/down.
             for container in reversed(created):
-                run("docker", "rm", "-f", "-v", container)
+                cleanup("docker", "rm", "-f", "-v", container)
             if network_created:
-                run("docker", "network", "rm", name)
+                cleanup("docker", "network", "rm", name)
             if image_created:
-                run("docker", "image", "rm", image)
+                cleanup("docker", "image", "rm", image)
 
 
 if __name__ == "__main__":
