@@ -9,7 +9,6 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from starlette.routing import Route
 
-
 ROOT = Path(__file__).resolve().parent
 FRONTEND = ROOT / "frontend"
 INDEX = FRONTEND / "index.html"
@@ -47,9 +46,8 @@ def _index_response(path: str) -> Response:
         html = html.replace("</body>", f"  {AUTH_REFERENCE_SCRIPT}\n</body>")
 
     normalized = path.strip("/")
-    if normalized == "dashboard" or normalized.startswith("dashboard/"):
-        if DASHBOARD_GUARD_SCRIPT not in html:
-            html = html.replace("</body>", f"  {DASHBOARD_GUARD_SCRIPT}\n</body>")
+    if (normalized == "dashboard" or normalized.startswith("dashboard/")) and DASHBOARD_GUARD_SCRIPT not in html:
+        html = html.replace("</body>", f"  {DASHBOARD_GUARD_SCRIPT}\n</body>")
     return HTMLResponse(html)
 
 

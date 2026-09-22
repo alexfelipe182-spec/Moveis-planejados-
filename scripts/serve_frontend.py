@@ -7,7 +7,6 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 PRIVATE_ROOTS = {".git", "backend", "scripts", "tests"}
 PRIVATE_SUFFIXES = {".cjs", ".py", ".pyc"}

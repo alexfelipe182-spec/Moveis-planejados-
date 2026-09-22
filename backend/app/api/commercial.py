@@ -67,6 +67,9 @@ def _stripe_secret() -> str:
     value = os.getenv("STRIPE_SECRET_KEY")
     if not value:
         raise HTTPException(status_code=503, detail="Cobrança recorrente ainda não foi configurada no ambiente")
+    mode = "live" if settings.environment == "production" else "test"
+    if not value.startswith((f"sk_{mode}_", f"rk_{mode}_")):
+        raise HTTPException(status_code=503, detail="Chave de cobrança incompatível com o ambiente")
     return value
 
 
@@ -276,7 +279,7 @@ def _verify_stripe_signature(raw_body: bytes, signature: str | None) -> None:
         raise HTTPException(status_code=400, detail="Timestamp de webhook inválido") from exc
     signed = timestamp.encode() + b"." + raw_body
     expected = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
-    if not any(hmac.compare_digest(expected, candidate) for candidate in signatures):
+    if not any(candidate.isascii() and hmac.compare_digest(expected, candidate) for candidate in signatures):
         raise HTTPException(status_code=400, detail="Assinatura de webhook inválida")
 
 

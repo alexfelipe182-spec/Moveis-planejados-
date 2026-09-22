@@ -1,4 +1,4 @@
-const API = window.API_BASE_URL || (location.hostname === 'localhost' ? 'http://localhost:8000/api/v1' : 'https://ideal-marcenaria-api.onrender.com/api/v1');
+const API = window.API_BASE_URL || (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) ? `http://${location.hostname}:8000/api/v1` : 'https://ideal-marcenaria-api.onrender.com/api/v1');
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const state = { user:null, resource:null, id:null, rows:[], categories:[], customers:[], suppliers:[], search:'', status:'', csrfToken:'', accessToken:'' };

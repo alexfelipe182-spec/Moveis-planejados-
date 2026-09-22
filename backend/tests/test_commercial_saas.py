@@ -115,7 +115,7 @@ def test_expired_trial_blocks_platform_but_keeps_account_and_billing_accessible(
             patch.dict(
                 os.environ,
                 {
-                    "STRIPE_SECRET_KEY": "sk_live_test_only_not_real",
+                    "STRIPE_SECRET_KEY": "sk_test_mock_only_not_real",
                     "STRIPE_PRICE_STARTER": "price_starter_test",
                 },
             ),
@@ -164,7 +164,7 @@ def test_checkout_creates_stripe_session_without_exposing_secret_and_preserves_t
             patch.dict(
                 os.environ,
                 {
-                    "STRIPE_SECRET_KEY": "sk_live_test_only_not_real",
+                    "STRIPE_SECRET_KEY": "sk_test_mock_only_not_real",
                     "STRIPE_PRICE_PROFESSIONAL": "price_professional_test",
                 },
             ),
@@ -186,7 +186,7 @@ def test_checkout_creates_stripe_session_without_exposing_secret_and_preserves_t
         assert call.kwargs["data"]["line_items[0][price]"] == "price_professional_test"
         assert call.kwargs["data"]["subscription_data[metadata][plan_code]"] == "professional"
         assert "subscription_data[trial_end]" in call.kwargs["data"]
-        assert call.kwargs["headers"] == {"Authorization": "Bearer sk_live_test_only_not_real"}
+        assert call.kwargs["headers"] == {"Authorization": "Bearer sk_test_mock_only_not_real"}
         assert "sk_live" not in response.text
 
 
@@ -211,7 +211,7 @@ def test_active_subscription_uses_billing_portal_and_blocks_duplicate_checkout()
         with patch.dict(
             os.environ,
             {
-                "STRIPE_SECRET_KEY": "sk_live_test_only_not_real",
+                "STRIPE_SECRET_KEY": "sk_test_mock_only_not_real",
                 "STRIPE_PRICE_BUSINESS": "price_business_test",
             },
         ):
@@ -232,7 +232,7 @@ def test_active_subscription_uses_billing_portal_and_blocks_duplicate_checkout()
             },
         )()
         with (
-            patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_live_test_only_not_real"}),
+            patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test_mock_only_not_real"}),
             patch("app.api.commercial.httpx.post", return_value=stripe_response) as stripe_post,
         ):
             portal = client.post("/api/v1/billing/portal", headers=csrf_headers(client))
