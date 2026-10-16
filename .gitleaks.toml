@@ -15,4 +15,5 @@ description = "CI-only deterministic test SECRET_KEY values"
 commits = [
   "590df38bafeae9a2445cb6446c6014d3a899ac63",
   "edcb26497ab1a4936aa5071bcc20197e2a74d384",
+  "57770345520f2cfa2cf9ccee26a63080703c9460",
 ]
