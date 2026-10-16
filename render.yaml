@@ -44,10 +44,11 @@ services:
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
+# O plano Free expira; confirme uma opção durável antes de operar em produção.
 databases:
   - name: Ideal
     plan: free
     region: oregon
     postgresMajorVersion: "18"
-    databaseName: ideal_1zre
-    user: ideal_1zre_user
+    databaseName: ideal_nisd
+    user: ideal_nisd_user
