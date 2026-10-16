@@ -49,5 +49,5 @@ databases:
     plan: free
     region: oregon
     postgresMajorVersion: "18"
-    databaseName: ideal_1zre
-    user: ideal_1zre_user
+    databaseName: ideal_nisd
+    user: ideal_nisd_user
