@@ -44,6 +44,7 @@ services:
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
+# O plano Free expira; confirme uma opção durável antes de operar em produção.
 databases:
   - name: Ideal
     plan: free
