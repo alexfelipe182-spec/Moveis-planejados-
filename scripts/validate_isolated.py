@@ -3,6 +3,7 @@
 import argparse
 import json
 import shutil
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -91,7 +92,7 @@ def main():
                 "--workdir", "/workspace/backend", "--entrypoint", "env", image,
                 "-i", "PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/tmp", "PYTHONPATH=/workspace/backend",
                 "ENVIRONMENT=test", "DATABASE_URL=postgresql+psycopg://postgres:isolated-test-only@postgres:5432/mm_validation",
-                "REDIS_URL=redis://redis:6379/0", "SECRET_KEY=isolated-validation-secret-at-least-32-bytes",
+                "REDIS_URL=redis://redis:6379/0", "SECRET_KEY=" + secrets.token_urlsafe(32),
                 "OPENAI_ENABLED=true", "OPENAI_API_DISABLED=true", "OPENAI_API_KEY=",
                 "RATE_LIMIT_PER_MINUTE=120", "python", "/workspace/scripts/validation_gates.py")
             run("docker", "run", "--rm", "--network", "none",
