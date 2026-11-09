@@ -20,6 +20,7 @@ def isolated_dependencies(monkeypatch):
     )
     connection = MagicMock()
     connection.__enter__.return_value = connection
+    connection.execute.return_value.scalar_one_or_none.return_value = main_module.EXPECTED_MIGRATION_HEAD
     monkeypatch.setattr(main_module.engine, "connect", lambda: connection)
     return connection
 
@@ -51,7 +52,7 @@ def test_readiness_returns_503_when_redis_ping_stalls(monkeypatch):
 
     response = asyncio.run(run())
     assert response.status_code == 503
-    assert response.json()["dependencies"] == {"postgres": "ok", "redis": "unhealthy"}
+    assert response.json()["dependencies"] == {"postgres": "ok", "migrations": "ok", "redis": "unhealthy"}
     assert response.headers["Cache-Control"] == "no-store"
 
 
@@ -66,7 +67,7 @@ def test_readiness_does_not_treat_a_false_redis_ping_as_healthy(monkeypatch):
 
     response = asyncio.run(run())
     assert response.status_code == 503
-    assert response.json()["dependencies"] == {"postgres": "ok", "redis": "unhealthy"}
+    assert response.json()["dependencies"] == {"postgres": "ok", "migrations": "ok", "redis": "unhealthy"}
 
 
 def test_slow_database_probe_does_not_block_other_requests(isolated_dependencies):
@@ -76,9 +77,11 @@ def test_slow_database_probe_does_not_block_other_requests(isolated_dependencies
         loop = asyncio.get_running_loop()
         query_started = asyncio.Event()
 
-        def blocked_query(_statement):
+        def blocked_query(statement):
             loop.call_soon_threadsafe(query_started.set)
             release_query.wait(timeout=2)
+            if "alembic_version" in str(statement):
+                return isolated_dependencies.execute.return_value
 
         isolated_dependencies.execute.side_effect = blocked_query
         async with httpx.AsyncClient(
@@ -94,6 +97,6 @@ def test_slow_database_probe_does_not_block_other_requests(isolated_dependencies
                 release_query.set()
                 response = await readiness
             assert response.status_code == 200
-            assert response.json()["dependencies"] == {"postgres": "ok", "redis": "ok"}
+            assert response.json()["dependencies"] == {"postgres": "ok", "migrations": "ok", "redis": "ok"}
 
     asyncio.run(run())

@@ -1,18 +1,21 @@
+import asyncio
 import logging
 import os
 import re
 import time
 from contextlib import asynccontextmanager
 from ipaddress import ip_address
+from pathlib import Path
 from uuid import uuid4
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -33,6 +36,12 @@ rate_limiter = DistributedRateLimiter(
     limit=settings.rate_limit_per_minute,
     redis_timeout_seconds=settings.redis_timeout_seconds,
 )
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+_ALEMBIC_CONFIG = Config(str(_BACKEND_ROOT / "alembic.ini"))
+_ALEMBIC_CONFIG.set_main_option("script_location", str(_BACKEND_ROOT / "alembic"))
+EXPECTED_MIGRATION_HEAD = ScriptDirectory.from_config(_ALEMBIC_CONFIG).get_current_head()
+READINESS_TIMEOUT_SECONDS = 4
 
 
 def _client_rate_limit_key(request: Request) -> str:
@@ -277,22 +286,34 @@ def health_check(response: Response):
     return {"status": "ok", "service": settings.app_name}
 
 
-def _check_postgres() -> None:
+def _check_postgres() -> bool:
     # The engine is synchronous; connection, query and cleanup all belong on
     # the worker thread so a slow database cannot freeze the API event loop.
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
+        try:
+            current = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
+        except Exception as exc:
+            logger.warning("readiness_failed dependency=migrations error_type=%s", type(exc).__name__)
+            return False
+        return current == EXPECTED_MIGRATION_HEAD
 
 
 @app.get("/ready", tags=["system"])
 async def readiness_check(response: Response):
-    dependencies = {"postgres": "ok", "redis": "ok"}
+    dependencies = {"postgres": "ok", "migrations": "ok", "redis": "ok"}
+    version = os.getenv("RENDER_GIT_COMMIT", "unknown")[:12]
 
     try:
-        await run_in_threadpool(_check_postgres)
+        migrations_ok = await asyncio.wait_for(
+            asyncio.to_thread(_check_postgres), timeout=READINESS_TIMEOUT_SECONDS
+        )
+        if not migrations_ok:
+            dependencies["migrations"] = "unhealthy"
     except Exception as exc:
         logger.warning("readiness_failed dependency=postgres error_type=%s", type(exc).__name__)
         dependencies["postgres"] = "unhealthy"
+        dependencies["migrations"] = "unhealthy"
 
     try:
         redis_ok = await rate_limiter.ping()
@@ -305,12 +326,15 @@ async def readiness_check(response: Response):
     if "unhealthy" in dependencies.values():
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "service": settings.app_name, "dependencies": dependencies},
+            content={"status": "not_ready", "service": settings.app_name, "dependencies": dependencies,
+                     "database": dependencies["postgres"], "migrations": dependencies["migrations"],
+                     "version": version},
             headers={"Cache-Control": "no-store"},
         )
 
     response.headers["Cache-Control"] = "no-store"
-    return {"status": "ready", "service": settings.app_name, "dependencies": dependencies}
+    return {"status": "ready", "service": settings.app_name, "dependencies": dependencies,
+            "database": "ok", "migrations": "ok", "version": version}
 
 
 @app.get("/", tags=["system"])
