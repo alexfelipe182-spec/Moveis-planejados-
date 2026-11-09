@@ -51,7 +51,7 @@ def apply_sql(target, sql):
 
 def assert_schema_matches_models(target):
     with target.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "016_ai_automation"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "017_customer_portal"
         assert set(inspect(connection).get_table_names()) == set(Base.metadata.tables) | {"alembic_version"}
         assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
 

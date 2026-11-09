@@ -639,5 +639,65 @@ ALTER TABLE subscriptions ALTER COLUMN provider_event_created DROP DEFAULT;
 
 UPDATE alembic_version SET version_num='016_ai_automation' WHERE alembic_version.version_num = '015_trial_30_days';
 
+-- Running upgrade 016_ai_automation -> 017_customer_portal
+
+CREATE TABLE customer_portal_accounts (
+    id SERIAL NOT NULL, 
+    customer_id INTEGER NOT NULL, 
+    email VARCHAR(255) NOT NULL, 
+    password_hash VARCHAR(255), 
+    is_active BOOLEAN NOT NULL, 
+    invitation_token_hash VARCHAR(64), 
+    invitation_expires_at TIMESTAMP WITHOUT TIME ZONE, 
+    reset_token_hash VARCHAR(64), 
+    reset_expires_at TIMESTAMP WITHOUT TIME ZONE, 
+    last_login_at TIMESTAMP WITHOUT TIME ZONE, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    tenant_id INTEGER NOT NULL, 
+    PRIMARY KEY (id), 
+    FOREIGN KEY(customer_id) REFERENCES customers (id) ON DELETE CASCADE, 
+    FOREIGN KEY(tenant_id) REFERENCES tenants (id) ON DELETE CASCADE, 
+    UNIQUE (invitation_token_hash), 
+    UNIQUE (reset_token_hash), 
+    CONSTRAINT uq_customer_portal_customer UNIQUE (tenant_id, customer_id), 
+    CONSTRAINT uq_customer_portal_email UNIQUE (tenant_id, email)
+);
+
+CREATE INDEX ix_customer_portal_accounts_customer_id ON customer_portal_accounts (customer_id);
+
+CREATE INDEX ix_customer_portal_accounts_email ON customer_portal_accounts (email);
+
+CREATE INDEX ix_customer_portal_accounts_tenant_id ON customer_portal_accounts (tenant_id);
+
+CREATE TABLE customer_portal_messages (
+    id SERIAL NOT NULL, 
+    customer_id INTEGER NOT NULL, 
+    quote_id INTEGER, 
+    project_id INTEGER, 
+    author_type VARCHAR(20) NOT NULL, 
+    body TEXT NOT NULL, 
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    tenant_id INTEGER NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT ck_customer_portal_message_author CHECK (author_type IN ('customer', 'staff')), 
+    FOREIGN KEY(customer_id) REFERENCES customers (id) ON DELETE CASCADE, 
+    FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE SET NULL, 
+    FOREIGN KEY(quote_id) REFERENCES quotes (id) ON DELETE SET NULL, 
+    FOREIGN KEY(tenant_id) REFERENCES tenants (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_customer_portal_messages_created_at ON customer_portal_messages (created_at);
+
+CREATE INDEX ix_customer_portal_messages_customer_id ON customer_portal_messages (customer_id);
+
+CREATE INDEX ix_customer_portal_messages_project_id ON customer_portal_messages (project_id);
+
+CREATE INDEX ix_customer_portal_messages_quote_id ON customer_portal_messages (quote_id);
+
+CREATE INDEX ix_customer_portal_messages_tenant_id ON customer_portal_messages (tenant_id);
+
+UPDATE alembic_version SET version_num='017_customer_portal' WHERE alembic_version.version_num = '016_ai_automation';
+
 COMMIT;
 

@@ -13,6 +13,7 @@ from app.api.automations import router as automations_router
 from app.api.commercial import router as commercial_router
 from app.api.crud_router import make_router
 from app.api.customer_history import router as customer_history_router
+from app.api.customer_portal import router as customer_portal_router
 from app.api.deps import get_current_user, require_admin, require_cookie_csrf
 from app.api.production_costs import router as production_costs_router
 from app.api.project_profitability import router as project_profitability_router
@@ -58,6 +59,7 @@ api_router.include_router(admin_router)
 api_router.include_router(automations_router)
 api_router.include_router(activity_router)
 api_router.include_router(customer_history_router)
+api_router.include_router(customer_portal_router)
 api_router.include_router(make_router(Category, CategoryCreate, CategoryRead, CategoryUpdate, "/categories"))
 api_router.include_router(make_router(Product, ProductCreate, ProductRead, ProductUpdate, "/products"))
 api_router.include_router(make_router(Customer, CustomerCreate, CustomerRead, CustomerUpdate, "/customers"))

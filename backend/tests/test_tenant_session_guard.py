@@ -110,6 +110,8 @@ def test_every_business_record_model_is_tenant_scoped():
     expected = {
         "activities",
         "categories",
+        "customer_portal_accounts",
+        "customer_portal_messages",
         "customers",
         "materials",
         "products",

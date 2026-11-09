@@ -2,6 +2,7 @@ from app.models.activity import Activity
 from app.models.automation import AIUsage, AutomationJob
 from app.models.category import Category
 from app.models.customer import Customer
+from app.models.customer_portal import CustomerPortalAccount, CustomerPortalMessage
 from app.models.password_reset import PasswordResetToken
 from app.models.product import Product
 from app.models.production_cost import Material, ProjectCost, Supplier
@@ -19,6 +20,8 @@ __all__ = [
     "AutomationJob",
     "Category",
     "Customer",
+    "CustomerPortalAccount",
+    "CustomerPortalMessage",
     "Material",
     "PasswordResetToken",
     "Product",
