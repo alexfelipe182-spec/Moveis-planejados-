@@ -21,7 +21,9 @@ def test_readiness_checks_database_and_redis():
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ready"
-    assert body["dependencies"] == {"postgres": "ok", "redis": "ok"}
+    assert body["dependencies"] == {"postgres": "ok", "migrations": "ok", "redis": "ok"}
+    assert body["database"] == body["migrations"] == "ok"
+    assert "version" in body
     assert response.headers["Cache-Control"] == "no-store"
 
 
@@ -42,7 +44,10 @@ def test_readiness_returns_503_when_postgres_is_unavailable(monkeypatch):
     assert response.json() == {
         "status": "not_ready",
         "service": main_module.settings.app_name,
-        "dependencies": {"postgres": "unhealthy", "redis": "ok"},
+        "dependencies": {"postgres": "unhealthy", "migrations": "unhealthy", "redis": "ok"},
+        "database": "unhealthy",
+        "migrations": "unhealthy",
+        "version": "unknown",
     }
     assert response.headers["Cache-Control"] == "no-store"
 
@@ -55,8 +60,13 @@ def test_readiness_returns_503_when_redis_is_unavailable(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return False
 
-        def execute(self, _statement):
+        def execute(self, statement):
+            if "alembic_version" in str(statement):
+                return self
             return None
+
+        def scalar_one_or_none(self):
+            return main_module.EXPECTED_MIGRATION_HEAD
 
     async def fail_ping():
         raise RuntimeError("redis unavailable")
@@ -71,9 +81,40 @@ def test_readiness_returns_503_when_redis_is_unavailable(monkeypatch):
     assert response.json() == {
         "status": "not_ready",
         "service": main_module.settings.app_name,
-        "dependencies": {"postgres": "ok", "redis": "unhealthy"},
+        "dependencies": {"postgres": "ok", "migrations": "ok", "redis": "unhealthy"},
+        "database": "ok",
+        "migrations": "ok",
+        "version": "unknown",
     }
     assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_readiness_rejects_outdated_migrations(monkeypatch):
+    class OutdatedConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def execute(self, _statement):
+            return self
+
+        def scalar_one_or_none(self):
+            return "outdated_revision"
+
+    async def redis_ok():
+        return True
+
+    monkeypatch.setattr(main_module.engine, "connect", lambda: OutdatedConnection())
+    monkeypatch.setattr(main_module.rate_limiter.redis, "ping", redis_ok)
+    with TestClient(app) as client:
+        response = client.get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["dependencies"] == {
+        "postgres": "ok", "migrations": "unhealthy", "redis": "ok"
+    }
 
 
 def test_security_headers_are_present():
