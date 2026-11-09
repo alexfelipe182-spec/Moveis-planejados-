@@ -38,16 +38,16 @@ def upgrade() -> None:
     op.create_index("ix_tenants_name", "tenants", ["name"])
     op.create_index("ix_tenants_slug", "tenants", ["slug"], unique=True)
 
-    connection = op.get_bind()
-    tenant_id = connection.execute(
+    # Keep data movement in SQL so the same migration also works with --sql.
+    # The slug is unique; do not assume a sequence-generated ID is always 1.
+    op.execute(
         sa.text(
             """
             INSERT INTO tenants (name, slug, is_active)
             VALUES ('Multi-Marcenarias — Base existente', 'legacy-default', TRUE)
-            RETURNING id
             """
         )
-    ).scalar_one()
+    )
 
     op.add_column("users", sa.Column("tenant_id", sa.Integer(), nullable=True))
     op.create_index("ix_users_tenant_id", "users", ["tenant_id"])
@@ -59,7 +59,8 @@ def upgrade() -> None:
         ["id"],
         ondelete="SET NULL",
     )
-    connection.execute(sa.text("UPDATE users SET tenant_id = :tenant_id"), {"tenant_id": tenant_id})
+    legacy_tenant = "(SELECT id FROM tenants WHERE slug = 'legacy-default')"
+    op.execute(sa.text(f"UPDATE users SET tenant_id = {legacy_tenant}"))
 
     for table in BUSINESS_TABLES:
         op.add_column(table, sa.Column("tenant_id", sa.Integer(), nullable=True))
@@ -72,10 +73,7 @@ def upgrade() -> None:
             ["id"],
             ondelete="CASCADE",
         )
-        connection.execute(
-            sa.text(f"UPDATE {table} SET tenant_id = :tenant_id"),
-            {"tenant_id": tenant_id},
-        )
+        op.execute(sa.text(f"UPDATE {table} SET tenant_id = {legacy_tenant}"))
         op.alter_column(table, "tenant_id", nullable=False)
 
     # Revision 007 created a globally-unique index on category name. In a
