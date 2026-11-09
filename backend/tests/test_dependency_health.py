@@ -81,7 +81,7 @@ def test_slow_database_probe_does_not_block_other_requests(isolated_dependencies
             loop.call_soon_threadsafe(query_started.set)
             release_query.wait(timeout=2)
             if "alembic_version" in str(statement):
-                return isolated_dependencies
+                return isolated_dependencies.execute.return_value
 
         isolated_dependencies.execute.side_effect = blocked_query
         async with httpx.AsyncClient(
