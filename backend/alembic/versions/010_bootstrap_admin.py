@@ -10,7 +10,7 @@ It never stores the address in the repository or activity history.
 import os
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "010_bootstrap_admin"
 down_revision = "009_materials_production_costs"
@@ -22,6 +22,10 @@ def upgrade() -> None:
     email = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
     if not email:
         return
+    if context.is_offline_mode():
+        raise RuntimeError(
+            "BOOTSTRAP_ADMIN_EMAIL exige migração online; remova a variável para exportar SQL estrutural"
+        )
 
     connection = op.get_bind()
     user_id = connection.execute(

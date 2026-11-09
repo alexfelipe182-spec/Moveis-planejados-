@@ -4,8 +4,6 @@ Revision ID: 015_trial_30_days
 Revises: 014_guided_onboarding
 """
 
-from datetime import datetime, timedelta, timezone
-
 import sqlalchemy as sa
 from alembic import op
 
@@ -14,15 +12,10 @@ down_revision = "014_guided_onboarding"
 branch_labels = None
 depends_on = None
 
-TRIAL_DAYS = 30
-
-
 def upgrade():
-    connection = op.get_bind()
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    trial_end = now + timedelta(days=TRIAL_DAYS)
-
-    connection.execute(
+    # Evaluate dates when SQL is applied, not when a recovery file is exported.
+    # UTC matches the application's timezone-naive timestamp convention.
+    op.execute(
         sa.text(
             """
             INSERT INTO subscriptions (
@@ -40,10 +33,10 @@ def upgrade():
                 'manual',
                 tenants.plan_code,
                 'trialing',
-                :trial_end,
+                (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '30 days',
                 false,
-                :now,
-                :now
+                CURRENT_TIMESTAMP AT TIME ZONE 'UTC',
+                CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
             FROM tenants
             WHERE NOT EXISTS (
                 SELECT 1
@@ -52,20 +45,18 @@ def upgrade():
             )
             """
         ),
-        {"now": now, "trial_end": trial_end},
     )
 
-    connection.execute(
+    op.execute(
         sa.text(
             """
             UPDATE subscriptions
-            SET trial_end = :trial_end,
-                updated_at = :now
+            SET trial_end = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '30 days',
+                updated_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
             WHERE status = 'trialing'
               AND trial_end IS NULL
             """
         ),
-        {"now": now, "trial_end": trial_end},
     )
 
 
