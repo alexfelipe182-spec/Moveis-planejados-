@@ -32,6 +32,15 @@ def create_access_token(subject: str) -> str:
     return token
 
 
+def create_customer_access_token(subject: str) -> str:
+    token, _, _ = _create_token(
+        subject,
+        "customer_access",
+        timedelta(minutes=settings.customer_portal_session_minutes),
+    )
+    return token
+
+
 def create_refresh_token(subject: str) -> tuple[str, str, datetime]:
     return _create_token(subject, "refresh", timedelta(days=settings.refresh_token_expire_days))
 

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    customer_portal_session_minutes: int = Field(default=480, ge=15, le=1440)
     refresh_token_expire_days: int = 7
     rate_limit_per_minute: int = 120
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
