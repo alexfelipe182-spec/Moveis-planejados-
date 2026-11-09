@@ -476,3 +476,12 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
   color:#111111!important;
   border:1px solid #d8e8df!important;
 }
+
+/* Accessible login controls, including touch targets on mobile. */
+#auth-overlay .login-password-field{display:flex;align-items:stretch;gap:8px}
+#auth-overlay .login-password-field input{flex:1;min-width:0;width:0}
+#auth-overlay #toggle-login-password{flex:0 0 auto;min-width:80px;min-height:44px;padding:8px 12px;border:1px solid #087a4f;border-radius:10px;background:#fff;color:#075c3b;font:inherit;cursor:pointer}
+#auth-overlay #show-recovery{min-height:44px;padding:8px 4px;background:transparent;border:0;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+#auth-overlay #toggle-login-password:focus-visible,
+#auth-overlay #show-recovery:focus-visible{outline:3px solid #087a4f;outline-offset:3px}
+
