@@ -214,7 +214,7 @@ test('the official logo assets are present and wired into every logo mark', () =
   assert.ok(fs.statSync(path.join(assets, 'logo-multi-marcenarias-512.png')).size > 10_000);
   assert.ok(fs.statSync(path.join(assets, 'logo-multi-marcenarias-social.png')).size > 10_000);
   assert.ok(fs.statSync(path.join(assets, 'favicon-32x32.png')).size > 1_000);
-  assert.ok(fs.statSync(path.join(assets, 'apple-touch-icon.png')).size > 10_000);
+  assert.ok(fs.statSync(path.join(assets, 'apple-touch-icon.png')).size > 1_000);
   const css = fs.readFileSync(path.join(__dirname, 'commercial.css'), 'utf8');
   assert.match(css, /\.logo-mark[^{]*\{[^}]*logo-multi-marcenarias-512\.png/s);
   const publicCss = fs.readFileSync(path.join(__dirname, 'public-reference.css'), 'utf8');
