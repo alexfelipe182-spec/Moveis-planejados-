@@ -21,7 +21,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 #auth-overlay .logo-mark{
   color:transparent!important;
   background-color:#fff!important;
-  background-image:url('./assets/logo-multi-marcenarias-mark.svg')!important;
+  background-image:url('./assets/logo-multi-marcenarias-512.png?v=20261110')!important;
   background-position:center!important;
   background-repeat:no-repeat!important;
   background-size:contain!important;
@@ -31,7 +31,7 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 .reference-public-dashboard{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh;background:var(--ref-canvas)}
 .reference-public-sidebar{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:18px;padding:18px 10px 16px;background:#fff;border-right:1px solid var(--ref-line);box-shadow:3px 0 20px rgba(20,55,38,.035);z-index:3}
 .reference-public-brand{display:grid;justify-items:center;gap:8px;padding:4px 8px 12px;text-align:center;text-decoration:none}
-.reference-public-logo{display:grid;place-items:center;width:88px;height:88px;color:transparent;background:#fff url('./assets/logo-multi-marcenarias-mark.svg') center/contain no-repeat}
+.reference-public-logo{display:grid;place-items:center;width:88px;height:88px;color:transparent;background:#fff url('./assets/logo-multi-marcenarias-512.png?v=20261110') center/contain no-repeat}
 .reference-public-brand strong{display:block;color:var(--ref-ink);font-size:.92rem;line-height:1.12;letter-spacing:-.035em;white-space:nowrap}
 .reference-public-brand small{display:block;margin-top:8px;color:var(--ref-muted);font-size:.69rem;line-height:1.45}
 .reference-public-nav{display:grid;gap:3px;padding:0 6px}
