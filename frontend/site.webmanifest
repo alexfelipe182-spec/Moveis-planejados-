@@ -1,0 +1,21 @@
+{
+  "name": "Multi-Marcenarias",
+  "short_name": "Multi-Marcenarias",
+  "description": "Gestão inteligente para marcenarias.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#063e2f",
+  "icons": [
+    {
+      "src": "/assets/pwa-icon-192.png?v=20261110",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/logo-multi-marcenarias-512.png?v=20261110",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
