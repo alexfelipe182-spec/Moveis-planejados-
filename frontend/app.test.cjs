@@ -199,11 +199,11 @@ test('a network error does not automatically replay a write', async () => {
 test('the official landing page exposes the final brand, contact and canonical URL', () => {
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.match(html, /rel="canonical" href="https:\/\/multi-marcenarias\.onrender\.com\/"/);
-  assert.match(html, /rel="icon"[^>]+favicon-32x32\.png\?v=20261110/);
-  assert.match(html, /rel="apple-touch-icon"[^>]+apple-touch-icon\.png\?v=20261110/);
-  assert.match(html, /property="og:image"[^>]+logo-multi-marcenarias-social\.png/);
+  assert.match(html, /rel="icon"[^>]+m-dourado-32-v2\.png\?v=20261110m2/);
+  assert.match(html, /rel="apple-touch-icon"[^>]+m-dourado-iphone-v2\.png\?v=20261110m2/);
+  assert.match(html, /property="og:image"[^>]+m-dourado-compartilhar-v2\.png/);
   assert.match(html, /property="og:image:width" content="1200"/);
-  assert.match(html, /name="twitter:image"[^>]+logo-multi-marcenarias-social\.png/);
+  assert.match(html, /name="twitter:image"[^>]+m-dourado-compartilhar-v2\.png/);
   assert.match(html, /wa\.me\/5513981236650/);
   assert.match(html, /\+55 \(13\) 98123-6650/);
   assert.doesNotMatch(html, /multi-marcenarias-demo|multi-marcenarias-homologacao|ideal-marcenaria\.onrender\.com/i);
@@ -211,14 +211,14 @@ test('the official landing page exposes the final brand, contact and canonical U
 
 test('the official logo assets are present and wired into every logo mark', () => {
   const assets = path.join(__dirname, 'assets');
-  assert.ok(fs.statSync(path.join(assets, 'logo-multi-marcenarias-512.png')).size > 10_000);
-  assert.ok(fs.statSync(path.join(assets, 'logo-multi-marcenarias-social.png')).size > 10_000);
-  assert.ok(fs.statSync(path.join(assets, 'favicon-32x32.png')).size > 1_000);
+  assert.ok(fs.statSync(path.join(assets, 'm-dourado-512-v2.png')).size > 10_000);
+  assert.ok(fs.statSync(path.join(assets, 'm-dourado-compartilhar-v2.png')).size > 10_000);
+  assert.ok(fs.statSync(path.join(assets, 'm-dourado-32-v2.png')).size > 1_000);
   assert.ok(fs.statSync(path.join(assets, 'apple-touch-icon.png')).size > 1_000);
   const css = fs.readFileSync(path.join(__dirname, 'commercial.css'), 'utf8');
-  assert.match(css, /\.logo-mark[^{]*\{[^}]*logo-multi-marcenarias-512\.png/s);
+  assert.match(css, /\.logo-mark[^{]*\{[^}]*m-dourado-512-v2\.png/s);
   const publicCss = fs.readFileSync(path.join(__dirname, 'public-reference.css'), 'utf8');
-  assert.match(publicCss, /\.reference-public-logo[^}]+logo-multi-marcenarias-512\.png/s);
+  assert.match(publicCss, /\.reference-public-logo[^}]+m-dourado-512-v2\.png/s);
 });
 
 test('the public WhatsApp fallback uses the official business contact', () => {
