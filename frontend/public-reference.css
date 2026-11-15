@@ -485,3 +485,82 @@ body{background:var(--ref-canvas);color:var(--ref-ink)}
 #auth-overlay #toggle-login-password:focus-visible,
 #auth-overlay #show-recovery:focus-visible{outline:3px solid #087a4f;outline-offset:3px}
 
+
+/* Vitrine pública com camadas em perspectiva. */
+#public-site { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+#public-site .reference-public-hero {
+  padding: clamp(18px, 3vw, 42px);
+  border: 1px solid #c9ddd4;
+  border-radius: clamp(20px, 3vw, 38px);
+  background: radial-gradient(ellipse at 93% 0%, #c6eee0, transparent 55%), #f5faf7;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  perspective: 1150px;
+}
+#public-site .reference-public-hero-visual {
+  isolation: isolate;
+  border-radius: 24px;
+  box-shadow: 0 20px 35px #143e3240, 0 0 0 6px #bb97462b;
+  background-image: linear-gradient(160deg, #06241d00 28%, #031b15b3 100%), url('./assets/cozinha-planejada-hero.png');
+  transition: transform .35s ease, box-shadow .35s ease;
+}
+.vitrine-depth {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 450px;
+}
+.vitrine-depth span {
+  position: absolute;
+  inset: 8% 12% 34%;
+  border: 1px solid #d5ffef9e;
+  border-radius: 16px;
+  box-shadow: inset 0 0 28px #8bffd02e;
+  transform: rotateX(14deg) rotateY(-19deg) translateZ(12px);
+}
+.vitrine-depth span:nth-child(2) { transform: rotateX(14deg) rotateY(-19deg) translate3d(3%, 4%, 28px); }
+.vitrine-depth span:nth-child(3) { transform: rotateX(14deg) rotateY(-19deg) translate3d(6%, 8%, 44px); }
+#public-site .reference-public-ai-card {
+  border-color: #e4cc8d;
+  box-shadow: 0 12px 26px #04161280;
+}
+.vitrine-actions {
+  position: fixed;
+  z-index: 20;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  right: calc(14px + env(safe-area-inset-right));
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid #d8bc75;
+  border-radius: 18px;
+  background: #08271f;
+  box-shadow: 0 12px 32px #031d1855;
+}
+.vitrine-actions a, .vitrine-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+.vitrine-actions button { background: #d8bc75; color: #13271f; cursor: pointer; }
+.vitrine-actions :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  #public-site .reference-public-hero-visual:hover,
+  #public-site .reference-public-hero-visual:focus-within {
+    transform: rotateX(3deg) rotateY(-5deg) translateZ(18px);
+    box-shadow: 0 26px 42px #143e3255, 0 0 0 6px #bb974635;
+  }
+}
+@media (max-width: 480px) {
+  .vitrine-actions { left: calc(14px + env(safe-area-inset-left)); }
+  .vitrine-actions > * { flex: 1; padding-inline: 8px; }
+}
