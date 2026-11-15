@@ -170,6 +170,81 @@
   }
   window.openQuoteItems = openQuoteItems;
 
+  function addRequestDictation(requestField, modal, canStart) {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn secondary';
+    button.textContent = 'Ditar pedido';
+    const status = document.createElement('small');
+    status.setAttribute('role', 'status');
+    status.textContent = 'O navegador pode usar um serviço online para transcrever o áudio.';
+    requestField.parentElement.after(button, status);
+
+    let active = null;
+    const modalClosed = () => modal.getAttribute('aria-hidden') === 'true' || !requestField.isConnected;
+    const observer = new MutationObserver(() => {
+      if (modalClosed()) active?.abort();
+    });
+
+    button.addEventListener('click', () => {
+      if (active) {
+        active.stop();
+        button.disabled = true;
+        return;
+      }
+      if (!canStart()) return;
+
+      const recognition = new Recognition();
+      recognition.lang = 'pt-BR';
+      recognition.interimResults = false;
+      active = recognition;
+      const reset = () => {
+        active = null;
+        observer.disconnect();
+        button.disabled = false;
+        button.textContent = 'Ditar pedido';
+      };
+      recognition.onresult = event => {
+        if (modalClosed() || !canStart()) return;
+        const transcript = Array.from(event.results).slice(event.resultIndex)
+          .map(result => result[0].transcript.trim()).filter(Boolean).join(' ');
+        if (!transcript) return;
+        const previous = requestField.value.trimEnd();
+        const updated = [previous, transcript].filter(Boolean).join(' ').slice(0, requestField.maxLength);
+        if (updated !== requestField.value) {
+          requestField.value = updated;
+          requestField.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        status.textContent = updated.length === requestField.maxLength
+          ? 'O pedido atingiu o limite de texto. Revise antes de continuar.'
+          : 'Revise o texto e clique em Interpretar pedido.';
+      };
+      recognition.onerror = event => {
+        if (modalClosed()) return;
+        status.textContent = event.error === 'not-allowed' || event.error === 'service-not-allowed'
+          ? 'Permita o microfone nas configurações do navegador ou digite o pedido.'
+          : 'Não foi possível transcrever. Tente novamente ou digite o pedido.';
+      };
+      recognition.onend = () => {
+        if (status.textContent === 'Ouvindo…') status.textContent = 'Nenhum texto reconhecido. Tente novamente ou digite o pedido.';
+        reset();
+      };
+
+      try {
+        recognition.start();
+        observer.observe(modal, { attributes: true, attributeFilter: ['aria-hidden'], childList: true, subtree: true });
+        button.textContent = 'Parar ditado';
+        status.textContent = 'Ouvindo…';
+      } catch (_) {
+        reset();
+        status.textContent = 'Não foi possível iniciar o ditado. Você pode digitar o pedido.';
+      }
+    });
+  }
+
   async function openSmartQuoteCreate() {
     const customers = await api('/customers?limit=100');
     if (!customers.length) {
@@ -186,6 +261,7 @@
     const smartForm = form.querySelector('.smart-quote-create');
     const saveButton = smartForm.querySelector('[data-smart-save]');
     const resultPanel = smartForm.querySelector('#smart-quote-result');
+    addRequestDictation(field(smartForm, 'request_text'), document.querySelector('#modal'), () => !busy);
     let lastEstimate = null;
     let interpretationSource = null;
     let technicalBrief = null;
