@@ -5,6 +5,46 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8').split('function openAuth')[0];
+test('business registration stays local on every loopback host and honors an explicit API', async () => {
+  const registrationSource = fs.readFileSync(path.join(__dirname, 'saas-public.js'), 'utf8');
+  for (const hostname of ['localhost', '127.0.0.1', '[::1]']) {
+    for (const override of [undefined, 'https://sandbox.example/api/v1']) {
+      let ready;
+      let submit;
+      const calls = [];
+      const form = { addEventListener: (event, handler) => { if (event === 'submit') submit = handler; }, reset() {} };
+      const elements = {
+        '#register-form': form,
+        '#register-message': { classList: { add() {} } },
+        '#register-business-name': { value: 'Empresa ficticia' },
+        '#register-name': { value: 'Responsavel ficticio' },
+        '#register-email': { value: ' DEMO@EXAMPLE.COM ' },
+        '#register-password': { value: 'test-password-only' },
+        '#register-plan': { value: 'starter' },
+      };
+      const context = {
+        window: { API_BASE_URL: override }, location: { hostname, search: '' }, URLSearchParams,
+        MutationObserver: class { observe() {} }, setTimeout() {},
+        document: {
+          addEventListener: (event, handler) => { if (event === 'DOMContentLoaded') ready = handler; },
+          querySelector: selector => selector.startsWith('script[') ? {} : elements[selector] || null,
+          querySelectorAll: () => [],
+        },
+        fetch: async (url, options) => {
+          calls.push({ url, options });
+          return { ok: true, json: async () => ({}) };
+        },
+      };
+      vm.runInNewContext(registrationSource, context);
+      ready();
+      await submit({ currentTarget: form, preventDefault() {}, stopImmediatePropagation() {} });
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, `${override || `http://${hostname}:8000/api/v1`}/auth/register-business`);
+      assert.equal(calls[0].options.method, 'POST');
+      assert.equal(JSON.parse(calls[0].options.body).email, 'demo@example.com');
+    }
+  }
+});
 test('loopback previews use a local API and explicit configuration takes precedence', () => {
   const declaration = source.split('\n')[0];
   for (const hostname of ['localhost', '127.0.0.1', '[::1]']) {
