@@ -1,6 +1,7 @@
 # Validação local de entrega
 
-Requisitos: Git, Python 3.12 e Docker com containers Linux. Execute na raiz:
+Requisitos: Git, Python 3.12 e Docker com containers Linux. Confirme primeiro
+que o daemon está disponível com `docker version`. Execute na raiz:
 
 ```powershell
 python scripts/validate_isolated.py
@@ -17,6 +18,10 @@ O PostgreSQL usa tmpfs. A execução não usa volumes ou bancos preexistentes.
 A cópia temporária contém somente arquivos já rastreados pelo Git e arquivos de
 contrato; arquivos locais não rastreados nunca são copiados. `.env` e variantes são excluídos. Apenas `.env.production.example`
 é copiado como texto de referência e nunca carregado pela aplicação.
+A pasta `database` também é copiada: o teste de recuperação compara o SQL
+gerado pelas migrations com `database/multi_marcenarias_postgresql.sql`.
+Arquivos novos de uma correção precisam estar rastreados antes da validação;
+use `git add caminho/do/arquivo` somente após revisar cada arquivo.
 O contexto enviado ao build da imagem contém somente o Dockerfile temporário e
 `backend/requirements.txt`, mesmo quando o daemon Docker é remoto.
 O processo Python do container começa com `env -i` e configurações de teste
@@ -45,6 +50,16 @@ encontram cadastros de rodadas anteriores porque cada rodada ganha banco novo.
 Não rode pytest diretamente contra um banco usado por pessoas. O conftest
 rejeita ambiente diferente de test e hosts externos, mas um endereço local
 sozinho não comprova que um banco é descartável: use o executor.
+
+Sem Docker, é possível verificar apenas a preparação da cópia, sem importar
+a aplicação, carregar `.env` ou acessar PostgreSQL/Redis:
+
+```powershell
+python -I backend/tests/test_validation_runner.py
+```
+
+Esse teste verifica a presença do SQL de recuperação e a exclusão de arquivos
+`.env` e material não rastreado. Ele não substitui a suíte completa acima.
 
 Ao terminar, mesmo com falha, o executor tenta remover independentemente todos os
 IDs dos containers criados por ele, seus volumes anônimos, sua rede e sua tag de

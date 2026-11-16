@@ -27,6 +27,22 @@ def cleanup(*args):
         print(f"Cleanup warning ({' '.join(args)}): {detail}", file=sys.stderr, flush=True)
 
 
+def stage_sources(staging: Path) -> None:
+    # Copy only files already tracked by Git; untracked local material may contain secrets.
+    files = run("git", "ls-files", "-z", "--cached", capture=True)
+    for relative in files.split("\0"):
+        path = Path(relative)
+        if not relative or (relative != ".env.production.example" and any(part.startswith(".env") for part in path.parts)):
+            continue
+        if path.parts[0] not in {"backend", "frontend", "scripts", "tests", ".github", "docs", "database"} and relative not in {"frontend_server.py", "requirements-frontend.txt", "render.yaml", ".env.production.example"}:
+            continue
+        source = ROOT / path
+        if source.is_file():
+            target = staging / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", help="Existing Python 3.12 image with requirements and pytest-cov")
@@ -39,19 +55,7 @@ def main():
     print(f"Execution: {name}", flush=True)
     with tempfile.TemporaryDirectory(prefix=name + "-") as temporary:
         staging = Path(temporary)
-        # Copy only files already tracked by Git; untracked local material may contain secrets.
-        files = run("git", "ls-files", "-z", "--cached", capture=True)
-        for relative in files.split("\0"):
-            path = Path(relative)
-            if not relative or (relative != ".env.production.example" and any(part.startswith(".env") for part in path.parts)):
-                continue
-            if path.parts[0] not in {"backend", "frontend", "scripts", "tests", ".github", "docs"} and relative not in {"frontend_server.py", "requirements-frontend.txt", "render.yaml", ".env.production.example"}:
-                continue
-            source = ROOT / path
-            if source.is_file():
-                target = staging / path
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(source, target)
+        stage_sources(staging)
         try:
             if not args.image:
                 build_context = staging / ".validation-image"
