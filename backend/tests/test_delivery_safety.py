@@ -77,3 +77,69 @@ def test_password_reset_expiration_replacement_and_production_privacy(monkeypatc
         assert known.status_code == unknown.status_code == 200
         assert known.json() == unknown.json()
         assert "debug_token" not in known.json()
+
+
+def test_partial_customer_and_product_edits_preserve_saved_fields():
+    email = f"crud-delivery-{uuid4().hex}@example.com"
+    with TestClient(app) as client:
+        registered = client.post("/api/v1/auth/register-business", json={
+            "business_name": "Marcenaria ficticia", "owner_name": "Responsavel ficticio",
+            "email": email, "password": "Senha-Forte-123!",
+        })
+        assert registered.status_code == 201, registered.text
+        assert client.post("/api/v1/auth/login", data={
+            "username": email, "password": "Senha-Forte-123!",
+        }).status_code == 200
+        headers = {"X-CSRF-Token": client.cookies["csrf_token"]}
+        customer = client.post("/api/v1/customers", headers=headers, json={
+            "name": "Cliente ficticio", "email": email, "phone": "11999999999",
+            "address": "Endereco demonstrativo",
+        })
+        assert customer.status_code == 201, customer.text
+        customer_path = f"/api/v1/customers/{customer.json()['id']}"
+        edited = client.put(customer_path, headers=headers, json={"name": "Cliente editado"})
+        assert edited.status_code == 200, edited.text
+        assert client.get(customer_path).json() == customer.json() | {"name": "Cliente editado"}
+        cleared = client.put(customer_path, headers=headers, json={"phone": None})
+        assert cleared.status_code == 200, cleared.text
+        assert client.get(customer_path).json() == customer.json() | {"name": "Cliente editado", "phone": None}
+
+        category = client.post("/api/v1/categories", headers=headers, json={"name": "Demonstracao"})
+        assert category.status_code == 201, category.text
+        product = client.post("/api/v1/products", headers=headers, json={
+            "category_id": category.json()["id"], "name": "Armario ficticio",
+            "description": "Produto demonstrativo", "price": "100.00", "is_active": True,
+        })
+        assert product.status_code == 201, product.text
+        product_path = f"/api/v1/products/{product.json()['id']}"
+        edited = client.put(product_path, headers=headers, json={"description": "Descricao editada"})
+        assert edited.status_code == 200, edited.text
+        assert client.get(product_path).json() == product.json() | {"description": "Descricao editada"}
+
+
+def test_product_image_url_is_saved_and_can_be_cleared():
+    email = f"image-delivery-{uuid4().hex}@example.com"
+    with TestClient(app) as client:
+        assert client.post("/api/v1/auth/register-business", json={
+            "business_name": "Marcenaria ficticia", "owner_name": "Responsavel ficticio",
+            "email": email, "password": "Senha-Forte-123!",
+        }).status_code == 201
+        assert client.post("/api/v1/auth/login", data={
+            "username": email, "password": "Senha-Forte-123!",
+        }).status_code == 200
+        headers = {"X-CSRF-Token": client.cookies["csrf_token"]}
+        category = client.post("/api/v1/categories", headers=headers, json={"name": "Demonstracao"})
+        assert category.status_code == 201
+        product = client.post("/api/v1/products", headers=headers, json={
+            "category_id": category.json()["id"], "name": "Armario ficticio", "price": "100.00",
+            "image_url": "https://example.com/armario.png",
+        })
+        assert product.status_code == 201, product.text
+        path = f"/api/v1/products/{product.json()['id']}"
+        assert client.get(path).json()["image_url"] == "https://example.com/armario.png"
+        changed = client.put(path, headers=headers, json={"image_url": "https://example.com/novo.png"})
+        assert changed.status_code == 200, changed.text
+        assert client.get(path).json()["image_url"] == "https://example.com/novo.png"
+        cleared = client.put(path, headers=headers, json={"image_url": None})
+        assert cleared.status_code == 200, cleared.text
+        assert client.get(path).json()["image_url"] is None
