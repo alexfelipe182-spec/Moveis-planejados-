@@ -225,7 +225,7 @@ jobs:
         run: node --test frontend/*.test.cjs
       - name: HTML assets
         run: |
-          grep -q '<script src="./app.js"></script>' frontend/index.html
+          grep -Eq '<script src="\./app\.js(\?v=[^"]+)?"></script>' frontend/index.html
           grep -q '<script src="./smart-quotes.js"></script>' frontend/index.html
           grep -q '<script src="./quote-decisions.js"></script>' frontend/index.html
           grep -q '<script src="./quote-proposal.js"></script>' frontend/index.html
