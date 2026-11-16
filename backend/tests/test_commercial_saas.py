@@ -379,3 +379,28 @@ def test_signed_subscription_webhook_updates_tenant_plan_and_trial_deadline():
         assert billing.json()["subscription"]["provider"] == "stripe"
         assert billing.json()["subscription"]["status"] == "trialing"
         assert billing.json()["subscription"]["trial_days_remaining"] in {9, 10}
+
+
+def test_management_keeps_business_data_scoped_and_platform_data_owner_only(monkeypatch):
+    owner_email = "management.platform@example.com"
+    monkeypatch.setenv("PLATFORM_OWNER_EMAILS", owner_email)
+    with TestClient(app) as owner:
+        register_and_login(owner, owner_email)
+        created = owner.post(
+            "/api/v1/customers", json={"name": "Cliente privado da gestão"}, headers=csrf_headers(owner)
+        )
+        assert created.status_code == 201, created.text
+        assert owner.get("/api/v1/admin/management").json()["customers"] == 1
+        assert owner.get("/api/v1/platform/access").json()["is_platform_owner"] is True
+
+        with TestClient(app) as business:
+            register_and_login(business, "management.business@example.com")
+            response = business.get("/api/v1/admin/management")
+            assert response.status_code == 200, response.text
+            assert response.json()["customers"] == 0
+            assert business.get("/api/v1/platform/access").json()["is_platform_owner"] is False
+            assert business.get("/api/v1/platform/dashboard").status_code == 403
+
+        response = owner.get("/api/v1/platform/dashboard")
+        assert response.status_code == 200, response.text
+        assert response.json()["subscription_statuses"]["trialing"] >= 2

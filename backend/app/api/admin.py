@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -32,6 +35,39 @@ def dashboard(current_user: User = Depends(require_admin), db: Session = Depends
             "projects": db.scalar(select(func.count()).select_from(Project)) or 0,
         },
         "recent_activities": [ActivityRead.model_validate(item).model_dump(mode="json") for item in recent],
+    }
+
+
+@router.get("/management")
+def management(current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    tenant_id = current_user.tenant_id
+    today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    end = today + timedelta(days=30)
+    schedule = db.execute(
+        select(Project.name, Project.project_date, Project.status)
+        .where(
+            Project.tenant_id == tenant_id,
+            Project.project_date.between(today, end),
+            Project.status.not_in(("cancelled", "completed", "delivered")),
+        )
+        .order_by(Project.project_date, Project.id)
+        .limit(51)
+    ).mappings().all()
+    quotes = db.execute(
+        select(Quote.status, func.count(), func.coalesce(func.sum(Quote.total), 0))
+        .where(Quote.tenant_id == tenant_id)
+        .group_by(Quote.status)
+    ).all()
+    return {
+        "today": today,
+        "end": end,
+        "customers": db.scalar(select(func.count(Customer.id)).where(Customer.tenant_id == tenant_id)),
+        "schedule": [dict(project) for project in schedule[:50]],
+        "schedule_truncated": len(schedule) > 50,
+        "quotes": [
+            {"status": status, "count": count, "total": str(total)}
+            for status, count, total in quotes
+        ],
     }
 
 
