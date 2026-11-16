@@ -140,13 +140,13 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
   });
 
   await test.step('Sair e voltar ao login', async () => {
-    await Promise.all([
-      page.waitForEvent('domcontentloaded'),
-      apiAction(page, 'POST', '/auth/logout', () => page.locator('#logout').click()),
-    ]);
+    await page.locator('#logout').click();
     // O logout atual recarrega a página pública. O formulário abre pelo botão Entrar.
     await expect(page.locator('#admin-app')).toBeHidden();
     await expect(page.locator('#open-login').filter({ visible: true })).toBeVisible();
+    await expect.poll(async () => (await context.cookies()).filter(cookie =>
+      ['access_token', 'refresh_token'].includes(cookie.name),
+    )).toHaveLength(0);
   });
 
   await test.step('Entrar novamente', () => login(page));
