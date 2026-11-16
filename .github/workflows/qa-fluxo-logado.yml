@@ -1,0 +1,93 @@
+name: QA do fluxo logado
+on:
+  push:
+    branches: [qa/fluxo-logado-playwright]
+permissions:
+  contents: read
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marcenaria_qa
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/marcenaria_qa
+      REDIS_URL: redis://127.0.0.1:6379/0
+      ENVIRONMENT: test
+      SECRET_KEY: chave-local-temporaria-para-qa-do-fluxo
+      E2E_BASE_URL: http://localhost:3000
+      E2E_API_URL: http://localhost:8000
+      E2E_EMAIL: administrador-qa@example.com
+      E2E_PASSWORD: Marcenaria-QA-temporaria-2026!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências
+        run: |
+          python -m pip install -r backend/requirements.txt -r requirements-frontend.txt
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Iniciar serviços e rodar Playwright
+        run: |
+          set -euo pipefail
+          (cd backend && alembic upgrade head)
+          python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 > api-qa.log 2>&1 &
+          api_pid=$!
+          python -m uvicorn frontend_server:app --host 127.0.0.1 --port 3000 > frontend-qa.log 2>&1 &
+          frontend_pid=$!
+          trap 'kill "$api_pid" "$frontend_pid" 2>/dev/null || true' EXIT
+
+          curl -fsS --retry 20 --retry-connrefused http://localhost:8000/ready
+          curl -fsS --retry 20 --retry-connrefused http://localhost:3000/ -o /dev/null
+
+          node <<'JS'
+          const api = process.env.E2E_API_URL + '/api/v1';
+          async function post(path, body, token) {
+            const res = await fetch(api + path, {
+              method: 'POST',
+              headers: {
+                'Content-Type': body instanceof URLSearchParams ? 'application/x-www-form-urlencoded' : 'application/json',
+                ...(token ? { Authorization: 'Bearer ' + token } : {}),
+              },
+              body: body instanceof URLSearchParams ? body : JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error(path + ': HTTP ' + res.status());
+            return res.json();
+          }
+          (async () => {
+            const { E2E_EMAIL: email, E2E_PASSWORD: password } = process.env;
+            await post('/auth/register-business', {
+              business_name: 'Marcenaria QA', owner_name: 'Administrador QA', email, password,
+            });
+            const { access_token } = await post('/auth/login', new URLSearchParams({ username: email, password }));
+            if (!access_token) throw new Error('Login de preparação retornou sem token.');
+            await post('/categories', { name: 'Categoria QA' }, access_token);
+          })().catch(error => { console.error(error.message); process.exitCode = 1; });
+          JS
+
+          npx playwright test tests/e2e/fluxo-logado.spec.cjs --workers=1 --reporter=list
+      - name: Guardar logs em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-fluxo-logado-logs
+          path: |
+            api-qa.log
+            frontend-qa.log
+            test-results/
