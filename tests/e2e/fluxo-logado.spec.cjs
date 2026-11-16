@@ -21,7 +21,7 @@ async function apiAction(page, method, path, click) {
       return url.origin === apiOrigin &&
         url.pathname === '/api/v1' + path &&
         res.request().method() === method;
-    }),
+    }, { timeout: 15000 }),
     click(),
   ]);
   expect(response.ok(), method + ' ' + path + ' retornou HTTP ' + response.status()).toBe(true);
@@ -103,7 +103,6 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
     await category.selectOption(await options.first().getAttribute('value'));
     await modal.getByLabel('Nome', { exact: true }).fill(productName);
     await modal.getByLabel('Valor', { exact: true }).fill(price.toFixed(2));
-    await modal.locator('input[name="image_url"]').fill(new URL('/assets/cozinha-planejada-hero.png', site).href);
     const response = await apiAction(page, 'POST', '/products',
       () => modal.getByRole('button', { name: 'Cadastrar', exact: true }).click());
     await expect(modal).toBeHidden();
