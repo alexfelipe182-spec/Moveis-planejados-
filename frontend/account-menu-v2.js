@@ -39,6 +39,11 @@
       #mm-account-menu button{width:100%;border:0;background:transparent;border-radius:10px;padding:10px 12px;text-align:left;color:#102119;font:inherit;font-weight:700;cursor:pointer}
       #mm-account-menu button:hover,#mm-account-menu button:focus-visible{background:#eef8f2;outline:none}
       #mm-account-menu button[data-danger="true"]{color:#9b2c2c}
+      #account-settings .mm-trial-exit{margin-top:22px;padding-top:20px;border-top:1px solid rgba(13,89,61,.14)}
+      #account-settings .mm-trial-exit p{margin:8px 0 14px;color:#53655a}
+      #account-settings .mm-trial-exit button{border-color:#a64242;color:#8b2828}
+      #account-settings .mm-trial-exit button:hover{background:#fff2f2}
+      #account-settings .mm-trial-exit button:disabled{opacity:.65;cursor:wait}
 
       #admin-app .smart-result-card strong,
       #admin-app .smart-quote-grid strong{
@@ -113,10 +118,43 @@
           <button id="settings-logout" class="btn secondary" type="button">↪ Sair da conta</button>
           <button id="settings-dashboard" class="btn secondary" type="button">⌂ Voltar ao Dashboard</button>
         </div>
+        <div id="settings-trial-exit" class="mm-trial-exit" hidden></div>
       </div>`;
     $('#settings-relogin')?.addEventListener('click', () => performLogout(true));
     $('#settings-logout')?.addEventListener('click', () => performLogout(false));
     $('#settings-dashboard')?.addEventListener('click', () => window.showSection?.('dashboard'));
+    loadTrialExit();
+  }
+
+  async function loadTrialExit() {
+    const container = $('#settings-trial-exit');
+    if (!container || typeof window.api !== 'function') return;
+    try {
+      const data = await window.api('/billing/subscription');
+      if (!container.isConnected || !data?.can_cancel_trial) return;
+      container.hidden = false;
+      container.innerHTML = '<h3>Desistir do teste grátis</h3><p>Encerra o acesso da marcenaria agora e impede a cobrança futura deste teste. Seus dados ficam preservados.</p><button id="settings-cancel-trial" class="btn secondary" type="button">Desistir do teste grátis</button><p id="settings-cancel-result" role="status" aria-live="polite"></p>';
+      $('#settings-cancel-trial')?.addEventListener('click', cancelTrial);
+    } catch (_) {
+      // O controle aparece apenas para administradores com teste ativo.
+    }
+  }
+
+  async function cancelTrial(event) {
+    if (!window.confirm('Deseja encerrar agora o teste grátis da sua marcenaria? O acesso será interrompido e esta assinatura não será cobrada.')) return;
+    const button = event.currentTarget;
+    const result = $('#settings-cancel-result');
+    button.disabled = true;
+    button.textContent = 'Encerrando teste...';
+    try {
+      await window.api('/billing/cancel-trial', { method: 'POST', body: { confirmation: 'DESISTIR' } });
+      button.remove();
+      result.textContent = 'Teste grátis encerrado. Esta assinatura não terá cobrança futura. Seus dados foram preservados.';
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = 'Desistir do teste grátis';
+      result.textContent = error?.message || 'Não foi possível encerrar o teste. Tente novamente.';
+    }
   }
 
   function showSettings() {

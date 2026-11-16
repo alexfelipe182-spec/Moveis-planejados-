@@ -241,12 +241,21 @@ def _subscription_changed(db: Session, job: AutomationJob) -> None:
     subscription = db.scalar(select(Subscription).where(Subscription.tenant_id == job.tenant_id).with_for_update())
     if subscription is None:
         raise PermanentAutomationError("invalid_subscription")
-    if subscription.provider_subscription_id and subscription.provider_subscription_id != data.subscription_id:
+    resubscribing = (
+        subscription.status == "canceled"
+        and subscription.provider_subscription_id != data.subscription_id
+        and data.status in {"active", "trialing"}
+        and (not subscription.provider_customer_id or subscription.provider_customer_id == data.customer_id)
+    )
+    if subscription.provider_subscription_id and subscription.provider_subscription_id != data.subscription_id and not resubscribing:
         # A second provider subscription must be reconciled, never overwrite billing silently.
         raise PermanentAutomationError("subscription_conflict")
     if subscription.provider_customer_id and subscription.provider_customer_id != data.customer_id:
         raise PermanentAutomationError("customer_conflict")
     if data.event_created < subscription.provider_event_created:
+        return
+    if subscription.status == "canceled" and subscription.provider_subscription_id == data.subscription_id and data.status != "canceled":
+        # Eventos anteriores ao cancelamento podem chegar fora de ordem.
         return
     subscription.provider = "stripe"
     subscription.provider_subscription_id = data.subscription_id

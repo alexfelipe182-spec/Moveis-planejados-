@@ -28,6 +28,10 @@ class CheckoutRequest(BaseModel):
     plan_code: str
 
 
+class CancelTrialRequest(BaseModel):
+    confirmation: str
+
+
 class OnboardingUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=160)
     phone: str | None = Field(default=None, max_length=40)
@@ -167,7 +171,50 @@ def update_onboarding(
 def subscription_status(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     tenant = _tenant(db, current_user)
     subscription = db.scalar(select(Subscription).where(Subscription.tenant_id == tenant.id))
-    return _subscription_payload(subscription, tenant) | {"usage": usage_snapshot(db, tenant)}
+    return _subscription_payload(subscription, tenant) | {
+        "usage": usage_snapshot(db, tenant),
+        "can_cancel_trial": current_user.is_admin and effective_subscription_status(subscription) == "trialing",
+    }
+
+
+@router.post("/billing/cancel-trial", dependencies=[Depends(require_cookie_csrf)])
+def cancel_trial(
+    payload: CancelTrialRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    if payload.confirmation != "DESISTIR":
+        raise HTTPException(status_code=422, detail="Confirme a desistência para encerrar o teste grátis")
+    tenant = _tenant(db, current_user)
+    subscription = db.scalar(
+        select(Subscription).where(Subscription.tenant_id == tenant.id).with_for_update()
+    )
+    if subscription is None or effective_subscription_status(subscription) != "trialing":
+        raise HTTPException(status_code=409, detail="Não há teste grátis ativo para encerrar")
+
+    if subscription.provider == "stripe":
+        if not subscription.provider_subscription_id:
+            raise HTTPException(status_code=409, detail="Assinatura Stripe ainda não disponível para cancelamento")
+        secret = _stripe_secret()
+        try:
+            response = httpx.delete(
+                f"https://api.stripe.com/v1/subscriptions/{subscription.provider_subscription_id}",
+                data={"invoice_now": "false", "prorate": "false"},
+                headers={"Authorization": f"Bearer {secret}"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            canceled = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise HTTPException(status_code=502, detail="Não foi possível confirmar o cancelamento no Stripe") from exc
+        if canceled.get("id") != subscription.provider_subscription_id or canceled.get("status") != "canceled":
+            raise HTTPException(status_code=502, detail="O Stripe não confirmou o cancelamento")
+        subscription.provider_event_created = max(subscription.provider_event_created, int(time.time()))
+
+    subscription.status = "canceled"
+    subscription.cancel_at_period_end = False
+    db.commit()
+    return {"status": "canceled", "access_allowed": False}
 
 
 @router.post("/billing/checkout", dependencies=[Depends(require_cookie_csrf)])
@@ -208,6 +255,9 @@ def create_checkout(
         "subscription_data[metadata][tenant_id]": str(tenant.id),
         "subscription_data[metadata][plan_code]": payload.plan_code,
     }
+    if existing_status == "canceled" and existing and existing.provider_customer_id:
+        form.pop("customer_email")
+        form["customer"] = existing.provider_customer_id
     if existing and existing_status == "trialing" and existing.trial_end:
         remaining_seconds = (existing.trial_end - datetime.now(timezone.utc).replace(tzinfo=None)).total_seconds()
         if remaining_seconds >= 48 * 3600:

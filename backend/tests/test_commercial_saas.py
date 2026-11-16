@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+import httpx
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
@@ -53,6 +54,7 @@ def test_plan_catalog_subscription_usage_and_guided_onboarding():
         assert payload["subscription"]["provider"] == "manual"
         assert payload["subscription"]["trial_end"] is not None
         assert payload["trial_days_remaining"] == 30
+        assert payload["can_cancel_trial"] is True
         assert payload["usage"]["limits"]["users"] == 3
 
         onboarding = client.get("/api/v1/onboarding")
@@ -144,6 +146,82 @@ def test_checkout_requires_billing_configuration():
                 headers=csrf_headers(client),
             )
         assert response.status_code == 503
+
+
+def test_owner_can_desist_from_manual_trial_without_deleting_account():
+    with TestClient(app) as client:
+        register_and_login(client, "trial.desist.manual@example.com")
+        missing_confirmation = client.post(
+            "/api/v1/billing/cancel-trial", json={"confirmation": ""}, headers=csrf_headers(client)
+        )
+        assert missing_confirmation.status_code == 422
+
+        canceled = client.post(
+            "/api/v1/billing/cancel-trial", json={"confirmation": "DESISTIR"}, headers=csrf_headers(client)
+        )
+        assert canceled.status_code == 200, canceled.text
+        assert canceled.json() == {"status": "canceled", "access_allowed": False}
+        assert client.get("/api/v1/billing/subscription").json()["subscription"]["status"] == "canceled"
+        assert client.get("/api/v1/billing/subscription").json()["can_cancel_trial"] is False
+        assert client.get("/api/v1/me").status_code == 200
+        assert client.get("/api/v1/admin/dashboard").status_code == 402
+        assert client.post(
+            "/api/v1/billing/cancel-trial", json={"confirmation": "DESISTIR"}, headers=csrf_headers(client)
+        ).status_code == 409
+
+
+def test_stripe_trial_is_canceled_at_provider_before_access_is_closed():
+    email = "trial.desist.stripe@example.com"
+    with TestClient(app) as client:
+        register_and_login(client, email)
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == email).one()
+            subscription = db.query(Subscription).filter(Subscription.tenant_id == user.tenant_id).one()
+            subscription.provider = "stripe"
+            subscription.provider_customer_id = "cus_desist_test"
+            subscription.provider_subscription_id = "sub_desist_test"
+            db.commit()
+
+        stripe_response = type("StripeResponse", (), {
+            "raise_for_status": lambda self: None,
+            "json": lambda self: {"id": "sub_desist_test", "status": "canceled"},
+        })()
+        with (
+            patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test_mock_only_not_real"}),
+            patch("app.api.commercial.httpx.delete", return_value=stripe_response) as stripe_delete,
+        ):
+            canceled = client.post(
+                "/api/v1/billing/cancel-trial", json={"confirmation": "DESISTIR"}, headers=csrf_headers(client)
+            )
+        assert canceled.status_code == 200, canceled.text
+        assert stripe_delete.call_args.args[0].endswith("/sub_desist_test")
+        assert stripe_delete.call_args.kwargs["data"] == {"invoice_now": "false", "prorate": "false"}
+        assert client.get("/api/v1/billing/subscription").json()["subscription"]["status"] == "canceled"
+
+
+def test_stripe_error_keeps_trial_active_and_does_not_claim_cancellation():
+    email = "trial.desist.stripe.error@example.com"
+    with TestClient(app) as client:
+        register_and_login(client, email)
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == email).one()
+            subscription = db.query(Subscription).filter(Subscription.tenant_id == user.tenant_id).one()
+            subscription.provider = "stripe"
+            subscription.provider_customer_id = "cus_desist_error"
+            subscription.provider_subscription_id = "sub_desist_error"
+            db.commit()
+
+        with (
+            patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test_mock_only_not_real"}),
+            patch("app.api.commercial.httpx.delete", side_effect=httpx.ConnectError("offline")),
+        ):
+            response = client.post(
+                "/api/v1/billing/cancel-trial", json={"confirmation": "DESISTIR"}, headers=csrf_headers(client)
+            )
+        assert response.status_code == 502
+        billing = client.get("/api/v1/billing/subscription").json()
+        assert billing["subscription"]["status"] == "trialing"
+        assert billing["can_cancel_trial"] is True
 
 
 def test_checkout_creates_stripe_session_without_exposing_secret_and_preserves_trial():

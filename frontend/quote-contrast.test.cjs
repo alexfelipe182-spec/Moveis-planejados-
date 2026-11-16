@@ -10,5 +10,5 @@ test('smart quote values use forced dark text in the light interface', () => {
   assert.match(accountMenu, /#admin-app \.smart-quote-grid strong\{[\s\S]*color:#111111!important;[\s\S]*-webkit-text-fill-color:#111111!important;/);
   assert.match(accountMenu, /#admin-app \.smart-result-card strong,[\s\S]*#admin-app \.smart-quote-grid strong/);
   assert.match(accountMenu, /body\.dark #admin-app \.smart-quote-grid strong[\s\S]*-webkit-text-fill-color:#f8fafc!important;/);
-  assert.match(loader, /account-menu-v2\.js\?v=20260908-contrast-1/);
+  assert.match(loader, /account-menu-v2\.js\?v=20261116cancel1/);
 });
