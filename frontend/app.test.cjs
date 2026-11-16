@@ -209,6 +209,21 @@ test('the official landing page exposes the final brand, contact and canonical U
   assert.doesNotMatch(html, /multi-marcenarias-demo|multi-marcenarias-homologacao|ideal-marcenaria\.onrender\.com/i);
 });
 
+test('the public showcase includes the cinematic room on desktop and mobile', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, 'public-reference.css'), 'utf8');
+  const image = path.join(__dirname, 'assets', 'sala-cinematica-multi.webp');
+  assert.match(html, /class="mm-cinematic" id="demonstracao"/);
+  assert.match(html, /id="mm-cinematic-replay"/);
+  assert.match(html, /sala-cinematica-multi\.webp/);
+  assert.match(html, /Visualização conceitual/);
+  assert.ok(fs.statSync(image).size > 50_000);
+  assert.ok(fs.statSync(image).size < 500_000);
+  assert.match(css, /\.mm-cinematic-head[\s\S]*grid-template-columns/);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.mm-cinematic-head/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
 test('the official logo assets are present and wired into every logo mark', () => {
   const assets = path.join(__dirname, 'assets');
   assert.ok(fs.statSync(path.join(assets, 'm-dourado-512-v2.png')).size > 10_000);
