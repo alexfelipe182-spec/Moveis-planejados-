@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 import json
 
 from fastapi.testclient import TestClient
@@ -14,7 +16,7 @@ def csrf_headers(client):
 
 def test_quote_creation_end_to_end_persists_analysis_and_automation():
     client = TestClient(app)
-    email = "quote.e2e.admin@example.com"
+    email = unique_email("quote.e2e.admin@example.com")
     password = "Senha-Forte-123!"
 
     registered = client.post(
@@ -36,7 +38,7 @@ def test_quote_creation_end_to_end_persists_analysis_and_automation():
 
     customer = client.post(
         "/api/v1/customers",
-        json={"name": "Cliente E2E", "email": "cliente.e2e@example.com", "phone": "+5513999999999"},
+        json={"name": "Cliente E2E", "email": unique_email("cliente.e2e@example.com"), "phone": "+5513999999999"},
         headers=csrf_headers(client),
     )
     assert customer.status_code == 201

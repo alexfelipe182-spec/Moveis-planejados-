@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -56,9 +58,9 @@ def create_team_user(client, *, name: str, email: str, password: str):
 
 def test_admin_user_management_guards_and_update(client):
     password = "Senha-Forte-123!"
-    admin_email = "admin.management@example.com"
-    target_email = "target.management@example.com"
-    duplicate_email = "duplicate.management@example.com"
+    admin_email = unique_email("admin.management@example.com")
+    target_email = unique_email("target.management@example.com")
+    duplicate_email = unique_email("duplicate.management@example.com")
 
     register(client, name="Admin Management", email=admin_email, password=password)
     admin_id = promote_to_admin(admin_email)
@@ -123,16 +125,16 @@ def test_admin_user_management_guards_and_update(client):
 
     updated = client.patch(
         f"/api/v1/admin/users/{target_id}",
-        json={"name": "Target Updated", "email": "TARGET.UPDATED@EXAMPLE.COM"},
+        json={"name": "Target Updated", "email": unique_email("TARGET.UPDATED@EXAMPLE.COM")},
         headers=csrf_headers(client),
     )
     assert updated.status_code == 200
     body = updated.json()
     assert body["name"] == "Target Updated"
-    assert body["email"] == "target.updated@example.com"
+    assert body["email"] == unique_email("target.updated@example.com")
 
     refreshed_users = client.get("/api/v1/admin/users")
     assert refreshed_users.status_code == 200
     refreshed = next(user for user in refreshed_users.json() if user["id"] == target_id)
     assert refreshed["name"] == "Target Updated"
-    assert refreshed["email"] == "target.updated@example.com"
+    assert refreshed["email"] == unique_email("target.updated@example.com")

@@ -30,6 +30,8 @@ def cleanup(*args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", help="Existing Python 3.12 image with requirements and pytest-cov")
+    parser.add_argument("--repeat-backend", action="store_true",
+                        help="Run backend tests twice against this execution's disposable database")
     args = parser.parse_args()
     name = "mm-validation-" + uuid.uuid4().hex[:12]
     created = []
@@ -45,7 +47,7 @@ def main():
             path = Path(relative)
             if not relative or (relative != ".env.production.example" and any(part.startswith(".env") for part in path.parts)):
                 continue
-            if path.parts[0] not in {"backend", "frontend", "scripts", "tests", ".github", "docs"} and relative not in {"frontend_server.py", "requirements-frontend.txt", "render.yaml", ".env.production.example"}:
+            if path.parts[0] not in {"backend", "frontend", "scripts", "tests", ".github", "docs", "database"} and relative not in {"frontend_server.py", "requirements-frontend.txt", "render.yaml", ".env.production.example"}:
                 continue
             source = ROOT / path
             if source.is_file():
@@ -94,7 +96,8 @@ def main():
                 "ENVIRONMENT=test", "DATABASE_URL=postgresql+psycopg://postgres:isolated-test-only@postgres:5432/mm_validation",
                 "REDIS_URL=redis://redis:6379/0", "SECRET_KEY=" + secrets.token_urlsafe(32),
                 "OPENAI_ENABLED=true", "OPENAI_API_DISABLED=true", "OPENAI_API_KEY=",
-                "RATE_LIMIT_PER_MINUTE=120", "python", "/workspace/scripts/validation_gates.py")
+                "RATE_LIMIT_PER_MINUTE=120", "python", "/workspace/scripts/validation_gates.py",
+                "--runs", "2" if args.repeat_backend else "1")
             run("docker", "run", "--rm", "--network", "none",
                 "--mount", f"type=bind,src={staging},dst=/workspace,readonly",
                 "--workdir", "/workspace/frontend", "node:22-alpine", "sh", "-ec",

@@ -40,8 +40,22 @@ mock. `OPENAI_ENABLED=true` permite os cenários positivos com mock, enquanto
 `OPENAI_API_DISABLED=true` e chave vazia mantêm o comportamento padrão local.
 Não configure `OPENAI_ENABLED=false` globalmente para essa suíte.
 
-Repita o comando para uma nova rodada. Os e-mails fixos dos testes nunca
-encontram cadastros de rodadas anteriores porque cada rodada ganha banco novo.
+Repita o comando para uma nova rodada com banco e Redis novos. Para conferir
+também que cadastros anteriores não impedem repetir o backend, execute:
+
+```powershell
+python scripts/validate_isolated.py --repeat-backend
+```
+
+Essa opção executa a suíte backend duas vezes, em processos pytest distintos,
+no mesmo banco temporário da chamada, sem apagar os dados entre as duas passagens.
+Cada passagem mantém o gate de cobertura de 80%. Os endereços de teste recebem
+um sufixo por processo; cadastro, login e assertions continuam usando o mesmo
+endereço dentro de cada cenário, inclusive nas verificações de duplicidade.
+O frontend e a auditoria de dependências são executados depois das duas passagens.
+O arquivo versionado `database/multi_marcenarias_postgresql.sql` acompanha a
+cópia isolada para validar a recuperação do schema.
+
 Não rode pytest diretamente contra um banco usado por pessoas. O conftest
 rejeita ambiente diferente de test e hosts externos, mas um endereço local
 sozinho não comprova que um banco é descartável: use o executor.

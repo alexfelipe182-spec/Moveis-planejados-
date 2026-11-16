@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 from starlette.testclient import TestClient
 
 from app.database import SessionLocal
@@ -33,12 +35,12 @@ def admin_client(email: str) -> TestClient:
 
 
 def test_project_production_workflow_requires_ordered_transitions():
-    client = admin_client("project.workflow@example.com")
+    client = admin_client(unique_email("project.workflow@example.com"))
     headers = csrf_headers(client)
 
     customer = client.post(
         "/api/v1/customers",
-        json={"name": "Cliente Produção", "email": "producao@example.com", "phone": "13999990001"},
+        json={"name": "Cliente Produção", "email": unique_email("producao@example.com"), "phone": "13999990001"},
         headers=headers,
     )
     assert customer.status_code == 201
@@ -115,12 +117,12 @@ def test_project_production_workflow_requires_ordered_transitions():
 
 
 def test_project_can_be_cancelled_before_completion():
-    client = admin_client("project.cancel@example.com")
+    client = admin_client(unique_email("project.cancel@example.com"))
     headers = csrf_headers(client)
 
     customer = client.post(
         "/api/v1/customers",
-        json={"name": "Cliente Cancelamento", "email": "cancelamento@example.com"},
+        json={"name": "Cliente Cancelamento", "email": unique_email("cancelamento@example.com")},
         headers=headers,
     )
     assert customer.status_code == 201
