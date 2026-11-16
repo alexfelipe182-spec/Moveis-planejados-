@@ -80,7 +80,8 @@ def test_frontend_does_not_hide_real_404s_or_private_files(frontend_client, path
 def test_frontend_serves_existing_assets(frontend_client):
     response = frontend_client("/notifications.js")
     assert response.status_code == 200
-    assert response.headers["cache-control"] == "no-cache"
+    headers = {key.lower(): value for key, value in response.headers.items()}
+    assert headers["cache-control"] == "no-cache"
     assert "mm-notifications-read" in response.text
 
 
