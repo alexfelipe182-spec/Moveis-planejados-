@@ -50,8 +50,15 @@ function rowWith(page, panel, text) {
   return panel.getByRole('row').filter({ has: page.getByRole('cell', { name: text, exact: true }) });
 }
 
+async function traceStep(name, run) {
+  console.log('QA: ' + name);
+  return test.step(name, run);
+}
+
 test('cliente, produto e orçamento persistem após novo login', async ({ page, context }) => {
   test.setTimeout(120_000);
+  page.setDefaultTimeout(12_000);
+  page.setDefaultNavigationTimeout(20_000);
   if (!email || !password) throw new Error('Defina E2E_EMAIL e E2E_PASSWORD para um administrador de teste.');
   if (productionHosts.has(site.hostname) || productionHosts.has(new URL(apiOrigin).hostname)) {
     throw new Error('Use um ambiente de teste com banco separado. Este roteiro cria registros.');
@@ -77,12 +84,12 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
   const total = 499.80;
   const modal = page.locator('#modal');
 
-  await test.step('Entrar como administrador de teste', async () => {
+  await traceStep('Entrar como administrador de teste', async () => {
     await page.goto(site.href);
     await login(page);
   });
 
-  const customer = await test.step('Cadastrar cliente', async () => {
+  const customer = await traceStep('Cadastrar cliente', async () => {
     const panel = await section(page, 'customers', /Clientes/);
     await panel.getByRole('button', { name: /Novo/ }).click();
     await modal.getByLabel('Nome', { exact: true }).fill(customerName);
@@ -94,7 +101,7 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
     return response.json();
   });
 
-  const product = await test.step('Cadastrar produto com preço', async () => {
+  const product = await traceStep('Cadastrar produto com preço', async () => {
     const panel = await section(page, 'products', /Produtos/);
     await panel.getByRole('button', { name: /Novo/ }).click();
     const category = modal.locator('select[name="category_id"]');
@@ -112,7 +119,7 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
     return saved;
   });
 
-  const quote = await test.step('Salvar orçamento e adicionar o móvel', async () => {
+  const quote = await traceStep('Salvar orçamento e adicionar o móvel', async () => {
     const panel = await section(page, 'quotes', /Orçamentos/);
     await panel.getByRole('button', { name: /Novo/ }).click();
     await modal.locator('select[name="customer_id"]').selectOption(String(customer.id));
@@ -139,7 +146,7 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
     return saved;
   });
 
-  await test.step('Sair e voltar ao login', async () => {
+  await traceStep('Sair e voltar ao login', async () => {
     await page.locator('#logout').click();
     // O logout atual recarrega a página pública. O formulário abre pelo botão Entrar.
     await expect(page.locator('#admin-app')).toBeHidden();
@@ -149,9 +156,9 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
     )).toHaveLength(0);
   });
 
-  await test.step('Entrar novamente', () => login(page));
+  await traceStep('Entrar novamente', () => login(page));
 
-  await test.step('Confirmar cliente, valor e item persistidos', async () => {
+  await traceStep('Confirmar cliente, valor e item persistidos', async () => {
     const panel = await section(page, 'quotes', /Orçamentos/);
     const row = rowWith(page, panel, quoteName);
     await expect(row.getByRole('cell', { name: customerName, exact: true })).toBeVisible();
