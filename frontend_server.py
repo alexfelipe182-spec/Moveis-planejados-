@@ -18,6 +18,8 @@ AUTH_REFERENCE_SCRIPT = '<script src="/authenticated-reference.js"></script>'
 DASHBOARD_GUARD_SCRIPT = '<script src="/dashboard-route-guard.js"></script>'
 PRIVATE_ROOTS = {".git", "backend", "scripts", "tests"}
 PRIVATE_SUFFIXES = {".cjs", ".py", ".pyc"}
+REVALIDATE_SUFFIXES = {".css", ".js", ".json", ".webmanifest"}
+RELEASE_VERSION = "20261116-cinema2"
 
 
 def _safe_target(path: str) -> Path | None:
@@ -71,7 +73,14 @@ async def frontend_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    if request.url.path == "/" or response.headers.get("content-type", "").startswith("text/html"):
+    response.headers["X-Multi-Marcenarias-Release"] = RELEASE_VERSION
+    content_type = response.headers.get("content-type", "")
+    suffix = Path(request.url.path).suffix.lower()
+    if (
+        request.url.path == "/"
+        or content_type.startswith("text/html")
+        or suffix in REVALIDATE_SUFFIXES
+    ):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
