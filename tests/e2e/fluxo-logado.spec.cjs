@@ -97,7 +97,7 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
   const product = await test.step('Cadastrar produto com preço', async () => {
     const panel = await section(page, 'products', /Produtos/);
     await panel.getByRole('button', { name: /Novo/ }).click();
-    const category = modal.getByLabel('Categoria', { exact: true });
+    const category = modal.locator('select[name="category_id"]');
     const options = category.locator('option:not([value=""])');
     await expect(options.first(), 'Cadastre uma categoria no ambiente de teste').toBeAttached();
     await category.selectOption(await options.first().getAttribute('value'));
@@ -115,7 +115,7 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
   const quote = await test.step('Salvar orçamento e adicionar o móvel', async () => {
     const panel = await section(page, 'quotes', /Orçamentos/);
     await panel.getByRole('button', { name: /Novo/ }).click();
-    await modal.getByLabel('Cliente', { exact: true }).selectOption(String(customer.id));
+    await modal.locator('select[name="customer_id"]').selectOption(String(customer.id));
     await modal.getByLabel('Descrição', { exact: true }).fill(quoteName);
     await modal.getByLabel('Material', { exact: true }).fill(total.toFixed(2));
     await modal.getByLabel('Margem de lucro (%)', { exact: true }).fill('0');
