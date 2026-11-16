@@ -223,7 +223,9 @@
       }
 
       let actions;
-      if (data?.can_manage_billing) {
+      if (subscription?.status === 'canceled') {
+        actions = planButtons();
+      } else if (data?.can_manage_billing) {
         actions = '<button class="btn primary" type="button" data-billing-portal>Gerenciar assinatura</button>';
       } else if (subscription?.status === 'active') {
         actions = '<span class="muted">Assinatura administrada pela plataforma.</span>';
@@ -333,7 +335,7 @@
 (() => {
   if (document.querySelector('script[data-mm-account-menu-v2]')) return;
   const script = document.createElement('script');
-  script.src = './account-menu-v2.js?v=20260908-contrast-1';
+  script.src = './account-menu-v2.js?v=20261116cancel1';
   script.dataset.mmAccountMenuV2 = 'true';
   document.head.appendChild(script);
 })();

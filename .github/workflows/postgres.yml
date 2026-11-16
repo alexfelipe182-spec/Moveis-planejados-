@@ -229,7 +229,7 @@ jobs:
           grep -q '<script src="./smart-quotes.js"></script>' frontend/index.html
           grep -q '<script src="./quote-decisions.js"></script>' frontend/index.html
           grep -q '<script src="./quote-proposal.js"></script>' frontend/index.html
-          grep -q '<script src="./saas-public.js"></script>' frontend/index.html
+          grep -Eq '<script src="\./saas-public\.js(\?v=[^"]+)?"></script>' frontend/index.html
           grep -q '<script src="./notifications.js"></script>' frontend/index.html
           grep -q '<link rel="stylesheet" href="./styles.css">' frontend/index.html
           grep -q '<link rel="stylesheet" href="./professional.css">' frontend/index.html
