@@ -385,6 +385,11 @@ async def stripe_webhook(
     return {"received": True}
 
 
+@router.get("/platform/access")
+def platform_access(current_user: User = Depends(get_current_user)):
+    return {"is_platform_owner": current_user.email.lower() in _owner_emails()}
+
+
 @router.get("/platform/dashboard")
 def platform_dashboard(
     _owner: User = Depends(_require_platform_owner),
@@ -397,7 +402,15 @@ def platform_dashboard(
         status = effective_subscription_status(subscription)
         status_counts[status] = status_counts.get(status, 0) + 1
     active_tenants = sum(1 for tenant in tenants if tenant.is_active)
-    estimated_mrr = sum(PLANS.get(tenant.plan_code, PLANS["starter"]).monthly_price_brl for tenant in tenants if tenant.is_active)
+    active_tenant_ids = {tenant.id for tenant in tenants if tenant.is_active}
+    estimated_mrr = sum(
+        PLANS[subscription.plan_code].monthly_price_brl
+        for subscription in subscriptions
+        if subscription.tenant_id in active_tenant_ids
+        and subscription.provider == "stripe"
+        and effective_subscription_status(subscription) == "active"
+        and subscription.plan_code in PLANS
+    )
     return {
         "tenants": len(tenants),
         "active_tenants": active_tenants,

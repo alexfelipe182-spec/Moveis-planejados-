@@ -216,7 +216,7 @@ test('the public showcase includes the cinematic room on desktop and mobile', ()
   assert.match(html, /class="mm-cinematic" id="demonstracao"/);
   assert.match(html, /id="mm-cinematic-replay"/);
   assert.match(html, /public-reference\.css\?v=20261116cinema2/);
-  assert.match(html, /app\.js\?v=20261116cinema2/);
+  assert.match(html, /app\.js\?v=20261116gestao1/);
   assert.match(html, /sala-cinematica-multi\.webp\?v=20261116cinema2/);
   assert.match(html, /name="application-version" content="20261116-cinema2"/);
   assert.ok(html.indexOf('class="mm-cinematic"') < html.indexOf('class="reference-public-hero"'));
