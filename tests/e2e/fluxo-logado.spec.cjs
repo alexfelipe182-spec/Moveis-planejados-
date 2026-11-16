@@ -147,7 +147,9 @@ test('cliente, produto e orçamento persistem após novo login', async ({ page, 
   });
 
   await traceStep('Sair e voltar ao login', async () => {
-    await page.locator('#logout').click();
+    await expect(page.locator('#mm-account-menu')).toBeAttached();
+    await page.locator('#admin-app .user-pill').click();
+    await page.getByRole('menuitem', { name: /Sair da conta/ }).click();
     // O logout atual recarrega a página pública. O formulário abre pelo botão Entrar.
     await expect(page.locator('#admin-app')).toBeHidden();
     await expect(page.locator('#open-login').filter({ visible: true })).toBeVisible();
