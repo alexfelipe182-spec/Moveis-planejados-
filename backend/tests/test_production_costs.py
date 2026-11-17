@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
@@ -12,7 +14,7 @@ def csrf_headers(client):
 
 def admin_client() -> TestClient:
     client = TestClient(app)
-    email = "production.costs.admin@example.com"
+    email = unique_email("production.costs.admin@example.com")
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Production Costs Admin", "email": email, "password": password}).status_code == 201
     db = SessionLocal()

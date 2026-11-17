@@ -1,5 +1,5 @@
 (() => {
-  const apiBase = window.API_BASE_URL || (location.hostname === 'localhost' ? 'http://localhost:8000/api/v1' : 'https://ideal-marcenaria-api.onrender.com/api/v1');
+  const apiBase = window.API_BASE_URL || (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) ? `http://${location.hostname}:8000/api/v1` : 'https://ideal-marcenaria-api.onrender.com/api/v1');
   const $ = (s, root = document) => root.querySelector(s);
   let selectedPlan = 'starter';
   let billingRequestPromise = null;

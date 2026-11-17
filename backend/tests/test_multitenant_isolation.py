@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -48,8 +50,8 @@ def login(client: TestClient, email: str, password: str) -> None:
 
 def test_customers_users_and_references_are_isolated_between_tenants(client: TestClient):
     password = "Senha-Forte-123!"
-    email_a = "tenant.a@example.com"
-    email_b = "tenant.b@example.com"
+    email_a = unique_email("tenant.a@example.com")
+    email_b = unique_email("tenant.b@example.com")
 
     tenant_a, user_a_id = register_and_promote(
         client,
@@ -73,7 +75,7 @@ def test_customers_users_and_references_are_isolated_between_tenants(client: Tes
 
     created_a = client.post(
         "/api/v1/customers",
-        json={"name": "Cliente exclusivo A", "email": "cliente.a@example.com"},
+        json={"name": "Cliente exclusivo A", "email": unique_email("cliente.a@example.com")},
         headers=csrf_headers(client),
     )
     assert created_a.status_code == 201
@@ -134,7 +136,7 @@ def test_customers_users_and_references_are_isolated_between_tenants(client: Tes
 
     created_b = client.post(
         "/api/v1/customers",
-        json={"name": "Cliente exclusivo B", "email": "cliente.b@example.com"},
+        json={"name": "Cliente exclusivo B", "email": unique_email("cliente.b@example.com")},
         headers=csrf_headers(client),
     )
     assert created_b.status_code == 201

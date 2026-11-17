@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 from starlette.testclient import TestClient
 
 from app.database import SessionLocal
@@ -27,9 +29,9 @@ def admin_client(email: str) -> TestClient:
 
 
 def test_project_quote_and_activity_history():
-    client = admin_client("admin.features@example.com")
+    client = admin_client(unique_email("admin.features@example.com"))
     headers = csrf_headers(client)
-    customer = client.post("/api/v1/customers", json={"name": "Cliente Projeto", "email": "cliente.projeto@example.com", "phone": "13999990000"}, headers=headers)
+    customer = client.post("/api/v1/customers", json={"name": "Cliente Projeto", "email": unique_email("cliente.projeto@example.com"), "phone": "13999990000"}, headers=headers)
     assert customer.status_code == 201
     customer_id = customer.json()["id"]
 
@@ -68,7 +70,7 @@ def test_project_quote_and_activity_history():
 
 def test_password_reset_token_expires_and_can_be_used_once():
     client = TestClient(app)
-    email = "password.reset@example.com"
+    email = unique_email("password.reset@example.com")
     old_password = "Senha-Antiga-123!"
     new_password = "Senha-Nova-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Reset Test", "email": email, "password": old_password}).status_code == 201

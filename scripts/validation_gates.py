@@ -1,5 +1,6 @@
 """Container-only validation entrypoint; refuses inherited or unexpected targets."""
 
+import argparse
 import os
 import subprocess
 import sys
@@ -7,6 +8,9 @@ from pathlib import Path
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--runs", type=int, choices=(1, 2), default=1)
+    args = parser.parse_args()
     from app.core.config import settings
 
     expected_db = "postgresql+psycopg://postgres:isolated-test-only@postgres:5432/mm_validation"
@@ -37,8 +41,10 @@ def main():
     with engine.connect() as connection:
         assert tuple(MigrationContext.configure(connection).get_current_heads()) == heads
     engine.dispose()
-    subprocess.run([sys.executable, "-m", "pytest", "-q", "tests", "--maxfail=1", "--strict-config",
-                    "--cov=app", "--cov-fail-under=80", "--cov-report=term-missing"], check=True)
+    for index in range(args.runs):
+        print(f"Backend run {index + 1}/{args.runs} (same disposable database)", flush=True)
+        subprocess.run([sys.executable, "-m", "pytest", "-q", "tests", "--maxfail=1", "--strict-config",
+                        "--cov=app", "--cov-fail-under=80", "--cov-report=term-missing"], check=True)
 
 
 if __name__ == "__main__":

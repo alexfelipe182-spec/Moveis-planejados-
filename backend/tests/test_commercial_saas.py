@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 import hashlib
 import hmac
 import json
@@ -5,6 +7,7 @@ import os
 import time
 from datetime import datetime, timedelta
 from unittest.mock import patch
+from uuid import uuid4
 
 import httpx
 from fastapi.testclient import TestClient
@@ -39,7 +42,7 @@ def register_and_login(client: TestClient, email: str, plan_code: str = "starter
 
 def test_plan_catalog_subscription_usage_and_guided_onboarding():
     with TestClient(app) as client:
-        register_and_login(client, "commercial.saas@example.com")
+        register_and_login(client, unique_email("commercial.saas@example.com"))
 
         plans = client.get("/api/v1/plans")
         assert plans.status_code == 200
@@ -80,7 +83,7 @@ def test_plan_catalog_subscription_usage_and_guided_onboarding():
 
 
 def test_expired_trial_blocks_platform_but_keeps_account_and_billing_accessible():
-    email = "trial.expired@example.com"
+    email = unique_email("trial.expired@example.com")
     with TestClient(app) as client:
         register_and_login(client, email)
         with SessionLocal() as db:
@@ -137,7 +140,7 @@ def test_expired_trial_blocks_platform_but_keeps_account_and_billing_accessible(
 
 def test_checkout_requires_billing_configuration():
     with TestClient(app) as client:
-        register_and_login(client, "billing.not.configured@example.com")
+        register_and_login(client, unique_email("billing.not.configured@example.com"))
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("STRIPE_PRICE_STARTER", None)
             response = client.post(
@@ -226,7 +229,7 @@ def test_stripe_error_keeps_trial_active_and_does_not_claim_cancellation():
 
 def test_checkout_creates_stripe_session_without_exposing_secret_and_preserves_trial():
     with TestClient(app) as client:
-        register_and_login(client, "billing.checkout@example.com")
+        register_and_login(client, unique_email("billing.checkout@example.com"))
         stripe_response = type(
             "StripeResponse",
             (),
@@ -269,7 +272,9 @@ def test_checkout_creates_stripe_session_without_exposing_secret_and_preserves_t
 
 
 def test_active_subscription_uses_billing_portal_and_blocks_duplicate_checkout():
-    email = "billing.portal@example.com"
+    email = unique_email("billing.portal@example.com")
+    customer_id = f"cus_portal_test_{uuid4().hex}"
+    subscription_id = f"sub_portal_test_{uuid4().hex}"
     with TestClient(app) as client:
         register_and_login(client, email)
         with SessionLocal() as db:
@@ -277,8 +282,8 @@ def test_active_subscription_uses_billing_portal_and_blocks_duplicate_checkout()
             tenant = db.get(Tenant, user.tenant_id)
             subscription = db.query(Subscription).filter(Subscription.tenant_id == tenant.id).one()
             subscription.provider = "stripe"
-            subscription.provider_customer_id = "cus_portal_test"
-            subscription.provider_subscription_id = "sub_portal_test"
+            subscription.provider_customer_id = customer_id
+            subscription.provider_subscription_id = subscription_id
             subscription.plan_code = "professional"
             subscription.status = "active"
             subscription.current_period_end = datetime.now() + timedelta(days=30)
@@ -318,7 +323,7 @@ def test_active_subscription_uses_billing_portal_and_blocks_duplicate_checkout()
         assert portal.status_code == 200, portal.text
         assert portal.json() == {"portal_url": "https://billing.stripe.com/p/session/test"}
         assert stripe_post.call_args.args[0] == "https://api.stripe.com/v1/billing_portal/sessions"
-        assert stripe_post.call_args.kwargs["data"]["customer"] == "cus_portal_test"
+        assert stripe_post.call_args.kwargs["data"]["customer"] == customer_id
 
 
 def test_signed_subscription_webhook_updates_tenant_plan_and_trial_deadline():
@@ -328,8 +333,8 @@ def test_signed_subscription_webhook_updates_tenant_plan_and_trial_deadline():
         "type": "customer.subscription.updated",
         "data": {
             "object": {
-                "id": "sub_test_commercial",
-                "customer": "cus_test_commercial",
+                "id": f"sub_test_commercial_{uuid4().hex}",
+                "customer": f"cus_test_commercial_{uuid4().hex}",
                 "status": "trialing",
                 "current_period_end": int(time.time()) + 30 * 86400,
                 "trial_end": stripe_trial_end,
@@ -345,7 +350,7 @@ def test_signed_subscription_webhook_updates_tenant_plan_and_trial_deadline():
             json={
                 "business_name": "Marcenaria Webhook SaaS",
                 "owner_name": "Dono Webhook",
-                "email": "webhook.saas@example.com",
+                "email": unique_email("webhook.saas@example.com"),
                 "password": PASSWORD,
                 "plan_code": "starter",
             },
@@ -367,7 +372,7 @@ def test_signed_subscription_webhook_updates_tenant_plan_and_trial_deadline():
 
         login = client.post(
             "/api/v1/auth/login",
-            data={"username": "webhook.saas@example.com", "password": PASSWORD},
+            data={"username": unique_email("webhook.saas@example.com"), "password": PASSWORD},
         )
         assert login.status_code == 200
         tenant = client.get("/api/v1/tenant")

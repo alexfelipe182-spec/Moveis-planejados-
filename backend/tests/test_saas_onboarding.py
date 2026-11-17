@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
@@ -53,10 +55,10 @@ def test_business_onboarding_creates_admin_and_editable_tenant_profile():
             client,
             business_name="Marcenaria SaaS Onboarding",
             owner_name="Dono SaaS",
-            email="owner.saas.onboarding@example.com",
+            email=unique_email("owner.saas.onboarding@example.com"),
             plan_code="business",
         )
-        login(client, "owner.saas.onboarding@example.com")
+        login(client, unique_email("owner.saas.onboarding@example.com"))
 
         tenant = client.get("/api/v1/tenant")
         assert tenant.status_code == 200
@@ -166,9 +168,9 @@ def test_inactive_tenant_blocks_existing_session():
             client,
             business_name="Marcenaria Suspensa",
             owner_name="Owner Suspenso",
-            email="owner.suspended@example.com",
+            email=unique_email("owner.suspended@example.com"),
         )
-        login(client, "owner.suspended@example.com")
+        login(client, unique_email("owner.suspended@example.com"))
         assert client.get("/api/v1/me").status_code == 200
 
         db = SessionLocal()

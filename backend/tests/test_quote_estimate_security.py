@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 from fastapi.testclient import TestClient
 
 from app.api.deps import require_admin
@@ -50,7 +52,7 @@ def test_quote_ai_draft_requires_authentication():
 
 def test_quote_estimate_rejects_non_admin_user():
     client = TestClient(app)
-    email = "quote.estimate.user@example.com"
+    email = unique_email("quote.estimate.user@example.com")
     password = "Senha-Forte-123!"
 
     registered = client.post(
@@ -73,7 +75,7 @@ def test_quote_estimate_rejects_non_admin_user():
 
 def test_quote_estimate_allows_admin_and_keeps_financial_values_locked():
     client = TestClient(app)
-    email = "quote.estimate.admin@example.com"
+    email = unique_email("quote.estimate.admin@example.com")
     password = "Senha-Forte-123!"
 
     registered = client.post(

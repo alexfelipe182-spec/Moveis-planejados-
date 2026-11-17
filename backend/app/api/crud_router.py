@@ -41,10 +41,12 @@ def _emit(action: str, model, item_id: int, user_id: int, db: Session) -> None:
                   entity_id=item_id, user_id=user_id, activity=activity)
 
 
-def _payload_data(payload) -> dict:
-    data = payload.model_dump()
+def _payload_data(payload, *, exclude_unset: bool = False) -> dict:
+    data = payload.model_dump(exclude_unset=exclude_unset)
     if "photos" in data and data["photos"] is not None:
         data["photos"] = [str(photo) for photo in data["photos"]]
+    if data.get("image_url") is not None:
+        data["image_url"] = str(data["image_url"])
     return data
 
 
@@ -149,7 +151,7 @@ def make_router(
             if not item:
                 raise HTTPException(status_code=404, detail="Registro não encontrado")
             try:
-                item = crud.update_item(db, item, _payload_data(payload), commit=False)
+                item = crud.update_item(db, item, _payload_data(payload, exclude_unset=True), commit=False)
                 _log(db, current_user, "updated", model, item.id, f"Atualizou {_entity_name(model)} #{item.id}")
                 _emit("updated", model, item.id, current_user.id, db)
                 _commit_or_conflict(db)

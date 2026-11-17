@@ -1,3 +1,5 @@
+from sample_data import unique_email
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -35,7 +37,7 @@ def test_swagger_page_and_cookie_diagnostic(client):
     assert "credentials: \"include\"" in docs.text
     assert "X-CSRF-Token" in docs.text
 
-    email = "teste.swagger.mobile@example.com"
+    email = unique_email("teste.swagger.mobile@example.com")
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Teste Swagger", "email": email, "password": password}).status_code == 201
     login = client.post("/api/v1/auth/login", data={"username": email, "password": password})
@@ -73,7 +75,7 @@ def test_anonymous_refresh_is_unauthorized_not_a_csrf_failure(client):
 
 
 def test_auth_flow(client):
-    email = "teste.auth@example.com"
+    email = unique_email("teste.auth@example.com")
     password = "Senha-Forte-123!"
 
     register = client.post("/api/v1/auth/register", json={"name": "Teste Auth", "email": email, "password": password})
@@ -129,7 +131,7 @@ def test_csrf_response_is_not_cacheable(client):
 
 
 def test_non_admin_cannot_access_admin_endpoint(client):
-    email = "teste.user@example.com"
+    email = unique_email("teste.user@example.com")
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Usuário", "email": email, "password": password}).status_code == 201
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
@@ -138,7 +140,7 @@ def test_non_admin_cannot_access_admin_endpoint(client):
 
 
 def test_csrf_rejects_wrong_token(client):
-    email = "teste.csrf@example.com"
+    email = unique_email("teste.csrf@example.com")
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Teste CSRF", "email": email, "password": password}).status_code == 201
     assert client.post("/api/v1/auth/login", data={"username": email, "password": password}).status_code == 200
@@ -146,7 +148,7 @@ def test_csrf_rejects_wrong_token(client):
 
 
 def test_non_admin_cannot_mutate_crud(client):
-    email = "teste.crud.csrf@example.com"
+    email = unique_email("teste.crud.csrf@example.com")
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Teste CRUD", "email": email, "password": password}).status_code == 201
 
@@ -157,7 +159,7 @@ def test_non_admin_cannot_mutate_crud(client):
 
 
 def test_admin_dashboard_and_user_management(client):
-    email = "teste.admin@example.com"
+    email = unique_email("teste.admin@example.com")
     password = "Senha-Forte-123!"
     assert client.post("/api/v1/auth/register", json={"name": "Administrador", "email": email, "password": password}).status_code == 201
     promote_to_admin(email)
